@@ -3,10 +3,6 @@ from backend.assessment_pipeline import (
     run_assessment
 )
 
-from backend.renderers.html_renderer import (
-    render_html
-)
-
 from backend.risk_engine import (
     identify_risks
 )
@@ -15,8 +11,12 @@ from backend.negotiation import (
     negotiation_guidance
 )
 
+from backend.renderers.html_renderer import (
+    render_html
+)
 
-def test_html_renderer():
+
+def main():
 
     data = PropertyInput(
         country="India",
@@ -65,6 +65,22 @@ def test_html_renderer():
         guidance
     )
 
-    assert "<html>" in html
-    assert "Buyer Protection Score" in html
-    assert "Aparna Sarovar Zenith" in html
+    output_file = (
+        "outputs/reports/"
+        "aparna_assessment.html"
+    )
+
+    with open(
+        output_file,
+        "w",
+        encoding="utf-8"
+    ) as f:
+        f.write(html)
+
+    print(
+        f"Report generated: {output_file}"
+    )
+
+
+if __name__ == "__main__":
+    main()
