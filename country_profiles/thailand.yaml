@@ -1,0 +1,13 @@
+country: Thailand
+
+currency: THB
+
+area_unit: sqm
+
+legal_checks:
+  - Chanote
+  - Nor Sor 3
+  - Building Permit
+  - Condominium Registration
+  - Foreign Ownership Compliance
+  - Land Office Verification
