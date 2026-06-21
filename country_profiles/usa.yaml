@@ -1,0 +1,12 @@
+country: USA
+
+currency: USD
+
+area_unit: sqft
+
+legal_checks:
+  - Title Search
+  - County Records
+  - HOA Review
+  - Property Tax Review
+  - Zoning Verification

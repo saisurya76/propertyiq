@@ -1,0 +1,13 @@
+country: India
+
+currency: INR
+
+area_unit: sqft
+
+legal_checks:
+  - RERA
+  - Encumbrance Certificate
+  - Khata
+  - Mutation
+  - Land Use
+  - Building Approval
