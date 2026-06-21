@@ -42,3 +42,49 @@ def rental_yield_value(
         fair_value,
         2
     )
+
+def replacement_cost_value(
+    land_share_cost: float,
+    construction_cost: float,
+    approval_cost: float,
+    developer_margin_percent: float
+) -> float:
+
+    base_cost = (
+        land_share_cost
+        + construction_cost
+        + approval_cost
+    )
+
+    developer_margin = (
+        base_cost
+        * developer_margin_percent
+        / 100
+    )
+
+    fair_value = (
+        base_cost
+        + developer_margin
+    )
+
+    return round(
+        fair_value,
+        2
+    )
+
+def weighted_fair_value(
+    comparable_value: float,
+    rental_value: float,
+    replacement_value: float
+) -> float:
+
+    fair_value = (
+        comparable_value * 0.45
+        + rental_value * 0.25
+        + replacement_value * 0.30
+    )
+
+    return round(
+        fair_value,
+        2
+    )
