@@ -1,10 +1,4 @@
-def render_html(
-    assessment,
-    risks,
-    negotiation_text
-):
 
-    html = f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -12,35 +6,35 @@ def render_html(
 
     <style>
 
-    body {{
+    body {
         font-family: Arial, sans-serif;
         margin: 40px;
         line-height: 1.6;
-    }}
+    }
 
-    h1 {{
+    h1 {
         color: #1f4e79;
-    }}
+    }
 
-    h2 {{
+    h2 {
         border-bottom: 1px solid #ddd;
         padding-bottom: 5px;
-    }}
+    }
 
-    table {{
+    table {
         width: 100%;
         border-collapse: collapse;
-    }}
+    }
 
-    td, th {{
+    td, th {
         border: 1px solid #ddd;
         padding: 8px;
-    }}
+    }
 
-    .score {{
+    .score {
         font-size: 28px;
         font-weight: bold;
-    }}
+    }
 
     </style>
 
@@ -56,17 +50,17 @@ def render_html(
 
     <tr>
         <td>Property</td>
-        <td>{assessment.property_name}</td>
+        <td>Aparna Sarovar Zenith</td>
     </tr>
 
     <tr>
         <td>Developer</td>
-        <td>{assessment.developer_name}</td>
+        <td>Aparna</td>
     </tr>
 
     <tr>
         <td>Recommendation</td>
-        <td>{assessment.recommendation}</td>
+        <td>BUY AFTER NEGOTIATION</td>
     </tr>
 
 </table>
@@ -74,8 +68,8 @@ def render_html(
 <h2>Buyer Protection Score</h2>
 
 <p class="score">
-    {assessment.buyer_protection_score}
-    ({assessment.buyer_protection_rating})
+    80.7
+    (STRONG)
 </p>
 
 <h2>Valuation Analysis</h2>
@@ -84,17 +78,17 @@ def render_html(
 
     <tr>
         <td>Quoted Price</td>
-        <td>{assessment.quoted_price}</td>
+        <td>18000000</td>
     </tr>
 
     <tr>
         <td>Fair Value</td>
-        <td>{assessment.fair_value}</td>
+        <td>15840000.0</td>
     </tr>
 
     <tr>
         <td>Overpricing %</td>
-        <td>{assessment.overpricing_percent}</td>
+        <td>13.64</td>
     </tr>
 
 </table>
@@ -102,59 +96,56 @@ def render_html(
 <h2>Inventory Assessment</h2>
 
 <p>
-    {assessment.inventory_risk}
+    HIGH
 </p>
 
 <h2>Developer Assessment</h2>
 
 <p>
-    {assessment.developer_rating}
+    EXCELLENT
 </p>
 
 <h2>Key Risks</h2>
 
 <ul>
-    {''.join(f'<li>{risk}</li>' for risk in risks)}
+    <li>Elevated inventory levels may impact appreciation and resale.</li>
 </ul>
 
 <h2>Negotiation Guidance</h2>
 
 <p>
-    {negotiation_text}
+    Consider negotiating approximately 2,160,000 from the quoted price.
 </p>
 
 <h2>Findings</h2>
 
 <p>
     <strong>Pricing:</strong><br>
-    {assessment.findings.pricing_finding}
+    The quoted price is approximately 13.64% above PropertyIQ's estimated fair value.
 </p>
 
 <p>
     <strong>Inventory:</strong><br>
-    {assessment.findings.inventory_finding}
+    Inventory levels indicate elevated supply risk and may impact short-term appreciation.
 </p>
 
 <p>
     <strong>Developer:</strong><br>
-    {assessment.findings.developer_finding}
+    The developer demonstrates a strong delivery track record and favorable operating history.
 </p>
 
 <p>
     <strong>Overall:</strong><br>
-    {assessment.findings.overall_finding}
+    PropertyIQ recommendation: BUY AFTER NEGOTIATION.
 </p>
 
 <h2>Final Recommendation</h2>
 
 <p>
     <strong>
-        {assessment.recommendation}
+        BUY AFTER NEGOTIATION
     </strong>
 </p>
 
 </body>
 </html>
-"""
-
-    return html

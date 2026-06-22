@@ -1,0 +1,27 @@
+{
+  "country": "USA",
+  "state_province": "Texas",
+  "city": "Austin",
+  "locality": "Round Rock",
+
+  "property_type": "Single Family Home",
+
+  "property_name": "Round Rock Meadows",
+  "developer_name": "Lone Star Homes",
+
+  "quoted_price": 550000,
+  "currency": "USD",
+
+  "unit_area": 2400,
+  "area_unit": "sqft",
+
+  "monthly_rent": 2800,
+
+  "total_units": 200,
+  "unsold_units": 20,
+
+  "projects_completed": 35,
+  "projects_delayed": 2,
+  "years_in_business": 25,
+  "rera_violations": 0
+}

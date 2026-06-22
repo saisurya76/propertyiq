@@ -1,0 +1,27 @@
+{
+  "country": "Thailand",
+  "state_province": "Bangkok",
+  "city": "Bangkok",
+  "locality": "Sukhumvit",
+
+  "property_type": "Condominium",
+
+  "property_name": "Sukhumvit Sky Residences",
+  "developer_name": "Thai Property Group",
+
+  "quoted_price": 8500000,
+  "currency": "THB",
+
+  "unit_area": 75,
+  "area_unit": "sqm",
+
+  "monthly_rent": 30000,
+
+  "total_units": 500,
+  "unsold_units": 120,
+
+  "projects_completed": 15,
+  "projects_delayed": 2,
+  "years_in_business": 18,
+  "rera_violations": 0
+}
