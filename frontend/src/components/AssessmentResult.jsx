@@ -45,7 +45,25 @@ function AssessmentResult({
               Number(formData.areaValue),
 
             monthlyRent:
-              Number(formData.monthlyRent || 0)
+              Number(formData.monthlyRent || 0),
+
+            totalUnits:
+              Number(formData.totalUnits || 100),
+
+            unsoldUnits:
+              Number(formData.unsoldUnits || 20),
+
+            projectsCompleted:
+              Number(formData.projectsCompleted || 10),
+
+            projectsDelayed:
+              Number(formData.projectsDelayed || 1),
+
+            yearsInBusiness:
+              Number(formData.yearsInBusiness || 15),
+
+            regulatoryViolations:
+              Number(formData.regulatoryViolations || 0)
           })
         }
       );

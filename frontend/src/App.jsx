@@ -65,11 +65,39 @@ function App() {
           body: JSON.stringify({
             country: formData.country,
             city: formData.city,
-            propertyName: formData.propertyName,
-            developerName: formData.developerName,
-            quotedPrice: Number(formData.quotedPrice),
-            unitArea: Number(formData.areaValue),
-            monthlyRent: Number(formData.monthlyRent || 0)
+
+            propertyName:
+              formData.propertyName,
+
+            developerName:
+              formData.developerName,
+
+            quotedPrice:
+              Number(formData.quotedPrice),
+
+            unitArea:
+              Number(formData.areaValue),
+
+            monthlyRent:
+              Number(formData.monthlyRent || 0),
+
+            totalUnits:
+              Number(formData.totalUnits || 100),
+
+            unsoldUnits:
+              Number(formData.unsoldUnits || 20),
+
+            projectsCompleted:
+              Number(formData.projectsCompleted || 10),
+
+            projectsDelayed:
+              Number(formData.projectsDelayed || 1),
+
+            yearsInBusiness:
+              Number(formData.yearsInBusiness || 15),
+
+            regulatoryViolations:
+              Number(formData.regulatoryViolations || 0)
           })
         }
       );
@@ -77,9 +105,14 @@ function App() {
       const data = await response.json();
 
       setResult(data);
+
     } catch (error) {
+
       console.error(error);
-      alert("Failed to connect to PropertyIQ API");
+
+      alert(
+        "Failed to connect to PropertyIQ API"
+      );
     }
   };
 

@@ -112,12 +112,6 @@ def run_assessment(
         fair_value
     )
 
-    # Recommendation
-
-    recommendation = get_recommendation(
-        overpricing
-    )
-
     # Inventory Assessment
 
     inventory = assess_inventory_risk(
@@ -150,6 +144,15 @@ def run_assessment(
         valuation_score=valuation_score_value,
         inventory_score=inventory_score_value,
         developer_score=developer.score
+    )
+
+    # Recommendation
+
+    recommendation = get_recommendation(
+        overpricing_percent=overpricing,
+        inventory_risk=inventory.risk_level,
+        developer_rating=developer.rating,
+        buyer_protection_score=bps.score
     )
 
     # Findings

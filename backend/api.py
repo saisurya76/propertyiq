@@ -48,6 +48,15 @@ class PropertyRequest(BaseModel):
 
     monthlyRent: float = 0
 
+    totalUnits: int = 100
+    unsoldUnits: int = 20
+
+    projectsCompleted: int = 10
+    projectsDelayed: int = 1
+
+    yearsInBusiness: int = 15
+    regulatoryViolations: int = 0
+
 
 def build_property_input(data: PropertyRequest):
 
@@ -70,13 +79,14 @@ def build_property_input(data: PropertyRequest):
 
         monthly_rent=data.monthlyRent,
 
-        total_units=100,
-        unsold_units=20,
+        total_units=data.totalUnits,
+        unsold_units=data.unsoldUnits,
 
-        projects_completed=10,
-        projects_delayed=1,
-        years_in_business=15,
-        rera_violations=0
+        projects_completed=data.projectsCompleted,
+        projects_delayed=data.projectsDelayed,
+
+        years_in_business=data.yearsInBusiness,
+        rera_violations=data.regulatoryViolations
     )
 
 
