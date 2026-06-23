@@ -17,14 +17,33 @@ def generate_findings(
 ) -> FindingsResult:
 
     # Pricing
+    
+    if overpricing_percent < -15:
 
-    if overpricing_percent <= 5:
+        pricing = (
+            f"The quoted price is approximately "
+            f"{abs(overpricing_percent)}% below "
+            "PropertyIQ's estimated fair value."
+        )
+
+    elif overpricing_percent < -5:
+
+        pricing = (
+            f"The quoted price is modestly below "
+            f"PropertyIQ's estimated fair value "
+            f"by approximately "
+            f"{abs(overpricing_percent)}%."
+        )
+
+    elif overpricing_percent <= 5:
+
         pricing = (
             "The quoted price is broadly aligned "
             "with PropertyIQ's estimated fair value."
         )
 
     elif overpricing_percent <= 15:
+
         pricing = (
             f"The quoted price is approximately "
             f"{overpricing_percent}% above "
@@ -32,6 +51,7 @@ def generate_findings(
         )
 
     else:
+
         pricing = (
             f"The quoted price appears materially "
             f"elevated at approximately "

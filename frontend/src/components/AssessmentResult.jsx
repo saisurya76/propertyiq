@@ -152,6 +152,41 @@ function AssessmentResult({
       <div className="findings-card">
 
         <div className="findings-title">
+          SCORE BREAKDOWN
+        </div>
+
+        <div className="finding-item">
+          <strong>
+            Valuation Analysis
+          </strong>
+          <p>
+            {result.valuationScore}
+          </p>
+        </div>
+
+        <div className="finding-item">
+          <strong>
+            Inventory Risk
+          </strong>
+          <p>
+            {result.inventoryScore}
+          </p>
+        </div>
+
+        <div className="finding-item">
+          <strong>
+            Developer Quality
+          </strong>
+          <p>
+            {result.developerScore}
+          </p>
+        </div>
+
+      </div>
+
+      <div className="findings-card">
+
+        <div className="findings-title">
           KEY FINDINGS
         </div>
 

@@ -44,9 +44,7 @@ class PropertyRequest(BaseModel):
     developerName: str
 
     quotedPrice: float
-
     unitArea: float
-    areaUnit: str = "sqft"
 
     monthlyRent: float = 0
 
@@ -58,6 +56,8 @@ class PropertyRequest(BaseModel):
 
     yearsInBusiness: int = 15
     regulatoryViolations: int = 0
+
+    areaUnit: str = "sqft"
 
 
 def build_property_input(data: PropertyRequest):
@@ -124,6 +124,15 @@ def assess(data: PropertyRequest):
 
         "recommendation":
             assessment.recommendation,
+
+        "valuationScore":
+            assessment.valuation_score,
+
+        "inventoryScore":
+            assessment.inventory_score,
+
+        "developerScore":
+            assessment.developer_score,
 
         "findings": {
             "pricing":
