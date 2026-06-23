@@ -100,7 +100,7 @@ textarea {
 .score-label {
   color: #6b7280;
   margin-top: 10px;
-  margin-bottom: 30px;
+  margin-bottom: 35px;
 }
 
 .result-grid {
@@ -114,4 +114,85 @@ textarea {
   font-size: 14px;
   color: #6b7280;
   line-height: 1.7;
+}
+
+.rating-pill {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 12px 30px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.recommendation-card {
+  margin-top: 40px;
+
+  background: #fff7ed;
+
+  border-left: 8px solid #f97316;
+
+  border-radius: 20px;
+
+  padding: 40px;
+
+  text-align: left;
+}
+
+.recommendation-title {
+  color: #ea580c;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+
+.recommendation-value {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1.1;
+
+  margin-top: 12px;
+  margin-bottom: 18px;
+}
+
+.recommendation-text {
+  color: #6b7280;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(280px, 1fr));
+
+  gap: 25px;
+
+  margin-top: 40px;
+}
+
+.metric-card {
+  background: white;
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 18px;
+
+  padding: 30px;
+
+  text-align: center;
+}
+
+.metric-card h4 {
+  margin-top: 0;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+.metric-card p {
+  font-size: 34px;
+  font-weight: 800;
+  margin: 0;
 }
