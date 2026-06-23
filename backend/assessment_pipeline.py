@@ -13,6 +13,10 @@ from backend.valuation_models import (
     weighted_fair_value
 )
 
+from backend.unit_conversion import (
+    to_sqft
+)
+
 from backend.inventory import (
     assess_inventory_risk
 )
@@ -77,10 +81,17 @@ def run_assessment(
     property_input: PropertyInput
 ):
 
+    # Normalize Area
+
+    normalized_area = to_sqft(
+        property_input.unit_area,
+        property_input.area_unit
+    )
+
     # Comparable Sales Value
 
     comparable_value = comparable_sales_value(
-        property_input.unit_area,
+        normalized_area,
         DEFAULT_COMPARABLE_PRICES
     )
 
@@ -169,13 +180,23 @@ def run_assessment(
     return create_assessment(
         property_name=property_input.property_name,
         developer_name=property_input.developer_name,
+
         quoted_price=property_input.quoted_price,
         fair_value=fair_value,
+
+        unit_area=property_input.unit_area,
+        area_unit=property_input.area_unit,
+
         overpricing_percent=overpricing,
+
         inventory_risk=inventory.risk_level,
+
         developer_rating=developer.rating,
+
         buyer_protection_score=bps.score,
         buyer_protection_rating=bps.rating,
+
         recommendation=recommendation,
+
         findings=findings
     )
