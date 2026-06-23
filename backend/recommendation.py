@@ -53,3 +53,53 @@ def get_recommendation(
         return "WAIT"
 
     return "AVOID"
+
+
+def get_recommendation_reasons(
+    overpricing_percent: float,
+    inventory_risk: str,
+    developer_rating: str,
+    buyer_protection_score: float
+) -> list[str]:
+
+    reasons = []
+
+    # Valuation
+
+    if overpricing_percent < -5:
+
+        reasons.append(
+            f"Property is {abs(overpricing_percent)}% below estimated fair value."
+        )
+
+    elif overpricing_percent <= 5:
+
+        reasons.append(
+            "Property pricing is broadly aligned with estimated fair value."
+        )
+
+    else:
+
+        reasons.append(
+            f"Property is {overpricing_percent}% above estimated fair value."
+        )
+
+    # Inventory
+
+    reasons.append(
+        f"Inventory Risk: {inventory_risk}"
+    )
+
+    # Developer
+
+    reasons.append(
+        f"Developer Rating: {developer_rating}"
+    )
+
+    # Buyer Protection
+
+    reasons.append(
+        f"Buyer Protection Score: {buyer_protection_score}"
+    )
+
+    return reasons
