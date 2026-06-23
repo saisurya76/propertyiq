@@ -67,13 +67,23 @@ def assess(data: PropertyRequest):
     )
 
     return {
-        "score": assessment.buyer_protection_score,
-        "rating": assessment.buyer_protection_rating,
-        "fairValue": round(
-            assessment.fair_value,
-            2
-        ),
-        "inventoryRisk": assessment.inventory_risk,
-        "developerRating": assessment.developer_rating,
-        "recommendation": assessment.recommendation
-    }
+    "score": round(
+        assessment.buyer_protection_score,
+        2
+    ),
+    "rating": assessment.buyer_protection_rating,
+
+    "fairValue": round(
+        assessment.fair_value,
+        2
+    ),
+
+    "inventoryRisk":
+        assessment.inventory_risk,
+
+    "developerRating":
+        assessment.developer_rating,
+
+    "recommendation":
+        assessment.recommendation
+}
