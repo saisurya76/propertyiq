@@ -207,6 +207,19 @@ def generate_pdf(
 
     # PROPERTY OVERVIEW
 
+    price_position = abs(
+        assessment.overpricing_percent
+    )
+
+    if assessment.overpricing_percent >= 0:
+        position_text = (
+            f"{price_position:.2f}% Above Fair Value"
+        )
+    else:
+        position_text = (
+            f"{price_position:.2f}% Below Fair Value"
+        )
+
     story.append(
         Paragraph(
             "PROPERTY OVERVIEW",
@@ -234,6 +247,13 @@ def generate_pdf(
 
     story.append(
         Paragraph(
+            f"<b>Area:</b> {assessment.unit_area:,.0f} {assessment.area_unit}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
             f"<b>Quoted Price:</b> {format_currency(assessment.quoted_price)}",
             styles["BodyText"]
         )
@@ -242,6 +262,13 @@ def generate_pdf(
     story.append(
         Paragraph(
             f"<b>Estimated Fair Value:</b> {format_currency(assessment.fair_value)}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Price Position:</b> {position_text}",
             styles["BodyText"]
         )
     )
@@ -264,10 +291,19 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
+    # KEY FINDINGS
+
     story.append(
         Paragraph(
             "KEY FINDINGS",
             section_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"• Property is priced {position_text.lower()}.",
+            styles["BodyText"]
         )
     )
 

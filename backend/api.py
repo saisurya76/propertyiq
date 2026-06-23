@@ -44,7 +44,9 @@ class PropertyRequest(BaseModel):
     developerName: str
 
     quotedPrice: float
+
     unitArea: float
+    areaUnit: str = "sqft"
 
     monthlyRent: float = 0
 
@@ -75,7 +77,7 @@ def build_property_input(data: PropertyRequest):
         currency="INR",
 
         unit_area=data.unitArea,
-        area_unit="sqft",
+        area_unit=data.areaUnit,
 
         monthly_rent=data.monthlyRent,
 

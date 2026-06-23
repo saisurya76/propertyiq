@@ -78,6 +78,9 @@ function App() {
             unitArea:
               Number(formData.areaValue),
 
+            areaUnit:
+              formData.areaUnit,
+
             monthlyRent:
               Number(formData.monthlyRent || 0),
 

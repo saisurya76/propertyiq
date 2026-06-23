@@ -14,6 +14,15 @@ def generate_executive_summary(
         2
     )
 
+    if price_gap >= 0:
+        price_position = (
+            f"{price_gap}% Above Fair Value"
+        )
+    else:
+        price_position = (
+            f"{abs(price_gap)}% Below Fair Value"
+        )
+
     summary = f"""
 Property: {property_name}
 
@@ -21,7 +30,7 @@ Quoted Price: {quoted_price:,.0f}
 
 Estimated Fair Value: {fair_value:,.0f}
 
-Price Premium: {price_gap}%
+Price Position: {price_position}
 
 Buyer Protection Score:
 {buyer_protection_score}/100
