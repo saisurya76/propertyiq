@@ -139,7 +139,7 @@ def run_assessment(
         property_input.rera_violations
     )
 
-    # Scores
+    # Component Scores
 
     valuation_score_value = valuation_score(
         overpricing
@@ -192,6 +192,10 @@ def run_assessment(
         inventory_risk=inventory.risk_level,
 
         developer_rating=developer.rating,
+
+        valuation_score=valuation_score_value,
+        inventory_score=inventory_score_value,
+        developer_score=developer.score,
 
         buyer_protection_score=bps.score,
         buyer_protection_rating=bps.rating,
