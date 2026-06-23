@@ -21,6 +21,10 @@ from backend.negotiation import (
     negotiation_guidance
 )
 
+from backend.recommendation import (
+    get_recommendation_reasons
+)
+
 from backend.renderers.pdf_renderer import (
     generate_pdf
 )
@@ -101,6 +105,22 @@ def assess(data: PropertyRequest):
         property_input
     )
 
+    recommendation_reasons = (
+        get_recommendation_reasons(
+            overpricing_percent=
+                assessment.overpricing_percent,
+
+            inventory_risk=
+                assessment.inventory_risk,
+
+            developer_rating=
+                assessment.developer_rating,
+
+            buyer_protection_score=
+                assessment.buyer_protection_score
+        )
+    )
+
     return {
         "score": round(
             assessment.buyer_protection_score,
@@ -124,6 +144,9 @@ def assess(data: PropertyRequest):
 
         "recommendation":
             assessment.recommendation,
+
+        "recommendationReasons":
+            recommendation_reasons,
 
         "valuationScore":
             assessment.valuation_score,

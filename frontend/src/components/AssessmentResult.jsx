@@ -187,6 +187,27 @@ function AssessmentResult({
       <div className="findings-card">
 
         <div className="findings-title">
+          WHY THIS RECOMMENDATION
+        </div>
+
+        {result.recommendationReasons?.map(
+          (reason, index) => (
+            <div
+              key={index}
+              className="finding-item"
+            >
+              <p>
+                • {reason}
+              </p>
+            </div>
+          )
+        )}
+
+      </div>
+
+      <div className="findings-card">
+
+        <div className="findings-title">
           KEY FINDINGS
         </div>
 
