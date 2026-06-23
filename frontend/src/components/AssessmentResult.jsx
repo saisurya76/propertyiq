@@ -1,21 +1,86 @@
-function AssessmentResult({ result }) {
+function AssessmentResult({
+  result,
+  formData
+}) {
   if (!result) return null;
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat("en-IN").format(value);
+  const formatIndianCurrency = (value) => {
+    if (value >= 10000000) {
+      return `₹${(value / 10000000).toFixed(2)} Cr`;
+    }
+
+    if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(2)} L`;
+    }
+
+    return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
   };
 
-  const formatIndianCurrency = (value) => {
-  if (value >= 10000000) {
-    return `₹${(value / 10000000).toFixed(2)} Cr`;
-  }
+  const downloadReport = async () => {
+    try {
 
-  if (value >= 100000) {
-    return `₹${(value / 100000).toFixed(2)} L`;
-  }
+      const response = await fetch(
+        "http://127.0.0.1:8000/generate-report",
+        {
+          method: "POST",
 
-  return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
-};
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            country: formData.country,
+            city: formData.city,
+
+            propertyName:
+              formData.propertyName,
+
+            developerName:
+              formData.developerName,
+
+            quotedPrice:
+              Number(formData.quotedPrice),
+
+            unitArea:
+              Number(formData.areaValue),
+
+            monthlyRent:
+              Number(formData.monthlyRent || 0)
+          })
+        }
+      );
+
+      const blob =
+        await response.blob();
+
+      const url =
+        window.URL.createObjectURL(blob);
+
+      const link =
+        document.createElement("a");
+
+      link.href = url;
+
+      link.download =
+        "PropertyIQ_Report.pdf";
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "Failed to download report"
+      );
+    }
+  };
 
   return (
     <div className="card result-card">
@@ -41,7 +106,9 @@ function AssessmentResult({ result }) {
         <div className="metric-card">
           <h4>Fair Value</h4>
           <p>
-          {formatIndianCurrency(result.fairValue)}
+            {formatIndianCurrency(
+              result.fairValue
+            )}
           </p>
         </div>
 
@@ -61,6 +128,41 @@ function AssessmentResult({ result }) {
 
       </div>
 
+      <div className="findings-card">
+
+        <div className="findings-title">
+          KEY FINDINGS
+        </div>
+
+        <div className="finding-item">
+          <strong>
+            Pricing Analysis
+          </strong>
+          <p>
+            {result.findings?.pricing}
+          </p>
+        </div>
+
+        <div className="finding-item">
+          <strong>
+            Inventory Analysis
+          </strong>
+          <p>
+            {result.findings?.inventory}
+          </p>
+        </div>
+
+        <div className="finding-item">
+          <strong>
+            Developer Analysis
+          </strong>
+          <p>
+            {result.findings?.developer}
+          </p>
+        </div>
+
+      </div>
+
       <div className="recommendation-card">
 
         <div className="recommendation-title">
@@ -72,10 +174,15 @@ function AssessmentResult({ result }) {
         </div>
 
         <div className="recommendation-text">
-          This recommendation is derived from
-          valuation analysis, inventory risk,
-          developer quality, and buyer protection scoring.
+          {result.findings?.overall}
         </div>
+
+        <button
+          className="download-report-btn"
+          onClick={downloadReport}
+        >
+          Download PropertyIQ Report
+        </button>
 
       </div>
 

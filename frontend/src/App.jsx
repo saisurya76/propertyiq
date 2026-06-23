@@ -110,7 +110,10 @@ function App() {
         generateAssessment={generateAssessment}
       />
 
-      <AssessmentResult result={result} />
+      <AssessmentResult
+        result={result}
+        formData={formData}
+      />
 
       <Disclaimer />
 

@@ -1,10 +1,28 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+
 from pydantic import BaseModel
 
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
+)
+
+from backend.executive_summary import (
+    generate_executive_summary
+)
+
+from backend.risk_engine import (
+    identify_risks
+)
+
+from backend.negotiation import (
+    negotiation_guidance
+)
+
+from backend.renderers.pdf_renderer import (
+    generate_pdf
 )
 
 app = FastAPI()
@@ -31,10 +49,9 @@ class PropertyRequest(BaseModel):
     monthlyRent: float = 0
 
 
-@app.post("/assess")
-def assess(data: PropertyRequest):
+def build_property_input(data: PropertyRequest):
 
-    property_input = PropertyInput(
+    return PropertyInput(
         country=data.country,
         state_province="Unknown",
         city=data.city,
@@ -62,45 +79,101 @@ def assess(data: PropertyRequest):
         rera_violations=0
     )
 
+
+@app.post("/assess")
+def assess(data: PropertyRequest):
+
+    property_input = build_property_input(data)
+
     assessment = run_assessment(
         property_input
     )
 
     return {
-    "score": round(
-        assessment.buyer_protection_score,
-        2
-    ),
-
-    "rating":
-        assessment.buyer_protection_rating,
-
-    "fairValue":
-        round(
-            assessment.fair_value,
+        "score": round(
+            assessment.buyer_protection_score,
             2
         ),
 
-    "inventoryRisk":
-        assessment.inventory_risk,
+        "rating":
+            assessment.buyer_protection_rating,
 
-    "developerRating":
-        assessment.developer_rating,
+        "fairValue":
+            round(
+                assessment.fair_value,
+                2
+            ),
 
-    "recommendation":
-        assessment.recommendation,
+        "inventoryRisk":
+            assessment.inventory_risk,
 
-    "findings": {
-        "pricing":
-            assessment.findings.pricing_finding,
+        "developerRating":
+            assessment.developer_rating,
 
-        "inventory":
-            assessment.findings.inventory_finding,
+        "recommendation":
+            assessment.recommendation,
 
-        "developer":
-            assessment.findings.developer_finding,
+        "findings": {
+            "pricing":
+                assessment.findings.pricing_finding,
 
-        "overall":
-            assessment.findings.overall_finding
+            "inventory":
+                assessment.findings.inventory_finding,
+
+            "developer":
+                assessment.findings.developer_finding,
+
+            "overall":
+                assessment.findings.overall_finding
+        }
     }
-}
+
+
+@app.post("/generate-report")
+def generate_report(data: PropertyRequest):
+
+    property_input = build_property_input(data)
+
+    assessment = run_assessment(
+        property_input
+    )
+
+    summary = generate_executive_summary(
+        property_name=assessment.property_name,
+        quoted_price=assessment.quoted_price,
+        fair_value=assessment.fair_value,
+        buyer_protection_score=assessment.buyer_protection_score,
+        buyer_protection_rating=assessment.buyer_protection_rating,
+        recommendation=assessment.recommendation,
+        inventory_risk=assessment.inventory_risk,
+        developer_rating=assessment.developer_rating
+    )
+
+    risks = identify_risks(
+        assessment.overpricing_percent,
+        assessment.inventory_risk,
+        assessment.developer_rating
+    )
+
+    guidance = negotiation_guidance(
+        assessment.quoted_price,
+        assessment.fair_value
+    )
+
+    output_file = (
+        "outputs/pdfs/propertyiq_report.pdf"
+    )
+
+    generate_pdf(
+        assessment=assessment,
+        risks=risks,
+        negotiation_text=guidance,
+        executive_summary=summary,
+        output_file=output_file
+    )
+
+    return FileResponse(
+        path=output_file,
+        media_type="application/pdf",
+        filename="PropertyIQ_Report.pdf"
+    )
