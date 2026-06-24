@@ -145,6 +145,12 @@ def assess(data: PropertyRequest):
         "recommendation":
             assessment.recommendation,
 
+        "dealQuality":
+            assessment.deal_quality,
+
+        "dealQualityReason":
+            assessment.deal_quality_reason,
+
         "recommendationReasons":
             recommendation_reasons,
 

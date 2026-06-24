@@ -120,6 +120,52 @@ function AssessmentResult({
           {result.rating}
         </div>
 
+        <div
+          style={{
+            maxWidth: "700px",
+            margin: "35px auto 0",
+            padding: "24px",
+            background: "#f8fafc",
+            border: "1px solid #e5e7eb",
+            borderRadius: "16px"
+          }}
+        >
+
+          <div
+            style={{
+              fontSize: "12px",
+              letterSpacing: "2px",
+              fontWeight: "700",
+              color: "#64748b",
+              marginBottom: "10px"
+            }}
+          >
+            DEAL QUALITY
+          </div>
+
+          <div
+            style={{
+              fontSize: "28px",
+              fontWeight: "800",
+              color: "#0f172a",
+              marginBottom: "12px"
+            }}
+          >
+            {result.dealQuality}
+          </div>
+
+          <div
+            style={{
+              color: "#64748b",
+              lineHeight: "1.7",
+              fontSize: "15px"
+            }}
+          >
+            {result.dealQualityReason}
+          </div>
+
+        </div>
+
       </div>
 
       <div className="metrics-grid">
