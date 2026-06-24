@@ -182,6 +182,30 @@ function AssessmentResult({
           </p>
         </div>
 
+        <div
+      style={{
+        marginTop: "15px",
+        fontSize: "14px",
+        color: "#6b7280",
+        lineHeight: "1.7"
+      }}
+    >
+      Scores range from 0–100.
+      Higher scores indicate lower buyer risk.
+
+      <br /><br />
+
+      90–100 → Excellent
+      <br />
+      80–89 → Strong
+      <br />
+      70–79 → Fair
+      <br />
+      60–69 → Caution
+      <br />
+      Below 60 → High Risk
+    </div>
+
       </div>
 
       <div className="findings-card">
@@ -204,6 +228,120 @@ function AssessmentResult({
         )}
 
       </div>
+
+<div className="findings-card">
+
+  <div className="findings-title">
+    HOW PROPERTYIQ WORKS
+  </div>
+
+  <div className="finding-item">
+
+    <strong>
+      Buyer Protection Score
+    </strong>
+
+    <p>
+      Valuation Analysis — 50%
+      <br />
+      Inventory Risk — 30%
+      <br />
+      Developer Quality — 20%
+    </p>
+
+    <p
+      style={{
+        marginTop: "12px",
+        color: "#6b7280",
+        fontSize: "14px",
+        lineHeight: "1.7"
+      }}
+    >
+      Valuation receives the highest
+      weight because purchase price
+      has the largest direct impact on
+      buyer outcomes.
+
+      <br /><br />
+
+      Inventory risk influences future
+      appreciation potential and resale
+      liquidity.
+
+      <br /><br />
+
+      Developer quality evaluates
+      delivery history, execution
+      capability, and regulatory
+      compliance.
+    </p>
+
+  </div>
+
+  <div className="finding-item">
+
+    <strong>
+      Valuation Model
+    </strong>
+
+    <p>
+      Comparable Sales
+      <br />
+      Rental Yield
+      <br />
+      Replacement Cost
+    </p>
+
+  </div>
+
+  <div className="finding-item">
+
+    <strong>
+      Inventory Analysis
+    </strong>
+
+    <p>
+      Total Units
+      <br />
+      Unsold Units
+    </p>
+
+  </div>
+
+  <div className="finding-item">
+
+    <strong>
+      Developer Analysis
+    </strong>
+
+    <p>
+      Delivery History
+      <br />
+      Years In Business
+      <br />
+      Regulatory Compliance
+    </p>
+
+  </div>
+
+  <div
+    style={{
+      marginTop: "20px",
+      paddingTop: "15px",
+      borderTop: "1px solid #e5e7eb",
+      fontSize: "13px",
+      color: "#6b7280",
+      fontStyle: "italic"
+    }}
+  >
+    These weights represent the current
+    PropertyIQ assessment methodology
+    and may evolve as additional market
+    intelligence and performance data
+    become available.
+  </div>
+
+</div>
 
       <div className="findings-card">
 

@@ -291,6 +291,132 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
+    story.append(
+    Paragraph(
+        "SCORE BREAKDOWN",
+        section_style
+    )
+    )
+
+    story.append(
+        Paragraph(
+            f"Valuation Analysis: {assessment.valuation_score:.2f}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"Inventory Risk: {assessment.inventory_score:.2f}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"Developer Quality: {assessment.developer_score:.2f}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "Scores range from 0–100. Higher scores indicate lower buyer risk.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "90–100 Excellent | 80–89 Strong | 70–79 Fair | 60–69 Caution | Below 60 High Risk",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 20)
+    )
+
+
+    story.append(
+    Paragraph(
+        "HOW PROPERTYIQ WORKS",
+        section_style
+    )
+    )
+
+    story.append(
+        Paragraph(
+            "Buyer Protection Score",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Valuation Analysis — 50%",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Inventory Risk — 30%",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Developer Quality — 20%",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "Valuation receives the highest weight because purchase price has the largest direct impact on buyer outcomes.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Inventory risk influences future appreciation potential and resale liquidity.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            "Developer quality evaluates delivery history, execution capability, and regulatory compliance.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "These weights represent the current PropertyIQ assessment methodology and may evolve as additional market intelligence and performance data become available.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 20)
+    )
+
     # KEY FINDINGS
 
     story.append(
