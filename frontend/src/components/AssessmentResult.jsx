@@ -232,6 +232,47 @@ function AssessmentResult({
 <div className="findings-card">
 
   <div className="findings-title">
+    MARKET INTELLIGENCE
+  </div>
+
+  <div className="finding-item">
+
+    <strong>
+      Market Average Price
+    </strong>
+
+    <p>
+      ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
+    </p>
+
+  </div>
+
+  {result.comparables?.map(
+    (project, index) => (
+      <div
+        key={index}
+        className="finding-item"
+      >
+
+        <strong>
+          {project.projectName}
+        </strong>
+
+        <p>
+          {project.developer}
+          <br />
+          ₹{project.pricePerSqft.toLocaleString("en-IN")} / sqft
+        </p>
+
+      </div>
+    )
+  )}
+
+</div>
+
+<div className="findings-card">
+
+  <div className="findings-title">
     HOW PROPERTYIQ WORKS
   </div>
 
