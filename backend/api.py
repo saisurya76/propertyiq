@@ -156,6 +156,23 @@ def assess(data: PropertyRequest):
 
         "developerScore":
             assessment.developer_score,
+        
+        "marketAveragePricePerSqft":
+            assessment.market_average_price_per_sqft,
+
+        "comparables": [
+            {
+                "projectName":
+                    c.project_name,
+
+                "developer":
+                    c.developer,
+
+                "pricePerSqft":
+                    c.price_per_sqft
+            }
+            for c in assessment.comparables
+        ],
 
         "findings": {
             "pricing":

@@ -1,5 +1,10 @@
 from dataclasses import dataclass
 
+from backend.comparables import (
+    get_comparables,
+    average_price_per_sqft
+)
+
 from configs.defaults import (
     DEFAULT_COMPARABLE_PRICES,
     DEFAULT_TARGET_YIELD,
@@ -86,6 +91,18 @@ def run_assessment(
     normalized_area = to_sqft(
         property_input.unit_area,
         property_input.area_unit
+    )
+
+    # Market Intelligence
+
+    comparables = get_comparables(
+    property_input.city
+    )
+
+    market_average_price_per_sqft = (
+        average_price_per_sqft(
+            comparables
+        )
     )
 
     # Comparable Sales Value
@@ -202,5 +219,10 @@ def run_assessment(
 
         recommendation=recommendation,
 
-        findings=findings
+        findings=findings,
+
+        comparables=comparables,
+
+        market_average_price_per_sqft=
+            market_average_price_per_sqft
     )
