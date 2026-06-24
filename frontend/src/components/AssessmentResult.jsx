@@ -168,6 +168,81 @@ function AssessmentResult({
 
       </div>
 
+      <div
+        style={{
+          maxWidth: "700px",
+          margin: "20px auto 0",
+          padding: "24px",
+          background: "#eff6ff",
+          border: "1px solid #bfdbfe",
+          borderRadius: "16px"
+        }}
+      >
+
+        <div
+          style={{
+            fontSize: "12px",
+            letterSpacing: "2px",
+            fontWeight: "700",
+            color: "#1d4ed8",
+            marginBottom: "10px"
+          }}
+        >
+          NEGOTIATION ADVISOR
+        </div>
+
+        <div
+          style={{
+            fontSize: "28px",
+            fontWeight: "800",
+            color: "#0f172a",
+            marginBottom: "15px"
+          }}
+        >
+          {
+            result.negotiationPosition === "STRONG"
+              ? "Strong Buyer Position"
+              : result.negotiationPosition === "FAIR"
+              ? "Moderate Buyer Position"
+              : "Limited Buyer Position"
+          }
+        </div>
+
+        <p
+          style={{
+            color: "#64748b",
+            lineHeight: "1.7",
+            marginBottom: "15px"
+          }}
+        >
+          {result.negotiationReason}
+        </p>
+
+        <div style={{ marginTop: "15px" }}>
+
+          <div className="finding-item">
+            <strong>Target Purchase Price</strong>
+            <p>{formatIndianCurrency(result.targetPrice)}</p>
+          </div>
+
+          <div className="finding-item">
+            <strong>Recommended Negotiation Range</strong>
+            <p>
+              {formatIndianCurrency(result.lowOffer)}
+              {" - "}
+              {formatIndianCurrency(result.highOffer)}
+            </p>
+          </div>
+
+          <div className="finding-item">
+            <strong>Estimated Buyer Savings</strong>
+            <p>{formatIndianCurrency(result.potentialSavings)}</p>
+          </div>
+
+      </div>
+
+      </div>      
+
       <div className="metrics-grid">
 
         <div className="metric-card">
@@ -278,17 +353,32 @@ function AssessmentResult({
 <div className="findings-card">
 
   <div className="findings-title">
-    MARKET INTELLIGENCE
+    MARKET CONTEXT
   </div>
 
   <div className="finding-item">
 
     <strong>
-      Market Average Price
+      Average Market Asking Price
     </strong>
 
     <p>
       ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
+    </p>
+
+  </div>
+
+  <div className="finding-item">
+
+    <strong>
+      Market Asking Value
+    </strong>
+
+    <p>
+      {formatIndianCurrency(
+        result.marketAveragePricePerSqft *
+        Number(formData.areaValue || 0)
+      )}
     </p>
 
   </div>
@@ -313,6 +403,27 @@ function AssessmentResult({
       </div>
     )
   )}
+
+    <div
+    style={{
+      marginTop: "15px",
+      fontSize: "14px",
+      color: "#6b7280",
+      lineHeight: "1.7"
+    }}
+  >
+
+    PropertyIQ Fair Value is derived using
+    comparable sales, rental yield, and
+    replacement cost models.
+
+    <br /><br />
+
+    Market asking prices reflect current
+    seller expectations and may differ
+    from intrinsic value.
+
+  </div>
 
 </div>
 

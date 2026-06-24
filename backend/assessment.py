@@ -32,6 +32,15 @@ class PropertyAssessment:
     deal_quality: str
     deal_quality_reason: str
 
+    negotiation_position: str
+    negotiation_reason: str
+
+    target_price: float
+    low_offer: float
+    high_offer: float
+
+    potential_savings: float
+
     findings: FindingsResult
 
     # Market Intelligence
@@ -63,6 +72,15 @@ def create_assessment(
 
     buyer_protection_score: float,
     buyer_protection_rating: str,
+
+    negotiation_position: str,
+    negotiation_reason: str,
+
+    target_price: float,
+    low_offer: float,
+    high_offer: float,
+
+    potential_savings: float,
 
     recommendation: str,
     deal_quality: str,
@@ -103,6 +121,24 @@ def create_assessment(
         deal_quality=deal_quality,
         deal_quality_reason=
             deal_quality_reason,
+
+        negotiation_position=
+            negotiation_position,
+
+        negotiation_reason=
+            negotiation_reason,
+
+        target_price=
+            target_price,
+
+        low_offer=
+            low_offer,
+
+        high_offer=
+            high_offer,
+
+        potential_savings=
+            potential_savings,    
 
         findings=findings,
 

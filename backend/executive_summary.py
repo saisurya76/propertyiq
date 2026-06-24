@@ -1,3 +1,13 @@
+def format_currency(value):
+
+    if value >= 10000000:
+        return f"₹{value / 10000000:.2f} Cr"
+
+    if value >= 100000:
+        return f"₹{value / 100000:.2f} L"
+
+    return f"₹{value:,.0f}"
+
 def generate_executive_summary(
     property_name: str,
     quoted_price: float,
@@ -26,9 +36,9 @@ def generate_executive_summary(
     summary = f"""
 Property: {property_name}
 
-Quoted Price: {quoted_price:,.0f}
+Quoted Price: {format_currency(quoted_price)}
 
-Estimated Fair Value: {fair_value:,.0f}
+Estimated Fair Value: {format_currency(fair_value)}
 
 Price Position: {price_position}
 

@@ -1,3 +1,13 @@
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+pdfmetrics.registerFont(
+    TTFont(
+        "DejaVuSans",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"
+    )
+)
+
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -40,9 +50,16 @@ def generate_pdf(
 
     styles = getSampleStyleSheet()
 
+    styles["BodyText"].fontName = "DejaVuSans"
+    styles["Title"].fontName = "DejaVuSans"
+    styles["Heading1"].fontName = "DejaVuSans"
+    styles["Heading2"].fontName = "DejaVuSans"
+    styles["Heading3"].fontName = "DejaVuSans"
+
     title_style = ParagraphStyle(
         "TitleStyle",
         parent=styles["Title"],
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         textColor=colors.HexColor("#0F172A")
     )
@@ -50,6 +67,7 @@ def generate_pdf(
     developer_style = ParagraphStyle(
         "DeveloperStyle",
         parent=styles["Heading3"],
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         textColor=colors.HexColor("#64748B")
     )
@@ -57,6 +75,7 @@ def generate_pdf(
     score_heading_style = ParagraphStyle(
         "ScoreHeading",
         parent=styles["Heading2"],
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         textColor=colors.HexColor("#64748B")
     )
@@ -64,6 +83,7 @@ def generate_pdf(
     score_style = ParagraphStyle(
         "ScoreStyle",
         parent=styles["Title"],
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         fontSize=42,
         leading=48,
@@ -73,6 +93,7 @@ def generate_pdf(
     rating_style = ParagraphStyle(
         "RatingStyle",
         parent=styles["Heading2"],
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         textColor=colors.HexColor("#15803D")
     )
@@ -80,12 +101,14 @@ def generate_pdf(
     section_style = ParagraphStyle(
         "SectionStyle",
         parent=styles["Heading2"],
+        fontName="DejaVuSans",
         textColor=colors.HexColor("#EA580C")
     )
 
     recommendation_style = ParagraphStyle(
         "RecommendationStyle",
         parent=styles["Title"],
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         fontSize=26,
         leading=32,
@@ -94,7 +117,8 @@ def generate_pdf(
 
     recommendation_text_style = ParagraphStyle(
         "RecommendationText",
-        parent=styles["BodyText"],
+        parent=styles["BodyText"], 
+        fontName="DejaVuSans",
         alignment=TA_CENTER,
         textColor=colors.HexColor("#64748B")
     )
@@ -169,7 +193,36 @@ def generate_pdf(
     )
 
     story.append(
-        Spacer(1, 50)
+        Spacer(1, 20)
+    )
+
+    story.append(
+        Paragraph(
+            "DEAL QUALITY",
+            section_style
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            assessment.deal_quality,
+            score_heading_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.deal_quality_reason,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 30)
     )
 
     story.append(
@@ -341,22 +394,28 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
-    # MARKET INTELLIGENCE
-
-        # MARKET INTELLIGENCE
+        # MARKET CONTEXT
 
     if assessment.comparables:
 
         story.append(
             Paragraph(
-                "MARKET INTELLIGENCE",
+                "MARKET CONTEXT",
                 section_style
             )
         )
 
         story.append(
             Paragraph(
-                f"Market Average Price: ₹{assessment.market_average_price_per_sqft:,.0f} / sqft",
+                f"Average Market Asking Price: ₹{assessment.market_average_price_per_sqft:,.0f} / sqft",
+                styles["BodyText"]
+            )
+        )
+
+        story.append(
+            Paragraph(
+                f"Market Asking Value: "
+                f"{format_currency(assessment.market_average_price_per_sqft * assessment.unit_area)}",
                 styles["BodyText"]
             )
         )
@@ -380,6 +439,28 @@ def generate_pdf(
                     styles["BodyText"]
                 )
             )
+
+            story.append(
+                Spacer(1, 6)
+            )
+
+        story.append(
+            Spacer(1, 10)
+        )
+
+        story.append(
+            Paragraph(
+                "PropertyIQ Fair Value is derived using comparable sales, rental yield, and replacement cost models.",
+                styles["BodyText"]
+            )
+        )
+
+        story.append(
+            Paragraph(
+                "Market asking prices reflect current seller expectations and may differ from intrinsic value.",
+                styles["BodyText"]
+            )
+        )
 
         story.append(
             Spacer(1, 20)
@@ -495,14 +576,92 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "NEGOTIATION GUIDANCE",
+            "NEGOTIATION ADVISOR",
             section_style
         )
     )
 
     story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
         Paragraph(
-            negotiation_text,
+            (
+                "Strong Buyer Position"
+                if assessment.negotiation_position == "STRONG"
+                else
+                "Moderate Buyer Position"
+                if assessment.negotiation_position == "FAIR"
+                else
+                "Limited Buyer Position"
+            ),
+            score_heading_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.negotiation_reason,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 10)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Target Purchase Price</b>",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            format_currency(
+                assessment.target_price
+            ),
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 6)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Recommended Negotiation Range</b>",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"{format_currency(assessment.low_offer)} - "
+            f"{format_currency(assessment.high_offer)}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 6)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Estimated Buyer Savings</b>",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            format_currency(
+                assessment.potential_savings
+            ),
             styles["BodyText"]
         )
     )

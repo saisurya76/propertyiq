@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+from backend.negotiation_intelligence import (
+    assess_negotiation_position
+)
+
 from backend.comparables import (
     get_comparables,
     average_price_per_sqft
@@ -196,6 +200,21 @@ def run_assessment(
         )
     )
 
+    # Negotiation Intelligence
+
+    negotiation = (
+        assess_negotiation_position(
+            quoted_price=
+                property_input.quoted_price,
+
+            fair_value=
+                fair_value,
+
+            inventory_risk=
+                inventory.risk_level
+        )
+    )
+
     # Findings
 
     findings = generate_findings(
@@ -231,10 +250,28 @@ def run_assessment(
         buyer_protection_rating=bps.rating,
 
         recommendation=recommendation,
-        
+
         deal_quality=deal_quality,
         deal_quality_reason=
             deal_quality_reason,
+
+        negotiation_position=
+            negotiation.position,
+
+        negotiation_reason=
+            negotiation.reason,
+    
+        target_price=
+            negotiation.target_price,
+
+        low_offer=
+            negotiation.low_offer,
+
+        high_offer=
+            negotiation.high_offer,
+
+        potential_savings=
+            negotiation.potential_savings,    
 
         findings=findings,
 
