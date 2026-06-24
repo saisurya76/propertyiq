@@ -30,6 +30,10 @@ from backend.developer import (
     assess_developer
 )
 
+from backend.deal_quality import (
+    get_deal_quality
+)
+
 from backend.recommendation import (
     calculate_overpricing_percent,
     get_recommendation
@@ -183,6 +187,15 @@ def run_assessment(
         buyer_protection_score=bps.score
     )
 
+    # Deal Quality
+
+    deal_quality, deal_quality_reason = (
+        get_deal_quality(
+            overpricing_percent=overpricing,
+            buyer_protection_score=bps.score
+        )
+    )
+
     # Findings
 
     findings = generate_findings(
@@ -218,6 +231,10 @@ def run_assessment(
         buyer_protection_rating=bps.rating,
 
         recommendation=recommendation,
+        
+        deal_quality=deal_quality,
+        deal_quality_reason=
+            deal_quality_reason,
 
         findings=findings,
 

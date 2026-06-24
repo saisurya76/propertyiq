@@ -28,6 +28,9 @@ class PropertyAssessment:
     buyer_protection_rating: str
 
     recommendation: str
+    
+    deal_quality: str
+    deal_quality_reason: str
 
     findings: FindingsResult
 
@@ -62,6 +65,8 @@ def create_assessment(
     buyer_protection_rating: str,
 
     recommendation: str,
+    deal_quality: str,
+    deal_quality_reason: str,
 
     findings: FindingsResult,
 
@@ -94,6 +99,10 @@ def create_assessment(
         buyer_protection_rating=buyer_protection_rating,
 
         recommendation=recommendation,
+
+        deal_quality=deal_quality,
+        deal_quality_reason=
+            deal_quality_reason,
 
         findings=findings,
 
