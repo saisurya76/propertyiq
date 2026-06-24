@@ -31,6 +31,12 @@ class PropertyAssessment:
 
     findings: FindingsResult
 
+    # Market Intelligence
+
+    comparables: list
+
+    market_average_price_per_sqft: float
+
 
 def create_assessment(
     property_name: str,
@@ -57,7 +63,11 @@ def create_assessment(
 
     recommendation: str,
 
-    findings: FindingsResult
+    findings: FindingsResult,
+
+    comparables: list,
+
+    market_average_price_per_sqft: float
 ) -> PropertyAssessment:
 
     return PropertyAssessment(
@@ -85,5 +95,10 @@ def create_assessment(
 
         recommendation=recommendation,
 
-        findings=findings
+        findings=findings,
+
+        comparables=comparables,
+
+        market_average_price_per_sqft=
+            market_average_price_per_sqft
     )
