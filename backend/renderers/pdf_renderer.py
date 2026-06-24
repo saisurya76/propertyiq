@@ -341,6 +341,53 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
+    # MARKET INTELLIGENCE
+
+        # MARKET INTELLIGENCE
+
+    if assessment.comparables:
+
+        story.append(
+            Paragraph(
+                "MARKET INTELLIGENCE",
+                section_style
+            )
+        )
+
+        story.append(
+            Paragraph(
+                f"Market Average Price: ₹{assessment.market_average_price_per_sqft:,.0f} / sqft",
+                styles["BodyText"]
+            )
+        )
+
+        story.append(
+            Spacer(1, 8)
+        )
+
+        for project in assessment.comparables:
+
+            story.append(
+                Paragraph(
+                    f"<b>{project.project_name}</b>",
+                    styles["BodyText"]
+                )
+            )
+
+            story.append(
+                Paragraph(
+                    f"{project.developer} | ₹{project.price_per_sqft:,.0f} / sqft",
+                    styles["BodyText"]
+                )
+            )
+
+        story.append(
+            Spacer(1, 20)
+        )
+
+    story.append(
+        Spacer(1, 20)
+    )
 
     story.append(
     Paragraph(
@@ -416,6 +463,7 @@ def generate_pdf(
     story.append(
         Spacer(1, 20)
     )
+
 
     # KEY FINDINGS
 
