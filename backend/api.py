@@ -151,6 +151,36 @@ def assess(data: PropertyRequest):
         "dealQualityReason":
             assessment.deal_quality_reason,
 
+        "negotiationPosition":
+            assessment.negotiation_position,
+
+        "negotiationReason":
+            assessment.negotiation_reason,
+
+        "targetPrice":
+            round(
+                assessment.target_price,
+                0
+            ),
+
+        "lowOffer":
+            round(
+                assessment.low_offer,
+                0
+            ),
+
+        "highOffer":
+            round(
+                assessment.high_offer,
+                0
+            ),
+
+        "potentialSavings":
+            round(
+                assessment.potential_savings,
+                0
+            ),    
+
         "recommendationReasons":
             recommendation_reasons,
 
