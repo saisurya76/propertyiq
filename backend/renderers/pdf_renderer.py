@@ -27,15 +27,22 @@ from reportlab.lib.enums import (
 from reportlab.lib import colors
 
 
-def format_currency(value):
+def format_currency(
+    value,
+    currency_code="INR"
+):
 
-    if value >= 10000000:
-        return f"₹{value / 10000000:.2f} Cr"
+    if currency_code == "INR":
 
-    if value >= 100000:
-        return f"₹{value / 100000:.2f} L"
+        if value >= 10000000:
+            return f"INR {value / 10000000:.2f} Cr"
 
-    return f"₹{value:,.0f}"
+        if value >= 100000:
+            return f"INR {value / 100000:.2f} L"
+
+        return f"INR {value:,.0f}"
+
+    return f"{currency_code} {value:,.2f}"
 
 
 def generate_pdf(
@@ -574,15 +581,24 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
-    story.append(
-        Paragraph(
-            "NEGOTIATION ADVISOR",
-            section_style
-        )
+    Paragraph(
+        "BUYER ADVISORY",
+        section_style
     )
 
     story.append(
         Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Negotiation Advisor</b>",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 6)
     )
 
     story.append(
@@ -662,6 +678,74 @@ def generate_pdf(
             format_currency(
                 assessment.potential_savings
             ),
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 20)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Buyer Advantage Meter</b>",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"{round(assessment.buyer_advantage_score)} / 100",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.buyer_advantage_rating,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.buyer_advantage_reason,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 12)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Recommendation Confidence</b>",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 6)
+    )
+
+    story.append(
+        Paragraph(
+            f"{round(assessment.recommendation_confidence_score)} / 100",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.recommendation_confidence_rating,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.recommendation_confidence_reason,
             styles["BodyText"]
         )
     )
