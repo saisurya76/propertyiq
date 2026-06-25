@@ -40,6 +40,13 @@ class PropertyAssessment:
     high_offer: float
 
     potential_savings: float
+    buyer_advantage_score: float
+    buyer_advantage_rating: str
+    buyer_advantage_reason: str
+
+    recommendation_confidence_score: float
+    recommendation_confidence_rating: str
+    recommendation_confidence_reason: str
 
     findings: FindingsResult
 
@@ -81,6 +88,13 @@ def create_assessment(
     high_offer: float,
 
     potential_savings: float,
+    buyer_advantage_score: float,
+    buyer_advantage_rating: str,
+    buyer_advantage_reason: str,
+
+    recommendation_confidence_score: float,
+    recommendation_confidence_rating: str,
+    recommendation_confidence_reason: str,
 
     recommendation: str,
     deal_quality: str,
@@ -139,6 +153,24 @@ def create_assessment(
 
         potential_savings=
             potential_savings,    
+
+        buyer_advantage_score=
+            buyer_advantage_score,
+
+        buyer_advantage_rating=
+            buyer_advantage_rating,
+
+        buyer_advantage_reason=
+            buyer_advantage_reason,
+
+        recommendation_confidence_score=
+            recommendation_confidence_score,
+
+        recommendation_confidence_rating=
+            recommendation_confidence_rating,
+
+        recommendation_confidence_reason=
+            recommendation_confidence_reason,        
 
         findings=findings,
 

@@ -4,6 +4,10 @@ from backend.negotiation_intelligence import (
     assess_negotiation_position
 )
 
+from backend.recommendation_confidence import (
+    assess_recommendation_confidence
+)
+
 from backend.comparables import (
     get_comparables,
     average_price_per_sqft
@@ -50,6 +54,10 @@ from backend.scoring import (
 
 from backend.buyer_protection import (
     calculate_buyer_protection_score
+)
+
+from backend.buyer_advantage import (
+    assess_buyer_advantage
 )
 
 from backend.findings import (
@@ -215,6 +223,28 @@ def run_assessment(
         )
     )
 
+    # Buyer Advantage
+
+    buyer_advantage = (
+        assess_buyer_advantage(
+            overpricing_percent=overpricing,
+            inventory_risk=inventory.risk_level,
+            negotiation_position=negotiation.position,
+            buyer_protection_score=bps.score
+        )
+    )
+
+    # Recommendation Confidence
+
+    recommendation_confidence = (
+        assess_recommendation_confidence(
+            buyer_protection_score=bps.score,
+            developer_score=developer.score,
+            inventory_score=inventory_score_value,
+            valuation_score=valuation_score_value
+        )
+    )
+
     # Findings
 
     findings = generate_findings(
@@ -272,6 +302,24 @@ def run_assessment(
 
         potential_savings=
             negotiation.potential_savings,    
+
+        buyer_advantage_score=
+            buyer_advantage.score,
+
+        buyer_advantage_rating=
+            buyer_advantage.rating,
+
+        buyer_advantage_reason=
+            buyer_advantage.reason,    
+
+        recommendation_confidence_score=
+            recommendation_confidence.score,
+
+        recommendation_confidence_rating=
+            recommendation_confidence.rating,
+
+        recommendation_confidence_reason=
+            recommendation_confidence.reason,    
 
         findings=findings,
 
