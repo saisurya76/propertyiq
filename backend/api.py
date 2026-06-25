@@ -181,6 +181,24 @@ def assess(data: PropertyRequest):
                 0
             ),    
 
+        "buyerAdvantageScore":
+            assessment.buyer_advantage_score,
+
+        "buyerAdvantageRating":
+            assessment.buyer_advantage_rating,
+
+        "buyerAdvantageReason":
+            assessment.buyer_advantage_reason,
+
+        "recommendationConfidenceScore":
+            assessment.recommendation_confidence_score,
+
+        "recommendationConfidenceRating":
+            assessment.recommendation_confidence_rating,
+
+        "recommendationConfidenceReason":
+            assessment.recommendation_confidence_reason,    
+            
         "recommendationReasons":
             recommendation_reasons,
 

@@ -243,6 +243,122 @@ function AssessmentResult({
 
       </div>      
 
+
+      <div
+        style={{
+          maxWidth: "700px",
+          margin: "20px auto 0",
+          padding: "24px",
+          background: "#f0fdf4",
+          border: "1px solid #bbf7d0",
+          borderRadius: "16px"
+        }}
+      >
+
+        <div
+          style={{
+            fontSize: "12px",
+            letterSpacing: "2px",
+            fontWeight: "700",
+            color: "#15803d",
+            marginBottom: "10px"
+          }}
+        >
+          BUYER ADVANTAGE METER
+        </div>
+
+        <div
+          style={{
+            fontSize: "42px",
+            fontWeight: "800",
+            color: "#0f172a"
+          }}
+        >
+          {result.buyerAdvantageScore} / 100
+        </div>
+
+        <div
+          style={{
+            fontSize: "22px",
+            fontWeight: "700",
+            color: "#15803d",
+            marginTop: "8px",
+            marginBottom: "15px"
+          }}
+        >
+          {result.buyerAdvantageRating}
+        </div>
+
+        <div
+          style={{
+            color: "#64748b",
+            lineHeight: "1.7",
+            fontSize: "15px"
+          }}
+        >
+          {result.buyerAdvantageReason}
+        </div>
+
+      </div>    
+
+      <div
+  style={{
+    maxWidth: "700px",
+    margin: "20px auto 0",
+    padding: "24px",
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
+    borderRadius: "16px"
+  }}
+>
+
+      <div
+        style={{
+          fontSize: "12px",
+          letterSpacing: "2px",
+          fontWeight: "700",
+          color: "#2563eb",
+          marginBottom: "10px"
+        }}
+      >
+        RECOMMENDATION CONFIDENCE
+      </div>
+
+      <div
+        style={{
+          fontSize: "42px",
+          fontWeight: "800",
+          color: "#0f172a"
+        }}
+      >
+        {result.recommendationConfidenceScore} / 100
+      </div>
+
+      <div
+        style={{
+          fontSize: "22px",
+          fontWeight: "700",
+          color: "#2563eb",
+          marginTop: "8px",
+          marginBottom: "15px"
+        }}
+      >
+        {result.recommendationConfidenceRating}
+      </div>
+
+      <div
+        style={{
+          color: "#64748b",
+          lineHeight: "1.7",
+          fontSize: "15px"
+        }}
+      >
+        {result.recommendationConfidenceReason}
+      </div>
+
+    </div>    
+
+
       <div className="metrics-grid">
 
         <div className="metric-card">
@@ -269,6 +385,8 @@ function AssessmentResult({
         </div>
 
       </div>
+
+
 
       <div className="findings-card">
 
