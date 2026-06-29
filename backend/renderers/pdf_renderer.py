@@ -1,10 +1,35 @@
+import os
+
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+FONT_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "fonts",
+    "DejaVuSans.ttf"
+)
+
+if not os.path.isfile(FONT_PATH):
+    raise FileNotFoundError(
+        f"""
+PropertyIQ startup failed.
+
+Required font file not found:
+
+{FONT_PATH}
+
+Expected location:
+backend/fonts/DejaVuSans.ttf
+
+Download DejaVuSans.ttf and place it in the backend/fonts directory.
+"""
+    )
 
 pdfmetrics.registerFont(
     TTFont(
         "DejaVuSans",
-        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"
+        FONT_PATH
     )
 )
 
