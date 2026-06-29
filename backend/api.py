@@ -292,3 +292,11 @@ def generate_report(data: PropertyRequest):
         media_type="application/pdf",
         filename="PropertyIQ_Report.pdf"
     )
+
+@app.get("/")
+def health():
+    return {
+        "service": "PropertyIQ API",
+        "version": "1.0.0-beta",
+        "status": "healthy"
+    }    
