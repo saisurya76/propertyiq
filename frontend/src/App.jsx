@@ -34,6 +34,7 @@ function App() {
   });
 
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -43,6 +44,7 @@ function App() {
   };
 
   const generateAssessment = async () => {
+    if (loading) return;
     if (
       !formData.city ||
       !formData.propertyName ||
@@ -55,6 +57,7 @@ function App() {
     }
 
     try {
+      setLoading(true);
       const response = await fetch(
         "https://propertyiq-api-q21y.onrender.com/assess",
         {
@@ -105,6 +108,10 @@ function App() {
         }
       );
 
+      if (!response.ok) {
+          throw new Error("Assessment failed.");
+      }
+
       const data = await response.json();
 
       setResult(data);
@@ -116,6 +123,9 @@ function App() {
       alert(
         "Failed to connect to PropertyIQ API"
       );
+    }
+    finally{
+        setLoading(false);
     }
   };
 
@@ -144,6 +154,7 @@ function App() {
         formData={formData}
         handleChange={handleChange}
         generateAssessment={generateAssessment}
+        loading={loading}
       />
 
       <AssessmentResult
