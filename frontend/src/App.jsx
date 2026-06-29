@@ -56,7 +56,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/assess",
+        "https://propertyiq-api-q21y.onrender.com/assess",
         {
           method: "POST",
           headers: {
