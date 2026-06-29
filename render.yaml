@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: propertyiq-api
+    runtime: python
+
+    buildCommand: pip install -r requirements.txt
+
+    startCommand: uvicorn backend.api:app --host 0.0.0.0 --port $PORT
+
+    plan: free
+
+    autoDeploy: true
