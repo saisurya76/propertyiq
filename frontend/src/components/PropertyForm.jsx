@@ -1,7 +1,8 @@
 function PropertyForm({
   formData,
   handleChange,
-  generateAssessment
+  generateAssessment,
+  loading
 }) {
   return (
     <div className="card">
@@ -145,8 +146,13 @@ function PropertyForm({
       <button
         className="primary-btn"
         onClick={generateAssessment}
+        disabled={loading}
       >
-        Analyze Property
+        {loading && <span className="spinner"></span>}
+
+        {loading
+            ? "Analyzing..."
+            : "Assess Property"}
       </button>
 
     </div>

@@ -1,8 +1,12 @@
+import { useState } from "react";
+
 function AssessmentResult({
   result,
   formData
 }) {
   if (!result) return null;
+
+  const [reportLoading, setReportLoading] = useState(false);
 
   const formatIndianCurrency = (value) => {
     if (value >= 10000000) {
@@ -17,7 +21,11 @@ function AssessmentResult({
   };
 
   const downloadReport = async () => {
+    if (reportLoading) return;
+
     try {
+
+      setReportLoading(true);
 
       const response = await fetch(
         "https://propertyiq-api-q21y.onrender.com/generate-report",
@@ -71,6 +79,10 @@ function AssessmentResult({
         }
       );
 
+      if (!response.ok) {
+          throw new Error("Failed to generate report.");
+      }
+
       const blob =
         await response.blob();
 
@@ -97,9 +109,10 @@ function AssessmentResult({
 
       console.error(error);
 
-      alert(
-        "Failed to download report"
-      );
+      alert("Failed to generate PropertyIQ report.");
+    }
+    finally {
+        setReportLoading(false);
     }
   };
 
@@ -711,8 +724,15 @@ function AssessmentResult({
         <button
           className="download-report-btn"
           onClick={downloadReport}
+          disabled={reportLoading}
         >
-          Download PropertyIQ Report
+          {reportLoading && (
+            <span className="spinner"></span>
+          )}
+
+          {reportLoading
+            ? "Generating Report..."
+            : "Download PropertyIQ Report"}
         </button>
 
       </div>
