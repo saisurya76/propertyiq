@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 def get_government_rate(
     country: str,
     state_province: str,
@@ -5,6 +8,22 @@ def get_government_rate(
     property_type: str
 ) -> float:
 
-    # Temporary dummy implementation
+    data_file = (
+        Path(__file__).parent.parent
+        / "data"
+        / "government"
+        / "india.json"
+    )
 
-    return 6500.0
+    with open(data_file, "r") as f:
+        data = json.load(f)
+
+    return data[
+        state_province
+    ][
+        city
+    ][
+        property_type
+    ][
+        "government_rate"
+    ]

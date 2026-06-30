@@ -1,0 +1,10 @@
+{
+    "Telangana": {
+        "Hyderabad": {
+            "Apartment": {
+                "government_rate": 6500,
+                "reference_name": "Government Guideline Value"
+            }
+        }
+    }
+}
