@@ -92,18 +92,25 @@ def render_html(
     </tr>
 
     <tr>
-        <td>Recommendation</td>
+        <td>Recommended Action</td>
         <td>{assessment.recommendation}</td>
     </tr>
 
 </table>
 
-<h2>Buyer Protection Score</h2>
+<div class="score-card">
 
-<p class="score">
-    {assessment.buyer_protection_score}
-    ({assessment.buyer_protection_rating})
-</p>
+    <h2>Buyer Protection Score</h2>
+
+    <div class="score-value">
+        {assessment.buyer_protection_score}
+    </div>
+
+    <div class="score-rating">
+        {assessment.buyer_protection_rating}
+    </div>
+
+</div>
 
 <h2>Fair Value Analysis</h2>
 
