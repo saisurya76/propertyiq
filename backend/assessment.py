@@ -8,6 +8,10 @@ class PropertyAssessment:
     property_name: str
     developer_name: str
 
+    country: str
+    state_province: str
+    city: str
+
     quoted_price: float
     fair_value: float
 
@@ -60,6 +64,9 @@ class PropertyAssessment:
 def create_assessment(
     property_name: str,
     developer_name: str,
+    country: str,
+    state_province: str,
+    city: str,
 
     quoted_price: float,
     fair_value: float,
@@ -110,6 +117,9 @@ def create_assessment(
     return PropertyAssessment(
         property_name=property_name,
         developer_name=developer_name,
+        country=country,
+        state_province=state_province,
+        city=city,
 
         quoted_price=quoted_price,
         fair_value=fair_value,

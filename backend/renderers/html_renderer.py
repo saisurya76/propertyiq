@@ -8,7 +8,21 @@ def render_html(
 <!DOCTYPE html>
 <html>
 <head>
-    <title>PropertyIQ Assessment Report</title>
+    <div class="report-header">
+
+        <div class="product-name">
+            PropertyIQ
+        </div>
+
+        <div class="product-tagline">
+            Independent Property Intelligence
+        </div>
+
+        <h1>
+            Buyer Protection Report
+        </h1>
+
+    </div>
 
     <style>
 
@@ -48,8 +62,6 @@ def render_html(
 
 <body>
 
-<h1>PropertyIQ Assessment Report</h1>
-
 <h2>Executive Summary</h2>
 
 <table>
@@ -60,8 +72,23 @@ def render_html(
     </tr>
 
     <tr>
-        <td>Developer</td>
+        <td>Seller / Builder</td>
         <td>{assessment.developer_name}</td>
+    </tr>
+
+     <tr>
+        <td>Country</td>
+        <td>{assessment.country}</td>
+    </tr>
+
+    <tr>
+        <td>State / Province</td>
+        <td>{assessment.state_province}</td>
+    </tr>
+
+    <tr>
+        <td>City</td>
+        <td>{assessment.city}</td>
     </tr>
 
     <tr>
@@ -78,7 +105,7 @@ def render_html(
     ({assessment.buyer_protection_rating})
 </p>
 
-<h2>Valuation Analysis</h2>
+<h2>Fair Value Analysis</h2>
 
 <table>
 
@@ -99,31 +126,31 @@ def render_html(
 
 </table>
 
-<h2>Inventory Assessment</h2>
+<h2>Inventory Risk</h2>
 
 <p>
     {assessment.inventory_risk}
 </p>
 
-<h2>Developer Assessment</h2>
+<h2>Seller / Builder Assessment</h2>
 
 <p>
     {assessment.developer_rating}
 </p>
 
-<h2>Key Risks</h2>
+<h2>Key Buyer Risks</h2>
 
 <ul>
     {''.join(f'<li>{risk}</li>' for risk in risks)}
 </ul>
 
-<h2>Negotiation Guidance</h2>
+<h2>Negotiation Strategy</h2>
 
 <p>
     {negotiation_text}
 </p>
 
-<h2>Findings</h2>
+<h2>Detailed Findings</h2>
 
 <p>
     <strong>Pricing:</strong><br>

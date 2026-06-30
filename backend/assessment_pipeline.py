@@ -259,6 +259,12 @@ def run_assessment(
     return create_assessment(
         property_name=property_input.property_name,
         developer_name=property_input.developer_name,
+        
+        country=property_input.country,
+
+        state_province=property_input.state_province,
+
+        city=property_input.city,
 
         quoted_price=property_input.quoted_price,
         fair_value=fair_value,
