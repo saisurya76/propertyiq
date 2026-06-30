@@ -134,19 +134,22 @@ function App() {
 
       <div className="hero">
 
-        <div className="hero-brand">
-          PROPERTYIQ
-        </div>
+       <div className="hero-brand">
+        PROPERTYIQ
+      </div>
 
-        <h1>
-          Know Before You Buy.
-        </h1>
+      <div className="hero-subtitle">
+        Independent Property Intelligence
+      </div>
 
-        <p>
-          Independent property intelligence
-          designed to protect buyers,
-          not sell property.
-        </p>
+      <h1>
+        Know Before You Buy.
+      </h1>
+
+      <p>
+        Make informed property decisions using
+        independent, explainable and evidence-based intelligence.
+      </p>
 
       </div>
 
@@ -163,6 +166,16 @@ function App() {
       />
 
       <Disclaimer />
+
+      <footer className="footer">
+
+      <p>PropertyIQ v1.0.0 Beta</p>
+
+      <p>Independent Property Intelligence</p>
+
+      <p>© 2026 PropertyIQ</p>
+
+    </footer>
 
     </div>
   );
