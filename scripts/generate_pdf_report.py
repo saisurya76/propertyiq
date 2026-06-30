@@ -77,9 +77,9 @@ generate_pdf(
     risks=risks,
     negotiation_text=guidance,
     executive_summary=summary,
-    output_file="outputs/pdfs/aparna_assessment.pdf"
+    output_file="outputs/pdfs/PropertyIQ_Buyer_Protection_Report.pdf"
 )
 
 print(
-    "PDF generated: outputs/pdfs/aparna_assessment.pdf"
+    "PDF generated: outputs/pdfs/PropertyIQ_Buyer_Protection_Report.pdf"
 )

@@ -67,7 +67,7 @@ def main():
 
     output_file = (
         "outputs/reports/"
-        "aparna_assessment.html"
+        "PropertyIQ_Buyer_Protection_Report.html"
     )
 
     with open(
