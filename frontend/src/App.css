@@ -60,14 +60,27 @@ input,
 select,
 textarea {
   width: 100%;
-  padding: 14px;
+  padding:12px 14px;
+
   border-radius: 12px;
   border: 1px solid #e5e7eb;
+
   box-sizing: border-box;
+
+  color: #111827;
+  background: #ffffff;
+
+  font-family: inherit;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 textarea {
   margin-top: 15px;
+  resize: vertical;
+  min-height: 140px;
 }
 
 .primary-btn {
@@ -365,6 +378,93 @@ textarea {
 
   to {
     transform: rotate(360deg);
+  }
+
+}
+
+.required-note {
+  margin-top: 8px;
+  margin-bottom: 28px;
+
+  font-size:13px;
+  color:#9ca3af;
+
+  text-align: center;
+}
+
+.form-section {
+  margin-top: 28px;
+}
+
+.form-section:first-of-type {
+  margin-top: 25px;
+}
+
+.form-section-title {
+  margin-bottom: 18px;
+  margin: 0 0 24px;
+
+  padding-bottom: 10px;
+
+  border-bottom:1px solid #e5e7eb;
+
+  font-size: 22px;
+  font-weight: 700;
+
+  color: #111827;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-field label {
+  margin-bottom: 8px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  color: #4b5563;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+
+  border-color: #2563eb;
+
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.primary-btn:disabled {
+  opacity: 0.75;
+
+  cursor: not-allowed;
+}
+
+/* mobile responsiveness */
+
+@media (max-width: 768px) {
+
+  .hero h1 {
+    font-size: 40px;
+  }
+
+  .form-section-title {
+    font-size: 20px;
+  }
+
+  .card {
+    padding: 24px;
   }
 
 }
