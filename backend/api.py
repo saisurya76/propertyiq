@@ -137,6 +137,21 @@ def assess(data: PropertyRequest):
                 2
             ),
 
+        "quotedPricePerSqft":
+            round(
+                assessment.quoted_price_per_sqft,
+                2
+            ),
+
+        "fairValuePerSqft":
+            round(
+                assessment.fair_value_per_sqft,
+                2
+            ),
+
+        "governmentRatePerUnit":
+            assessment.government_intelligence.government_rate_per_unit,    
+
         "inventoryRisk":
             assessment.inventory_risk,
 

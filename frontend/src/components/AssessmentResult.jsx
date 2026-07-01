@@ -141,6 +141,101 @@ function AssessmentResult({
         <div
           style={{
             maxWidth: "700px",
+            margin: "20px auto",
+            padding: "24px",
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "16px"
+          }}
+        >
+
+          <div
+            style={{
+              fontSize: "12px",
+              letterSpacing: "2px",
+              fontWeight: "700",
+              color: "#64748b",
+              marginBottom: "18px"
+            }}
+          >
+            PRICING INTELLIGENCE
+          </div>
+
+          <div className="finding-item">
+            <strong>Quoted Price</strong>
+            <p>{formatIndianCurrency(formData.quotedPrice)}</p>
+          </div>
+
+          <div className="finding-item">
+            <strong>Quoted Price / sqft</strong>
+            <p>
+              ₹{result.quotedPricePerSqft?.toLocaleString("en-IN")} / sqft
+            </p>
+          </div>
+
+          <div className="finding-item">
+            <strong>PropertyIQ Fair Value</strong>
+            <p>{formatIndianCurrency(result.fairValue)}</p>
+          </div>
+
+          <div className="finding-item">
+            <strong>Fair Value / sqft</strong>
+            <p>
+              ₹{result.fairValuePerSqft?.toLocaleString("en-IN")} / sqft
+            </p>
+          </div>
+
+          <div className="finding-item">
+            <strong>Market Average</strong>
+            <p>
+              ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
+            </p>
+          </div>
+
+          <div className="finding-item">
+            <strong>Government Guidance</strong>
+            <p>
+              ₹{result.governmentRatePerUnit?.toLocaleString("en-IN")} / sqft
+            </p>
+          </div>
+
+          <div
+            style={{
+              marginTop: "18px",
+              padding: "16px",
+              background: "#f8fafc",
+              borderRadius: "10px",
+              color: "#475569",
+              lineHeight: "1.7",
+              fontSize: "14px"
+            }}
+          >
+            <strong>PropertyIQ Insight</strong>
+
+            <br /><br />
+
+            The quoted price is approximately{" "}
+            <strong>
+              {(
+                (
+                  (Number(formData.quotedPrice) - result.fairValue)
+                  / result.fairValue
+                ) * 100
+              ).toFixed(2)}%
+            </strong>
+            {" "}
+            above the estimated fair value.
+
+            Government guidance values are intended for
+            registration and taxation purposes and are
+            generally lower than prevailing market prices.
+          </div>
+
+        </div> 
+
+        <div
+          style={{
+            maxWidth: "700px",
             margin: "35px auto 0",
             padding: "24px",
             background: "#f8fafc",
