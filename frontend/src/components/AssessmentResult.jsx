@@ -38,7 +38,12 @@ function AssessmentResult({
 
           body: JSON.stringify({
             country: formData.country,
-            city: formData.city,
+
+            stateProvince:
+                formData.stateProvince,
+
+            city:
+                formData.city,
 
             propertyName:
               formData.propertyName,

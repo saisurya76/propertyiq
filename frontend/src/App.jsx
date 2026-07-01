@@ -8,6 +8,7 @@ import Disclaimer from "./components/Disclaimer";
 function App() {
   const [formData, setFormData] = useState({
     country: "India",
+    stateProvince: "Telangana",
     city: "",
 
     propertyType: "Apartment",
@@ -67,6 +68,7 @@ function App() {
           },
           body: JSON.stringify({
             country: formData.country,
+            stateProvince: formData.stateProvince,
             city: formData.city,
 
             propertyName:
