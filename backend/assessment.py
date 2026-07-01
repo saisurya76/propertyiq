@@ -2,6 +2,9 @@ from dataclasses import dataclass
 
 from backend.findings import FindingsResult
 
+from backend.government_intelligence import (
+    GovernmentIntelligence
+)
 
 @dataclass
 class PropertyAssessment:
@@ -14,6 +17,13 @@ class PropertyAssessment:
 
     quoted_price: float
     fair_value: float
+
+    quoted_price_per_sqft: float
+    fair_value_per_sqft: float
+
+    quoted_price_per_sqft: float
+
+    fair_value_per_sqft: float
 
     unit_area: float
     area_unit: str
@@ -54,6 +64,8 @@ class PropertyAssessment:
 
     findings: FindingsResult
 
+    government_intelligence: GovernmentIntelligence
+
     # Market Intelligence
 
     comparables: list
@@ -70,6 +82,10 @@ def create_assessment(
 
     quoted_price: float,
     fair_value: float,
+
+    quoted_price_per_sqft: float,
+
+    fair_value_per_sqft: float,
 
     unit_area: float,
     area_unit: str,
@@ -109,6 +125,8 @@ def create_assessment(
 
     findings: FindingsResult,
 
+    government_intelligence: GovernmentIntelligence,
+
     comparables: list,
 
     market_average_price_per_sqft: float
@@ -123,6 +141,12 @@ def create_assessment(
 
         quoted_price=quoted_price,
         fair_value=fair_value,
+                
+        quoted_price_per_sqft=
+            quoted_price_per_sqft,
+
+        fair_value_per_sqft=
+            fair_value_per_sqft,
 
         unit_area=unit_area,
         area_unit=area_unit,
@@ -183,6 +207,9 @@ def create_assessment(
             recommendation_confidence_reason,        
 
         findings=findings,
+
+        government_intelligence=
+            government_intelligence,
 
         comparables=comparables,
 

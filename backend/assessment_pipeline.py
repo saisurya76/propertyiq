@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+from backend.government_intelligence import (
+    assess_government_intelligence
+)
+
 from backend.negotiation_intelligence import (
     assess_negotiation_position
 )
@@ -109,6 +113,13 @@ def run_assessment(
         property_input.area_unit
     )
 
+    quoted_price_per_sqft = (
+        property_input.quoted_price /
+        normalized_area
+    )
+
+    fair_value_per_sqft = 0.0
+
     # Market Intelligence
 
     comparables = get_comparables(
@@ -147,6 +158,11 @@ def run_assessment(
         comparable_value=comparable_value,
         rental_value=rental_value,
         replacement_value=replacement_value
+    )
+
+    fair_value_per_sqft = (
+        fair_value /
+        normalized_area
     )
 
     # Overpricing
@@ -245,6 +261,24 @@ def run_assessment(
         )
     )
 
+    government_intelligence = (
+        assess_government_intelligence(
+            country=property_input.country,
+
+            state_province=
+                property_input.state_province,
+
+            city=
+                property_input.city,
+
+            property_type=
+                property_input.property_type,
+
+            unit_area=
+                property_input.unit_area
+        )
+    )
+
     # Findings
 
     findings = generate_findings(
@@ -268,6 +302,12 @@ def run_assessment(
 
         quoted_price=property_input.quoted_price,
         fair_value=fair_value,
+
+        quoted_price_per_sqft=
+            quoted_price_per_sqft,
+
+        fair_value_per_sqft=
+            fair_value_per_sqft,
 
         unit_area=property_input.unit_area,
         area_unit=property_input.area_unit,
@@ -328,6 +368,9 @@ def run_assessment(
             recommendation_confidence.reason,    
 
         findings=findings,
+
+        government_intelligence=
+            government_intelligence,
 
         comparables=comparables,
 

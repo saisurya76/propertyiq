@@ -213,7 +213,7 @@ def render_html(
 
 </div>
 
-<h2>Fair Value Analysis</h2>
+<h2>Pricing Analysis</h2>
 
 <table>
 
@@ -233,6 +233,40 @@ def render_html(
     </tr>
 
 </table>
+
+<h2>Government Intelligence</h2>
+
+<table>
+
+    <tr>
+        <td>Government Guidance Rate</td>
+        <td>
+            {assessment.government_intelligence.government_rate_per_unit}
+            / {assessment.area_unit}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Government Guidance Value</td>
+        <td>
+            {assessment.government_intelligence.government_property_value}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Reference</td>
+        <td>
+            {assessment.government_intelligence.reference_name}
+        </td>
+    </tr>
+
+</table>
+
+<h3>Buyer Observation</h3>
+
+<p>
+    {assessment.government_intelligence.buyer_observation}
+</p>
 
 <h2>Inventory Risk</h2>
 
