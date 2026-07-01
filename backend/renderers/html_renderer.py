@@ -1,3 +1,5 @@
+from backend.utils.formatters import format_currency
+
 def render_html(
     assessment,
     risks,
@@ -8,6 +10,7 @@ def render_html(
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
   
     <style>
 
@@ -219,17 +222,31 @@ def render_html(
 
     <tr>
         <td>Quoted Price</td>
-        <td>{assessment.quoted_price}</td>
+        <td>{format_currency(assessment.quoted_price)}</td>
     </tr>
 
     <tr>
-        <td>Fair Value</td>
-        <td>{assessment.fair_value}</td>
+        <td>Quoted Price / sqft</td>
+        <td>
+            INR {assessment.quoted_price_per_sqft:,.0f} / sqft
+        </td>
+    </tr>
+
+    <tr>
+        <td>Estimated Fair Value</td>
+        <td>{format_currency(assessment.fair_value)}</td>
+    </tr>
+
+    <tr>
+        <td>Estimated Fair Value / sqft</td>
+        <td>
+            INR {assessment.fair_value_per_sqft:,.0f} / sqft
+        </td>
     </tr>
 
     <tr>
         <td>Overpricing %</td>
-        <td>{assessment.overpricing_percent}</td>
+        <td>{assessment.overpricing_percent:.2f}%</td>
     </tr>
 
 </table>
@@ -249,7 +266,9 @@ def render_html(
     <tr>
         <td>Government Guidance Value</td>
         <td>
-            {assessment.government_intelligence.government_property_value}
+            {format_currency(
+                assessment.government_intelligence.government_property_value
+            )}
         </td>
     </tr>
 
