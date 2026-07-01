@@ -287,6 +287,18 @@ def render_html(
     {assessment.government_intelligence.buyer_observation}
 </p>
 
+<h3>Confidence</h3>
+
+<p>
+    {assessment.government_intelligence.confidence}
+</p>
+
+<h3>Disclaimer</h3>
+
+<p>
+    {assessment.government_intelligence.disclaimer}
+</p>
+
 <h2>Inventory Risk</h2>
 
 <p>

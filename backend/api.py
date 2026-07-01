@@ -42,6 +42,7 @@ app.add_middleware(
 
 class PropertyRequest(BaseModel):
     country: str
+    stateProvince: str
     city: str
 
     propertyName: str
@@ -68,7 +69,7 @@ def build_property_input(data: PropertyRequest):
 
     return PropertyInput(
         country=data.country,
-        state_province="Unknown",
+        state_province=data.stateProvince,
         city=data.city,
         locality="Unknown",
 
