@@ -168,11 +168,28 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "Independent Property Assessment Report",
+            "Independent Property Intelligence",
             ParagraphStyle(
                 "SubtitleStyle",
                 parent=styles["Heading2"],
                 alignment=TA_CENTER
+            )
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "Buyer Protection Report",
+            ParagraphStyle(
+                "ReportTypeStyle",
+                parent=styles["Heading3"],
+                fontName="DejaVuSans",
+                alignment=TA_CENTER,
+                textColor=colors.HexColor("#64748B")
             )
         )
     )
@@ -201,8 +218,30 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "BUYER PROTECTION SCORE",
+            "PROPERTYIQ DECISION",
             score_heading_style
+        )
+    )
+    
+    story.append(
+        Spacer(1, 10)
+    )
+
+    story.append(
+        Paragraph(
+            assessment.recommendation,
+            recommendation_style
+        )
+    )
+
+    story.append(
+        Spacer(1, 15)
+    )
+
+    story.append(
+        Paragraph(
+            "Independent recommendation generated from valuation analysis, inventory risk assessment, and developer quality review.",
+            recommendation_text_style
         )
     )
 
@@ -255,35 +294,6 @@ def generate_pdf(
 
     story.append(
         Spacer(1, 30)
-    )
-
-    story.append(
-        Paragraph(
-            "FINAL RECOMMENDATION",
-            section_style
-        )
-    )
-
-    story.append(
-        Spacer(1, 10)
-    )
-
-    story.append(
-        Paragraph(
-            assessment.recommendation,
-            recommendation_style
-        )
-    )
-
-    story.append(
-        Spacer(1, 15)
-    )
-
-    story.append(
-        Paragraph(
-            "Independent recommendation generated from valuation analysis, inventory risk assessment, and developer quality review.",
-            recommendation_text_style
-        )
     )
 
     story.append(
@@ -606,9 +616,11 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
-    Paragraph(
-        "BUYER ADVISORY",
-        section_style
+    story.append(
+        Paragraph(
+            "BUYER ADVISORY",
+            section_style
+        )
     )
 
     story.append(
