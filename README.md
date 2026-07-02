@@ -174,10 +174,6 @@ Designed for buyers, investors, consultants, and advisors.
 
 # Dashboard Preview
 
-> **📷 Screenshot Placeholder**
-
-# Dashboard Preview
-
 ![Dashboard Overview](docs/images/dashboard-overview.png)
 
 ### Pricing Intelligence
@@ -200,24 +196,7 @@ Designed for buyers, investors, consultants, and advisors.
 
 ![PDF Report](docs/images/pdf-cover.png)
 
-Recommended screenshots:
-
-- Assessment Dashboard
-- Buyer Protection Score
-- Pricing Intelligence
-- Government Intelligence
-- Negotiation Advisor
-- Market Context
-
 ---
-
-# Sample Buyer Protection Report
-
-> **📷 Screenshot Placeholder**
-
-```
-![Dashboard](docs/images/pdf-cover.png)
-```
 
 The generated report includes:
 
