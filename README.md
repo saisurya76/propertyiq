@@ -622,3 +622,173 @@ Evaluate Negotiation Guidance
           ▼
 Download Buyer Protection Report
 ```
+
+# 🗺️ Roadmap
+
+## ✅ Version 1.0
+
+PropertyIQ v1.0 delivers a complete buyer-first property assessment platform with:
+
+- Buyer Protection Score
+- Fair Value Estimation
+- Pricing Intelligence
+- Developer Assessment
+- Inventory Risk Analysis
+- Government Intelligence
+- Market Intelligence
+- Negotiation Intelligence
+- Buyer Advantage Meter
+- Recommendation Confidence
+- Interactive Dashboard
+- HTML Report
+- PDF Buyer Protection Report
+- REST API
+- Automated Test Suite
+
+---
+
+## 🚀 Future Roadmap
+
+The following capabilities are planned for future releases.
+
+### Location Intelligence
+
+Interactive map showing:
+
+- Property location
+- Metro stations
+- Highways
+- Airports
+- Railway stations
+- Schools
+- Hospitals
+- Shopping centres
+- Employment hubs
+- Parks
+- Future infrastructure projects
+
+---
+
+### Environmental Intelligence
+
+- Flood zones
+- High tension power lines
+- Industrial zones
+- Quarry and mining areas
+- Airport noise zones
+- Lake buffer zones
+
+---
+
+### Additional Intelligence Engines
+
+- Infrastructure Score
+- Connectivity Score
+- Lifestyle Score
+- Future Growth Score
+- Environmental Risk Score
+- Location Intelligence Score
+
+---
+
+# Contributing
+
+Contributions are welcome.
+
+If you would like to contribute:
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Open a Pull Request.
+
+For significant feature additions, please open an issue first to discuss the proposed enhancement.
+
+---
+
+# Design Principles
+
+PropertyIQ is built around a few core principles.
+
+- Buyer First
+- Independent Assessment
+- Transparent Methodology
+- Explainable Recommendations
+- Practical Decision Support
+
+The platform is designed to help buyers make informed decisions rather than simply estimate market prices.
+
+---
+
+# Project Status
+
+Current Release
+
+```
+Version: 1.0.0
+Status : Beta
+```
+
+The assessment engines, reporting system, REST API, and user interface are stable and ready for evaluation.
+
+Future releases will continue to expand PropertyIQ with additional intelligence engines while maintaining backward compatibility wherever practical.
+
+---
+
+# License
+
+This project is licensed under the MIT License.
+
+See the LICENSE file for details.
+
+---
+
+# Acknowledgements
+
+PropertyIQ brings together ideas from multiple disciplines including:
+
+- Property valuation
+- Market analysis
+- Risk assessment
+- Software engineering
+- User experience design
+- Decision support systems
+
+The project was developed with the goal of providing transparent, buyer-first intelligence for one of life's most important financial decisions.
+
+---
+
+# Support
+
+If you encounter an issue or have suggestions for improvement:
+
+- Open a GitHub Issue
+- Submit a Pull Request
+- Share feedback through the repository discussions
+
+---
+
+# Author
+
+**Suryanarayana Bollapragada**
+
+Senior Full Stack AI Engineer
+
+Independent Software Architect
+
+---
+
+<div align="center">
+
+## PropertyIQ
+
+### Independent Property Intelligence for Home Buyers
+
+**Know Before You Negotiate.**
+
+Built with a buyer-first philosophy.
+
+⭐ If you find this project useful, consider giving it a star.
+
+</div>
+
