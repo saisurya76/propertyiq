@@ -209,3 +209,184 @@ The generated report includes:
 - Negotiation Strategy
 - Key Findings
 - Final Recommendation
+
+
+
+
+# 🏗️ Architecture
+
+PropertyIQ follows a modular architecture that separates assessment engines, intelligence modules, report generation, and the user interface.
+
+```text
+                    +----------------------+
+                    |    React Dashboard   |
+                    +----------+-----------+
+                               |
+                               |
+                     REST API (FastAPI)
+                               |
+                 +-------------+-------------+
+                 |                           |
+        Assessment Pipeline          Report Generation
+                 |                           |
+                 |                           |
+   +-------------+-------------+             |
+   |             |             |             |
+ Valuation   Developer    Inventory      HTML Report
+ Engine       Engine        Engine
+   |             |             |             |
+   +-------------+-------------+             |
+                 |                           |
+         Buyer Protection Engine             |
+                 |                           |
+   +-------------+-------------+             |
+   |             |             |             |
+Government   Market      Negotiation     PDF Report
+Intelligence Intelligence Intelligence
+                 |
+                 |
+        Final Buyer Assessment
+```
+
+---
+
+# Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18 |
+| Backend | FastAPI |
+| Language | Python 3.9+ |
+| Reports | HTML, PDF |
+| API | REST |
+| Styling | CSS |
+| Testing | Pytest |
+| Deployment | Render |
+
+---
+
+# Project Structure
+
+```text
+propertyiq/
+
+├── backend/
+│   ├── assessment_pipeline.py
+│   ├── valuation_models.py
+│   ├── buyer_protection.py
+│   ├── negotiation.py
+│   ├── government_intelligence.py
+│   ├── comparables.py
+│   ├── findings.py
+│   ├── recommendation.py
+│   ├── renderers/
+│   │      ├── html_renderer.py
+│   │      └── pdf_renderer.py
+│   └── api.py
+│
+├── frontend/
+│
+├── configs/
+│
+├── scripts/
+│
+├── tests/
+│
+├── outputs/
+│   ├── reports/
+│   └── pdfs/
+│
+└── README.md
+```
+
+---
+
+# Installation
+
+Clone the repository
+
+```bash
+git clone https://github.com/saisurya76/propertyiq.git
+
+cd propertyiq
+```
+
+Create a virtual environment
+
+```bash
+python3 -m venv .venv
+```
+
+Activate
+
+macOS / Linux
+
+```bash
+source .venv/bin/activate
+```
+
+Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+# Running PropertyIQ
+
+Start the backend
+
+```bash
+python3 -m uvicorn backend.api:app --reload
+```
+
+Backend
+
+```
+http://localhost:8000
+```
+
+Swagger
+
+```
+http://localhost:8000/docs
+```
+
+Start the frontend
+
+```bash
+cd frontend
+
+npm install
+
+npm run dev
+```
+
+Frontend
+
+```
+http://localhost:5173
+```
+
+---
+
+# Quick Start
+
+1. Open the dashboard.
+
+2. Enter property details.
+
+3. Click **Assess Property**.
+
+4. Review the Buyer Protection Score.
+
+5. Analyze pricing, developer quality, inventory risk, and market intelligence.
+
+6. Download the professional Buyer Protection Report.
