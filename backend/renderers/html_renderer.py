@@ -109,6 +109,52 @@ def render_html(
         margin-top: 8px;
     }}
 
+    .decision-card {{
+        background: white;
+        border: 2px solid #1f4e79;
+        border-radius: 16px;
+        text-align: center;
+        padding: 30px;
+        margin: 35px 0;
+    }}
+
+    .decision-title {{
+        font-size: 13px;
+        letter-spacing: 2px;
+        color: #64748b;
+        font-weight: bold;
+    }}
+
+    .decision-recommendation {{
+        font-size: 34px;
+        font-weight: bold;
+        color: #0f172a;
+        margin-top: 12px;
+    }}
+
+    .decision-score {{
+        font-size: 56px;
+        font-weight: bold;
+        color: #1f4e79;
+        margin-top: 20px;
+    }}
+
+    .decision-label {{
+        font-size: 18px;
+        color: #64748b;
+        margin-top: 6px;
+    }}
+
+    .decision-rating {{
+        display: inline-block;
+        margin-top: 18px;
+        padding: 8px 18px;
+        background: #dcfce7;
+        color: #166534;
+        border-radius: 20px;
+        font-weight: bold;
+    }}
+
     .report-metadata {{
         margin-bottom: 35px;
     }}
@@ -166,6 +212,30 @@ def render_html(
 
     </div>
 
+    <div class="decision-card">
+
+    <div class="decision-title">
+        PROPERTYIQ DECISION
+    </div>
+
+    <div class="decision-recommendation">
+        {assessment.recommendation}
+    </div>
+
+    <div class="decision-score">
+        {assessment.buyer_protection_score} / 100
+    </div>
+
+    <div class="decision-label">
+        Buyer Protection Score
+    </div>
+
+    <div class="decision-rating">
+        {assessment.buyer_protection_rating}
+    </div>
+
+</div>
+
 <h2>Executive Summary</h2>
 
 <table>
@@ -202,21 +272,7 @@ def render_html(
 
 </table>
 
-<div class="score-card">
-
-    <h2>Buyer Protection Score</h2>
-
-    <div class="score-value">
-        {assessment.buyer_protection_score}
-    </div>
-
-    <div class="score-rating">
-        {assessment.buyer_protection_rating}
-    </div>
-
-</div>
-
-<h2>Pricing Analysis</h2>
+<h2>Pricing Intelligence</h2>
 
 <table>
 
@@ -273,7 +329,7 @@ def render_html(
     </tr>
 
     <tr>
-        <td>Reference</td>
+        <td>Government Source</td>
         <td>
             {assessment.government_intelligence.reference_name}
         </td>
@@ -281,17 +337,18 @@ def render_html(
 
 </table>
 
+<h3>Data Confidence</h3>
+
+<p>
+    {assessment.government_intelligence.confidence}
+</p>
+
 <h3>Buyer Observation</h3>
 
 <p>
     {assessment.government_intelligence.buyer_observation}
 </p>
 
-<h3>Confidence</h3>
-
-<p>
-    {assessment.government_intelligence.confidence}
-</p>
 
 <h3>Disclaimer</h3>
 
