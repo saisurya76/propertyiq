@@ -9,7 +9,7 @@ function App() {
   const [formData, setFormData] = useState({
     country: "India",
     stateProvince: "Telangana",
-    city: "",
+    city: "Hyderabad",
 
     propertyType: "Apartment",
 

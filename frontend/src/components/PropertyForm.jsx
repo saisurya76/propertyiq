@@ -29,6 +29,7 @@ function PropertyForm({
               name="country"
               value={formData.country}
               onChange={handleChange}
+              disabled
             >
               <option>India</option>
               <option>USA</option>
@@ -43,9 +44,10 @@ function PropertyForm({
 
             <input
               name="city"
-              value={formData.city}
+               value={formData.city}
               onChange={handleChange}
               placeholder="Hyderabad"
+              disabled
             />
           </div>
 
