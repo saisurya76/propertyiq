@@ -177,7 +177,7 @@ Designed for buyers, investors, consultants, and advisors.
 > **📷 Screenshot Placeholder**
 
 ```
-docs/images/dashboard-overview.png
+![Dashboard](docs/images/dashboard-overview.png)
 ```
 
 Recommended screenshots:
@@ -196,7 +196,7 @@ Recommended screenshots:
 > **📷 Screenshot Placeholder**
 
 ```
-docs/images/pdf-cover.png
+![Dashboard](docs/images/pdf-cover.png)
 ```
 
 The generated report includes:
