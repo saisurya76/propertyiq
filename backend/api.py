@@ -97,14 +97,18 @@ def build_property_input(data: PropertyRequest):
     )
 
 
-@app.post("/assess")
-def assess(data: PropertyRequest):
+def build_assessment(data: PropertyRequest):
 
     property_input = build_property_input(data)
 
-    assessment = run_assessment(
+    return run_assessment(
         property_input
     )
+
+@app.post("/assess")
+def assess(data: PropertyRequest):
+
+    assessment = build_assessment(data)
 
     recommendation_reasons = (
         get_recommendation_reasons(
@@ -274,12 +278,8 @@ def assess(data: PropertyRequest):
 
 @app.post("/generate-report")
 def generate_report(data: PropertyRequest):
-
-    property_input = build_property_input(data)
-
-    assessment = run_assessment(
-        property_input
-    )
+    
+    assessment = build_assessment(data)
 
     summary = generate_executive_summary(
         property_name=assessment.property_name,
