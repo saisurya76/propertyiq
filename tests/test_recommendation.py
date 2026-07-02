@@ -6,28 +6,48 @@ from backend.recommendation import (
 
 def test_buy():
 
-    recommendation = get_recommendation(4)
+    recommendation = get_recommendation(
+        overpricing_percent=4,
+        inventory_risk="LOW",
+        developer_rating="EXCELLENT",
+        buyer_protection_score=90
+    )
 
     assert recommendation == "BUY"
 
 
 def test_buy_after_negotiation():
 
-    recommendation = get_recommendation(10)
+    recommendation = get_recommendation(
+        overpricing_percent=10,
+        inventory_risk="MEDIUM",
+        developer_rating="GOOD",
+        buyer_protection_score=82
+    )
 
     assert recommendation == "BUY AFTER NEGOTIATION"
 
 
 def test_wait():
 
-    recommendation = get_recommendation(20)
+    recommendation = get_recommendation(
+        overpricing_percent=20,
+        inventory_risk="LOW",
+        developer_rating="EXCELLENT",
+        buyer_protection_score=90
+    )
 
     assert recommendation == "WAIT"
 
 
 def test_avoid():
 
-    recommendation = get_recommendation(30)
+    recommendation = get_recommendation(
+        overpricing_percent=30,
+        inventory_risk="SEVERE",
+        developer_rating="WEAK",
+        buyer_protection_score=50
+    )
 
     assert recommendation == "AVOID"
 
