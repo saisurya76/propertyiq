@@ -226,9 +226,9 @@ function AssessmentResult({
             {" "}
             above the estimated fair value.
 
-            Government guidance values are intended for
-            registration and taxation purposes and are
-            generally lower than prevailing market prices.
+            Government guidance values are primarily used
+            for property registration and should not be
+            interpreted as market value.
           </div>
 
         </div> 
@@ -277,6 +277,73 @@ function AssessmentResult({
             {result.dealQualityReason}
           </div>
 
+        </div>
+
+      </div>
+
+      <div
+        style={{
+          maxWidth: "700px",
+          margin: "20px auto",
+          padding: "24px",
+          background: "#ffffff",
+          border: "1px solid #e5e7eb",
+          borderRadius: "16px"
+        }}
+      >
+
+        <div
+          style={{
+            fontSize: "12px",
+            letterSpacing: "2px",
+            fontWeight: "700",
+            color: "#64748b",
+            marginBottom: "18px"
+          }}
+        >
+          GOVERNMENT INTELLIGENCE
+        </div>
+
+        <div className="finding-item">
+          <strong>Government Guidance Rate</strong>
+          <p>
+            ₹{result.governmentRatePerUnit?.toLocaleString("en-IN")} / sqft
+          </p>
+        </div>
+
+        <div className="finding-item">
+          <strong>Estimated Government Value</strong>
+          <p>
+            {formatIndianCurrency(result.governmentPropertyValue)}
+          </p>
+        </div>
+
+        <div className="finding-item">
+          <strong>Government Source</strong>
+          <p>{result.governmentReference}</p>
+        </div>
+
+        <div className="finding-item">
+          <strong>Data Confidence</strong>
+          <p>{result.governmentConfidence}</p>
+        </div>
+
+        <div
+          style={{
+            marginTop: "18px",
+            padding: "16px",
+            background: "#f8fafc",
+            borderRadius: "10px",
+            color: "#475569",
+            lineHeight: "1.7",
+            fontSize: "14px"
+          }}
+        >
+          <strong>PropertyIQ Insight</strong>
+
+          <br /><br />
+
+          {result.governmentBuyerObservation}
         </div>
 
       </div>
@@ -584,7 +651,7 @@ function AssessmentResult({
 <div className="findings-card">
 
   <div className="findings-title">
-    MARKET CONTEXT
+    MARKET BENCHMARKS
   </div>
 
   <div className="finding-item">
@@ -671,11 +738,11 @@ function AssessmentResult({
     </strong>
 
     <p>
-      Valuation Analysis — 50%
+      ✓ Valuation Analysis (50%)
       <br />
-      Inventory Risk — 30%
+      ✓ Inventory Risk (30%)
       <br />
-      Developer Quality — 20%
+      ✓ Developer Quality (20%)
     </p>
 
     <p

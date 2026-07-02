@@ -152,6 +152,18 @@ def assess(data: PropertyRequest):
         "governmentRatePerUnit":
             assessment.government_intelligence.government_rate_per_unit,    
 
+        "governmentPropertyValue":
+            assessment.government_intelligence.government_property_value,
+
+        "governmentReference":
+            assessment.government_intelligence.reference_name,
+
+        "governmentConfidence":
+            assessment.government_intelligence.confidence,
+
+        "governmentBuyerObservation":
+            assessment.government_intelligence.buyer_observation,    
+
         "inventoryRisk":
             assessment.inventory_risk,
 
