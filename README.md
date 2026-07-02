@@ -390,3 +390,235 @@ http://localhost:5173
 5. Analyze pricing, developer quality, inventory risk, and market intelligence.
 
 6. Download the professional Buyer Protection Report.
+
+
+# 🔍 How PropertyIQ Works
+
+PropertyIQ evaluates every property through multiple independent intelligence engines. Each engine analyzes a different aspect of the purchase before producing a final buyer recommendation.
+
+```text
+Property Details
+        │
+        ▼
+Valuation Intelligence
+        │
+        ▼
+Developer Intelligence
+        │
+        ▼
+Inventory Intelligence
+        │
+        ▼
+Government Intelligence
+        │
+        ▼
+Market Intelligence
+        │
+        ▼
+Negotiation Intelligence
+        │
+        ▼
+Buyer Protection Score
+        │
+        ▼
+Final Recommendation
+```
+
+The result is a transparent assessment that explains **why** a recommendation was generated rather than presenting only a final score.
+
+---
+
+# Buyer Protection Score
+
+The **Buyer Protection Score (BPS)** is PropertyIQ's primary decision metric.
+
+Unlike traditional valuation tools that estimate only property value, the Buyer Protection Score evaluates the overall quality of a purchase from a buyer's perspective.
+
+Current assessment weights:
+
+| Intelligence Engine | Weight |
+|----------------------|-------:|
+| Valuation Analysis | 50% |
+| Inventory Risk | 30% |
+| Developer Quality | 20% |
+
+Score interpretation:
+
+| Score | Rating |
+|-------:|---------|
+| 90–100 | Excellent |
+| 80–89 | Strong |
+| 70–79 | Fair |
+| 60–69 | Caution |
+| Below 60 | High Risk |
+
+---
+
+# Intelligence Engines
+
+## Pricing Intelligence
+
+Evaluates whether the asking price is justified.
+
+Includes:
+
+- Comparable Sales
+- Rental Yield
+- Replacement Cost
+- Weighted Fair Value
+
+---
+
+## Developer Intelligence
+
+Measures execution capability using:
+
+- Completed projects
+- Delayed projects
+- Years in business
+- Regulatory history
+
+---
+
+## Inventory Intelligence
+
+Measures market supply conditions.
+
+Includes:
+
+- Unsold inventory
+- Inventory risk
+- Buyer leverage
+
+---
+
+## Government Intelligence
+
+Compares the property with official government guidance values.
+
+Provides:
+
+- Government guidance rate
+- Estimated government value
+- Buyer observations
+- Confidence assessment
+
+---
+
+## Market Intelligence
+
+Compares the property with nearby developments.
+
+Includes:
+
+- Comparable projects
+- Market asking prices
+- Average price per square foot
+
+---
+
+## Negotiation Intelligence
+
+Provides practical buyer guidance.
+
+Includes:
+
+- Target purchase price
+- Recommended negotiation range
+- Estimated buyer savings
+- Buyer negotiation position
+
+---
+
+# Report Generation
+
+PropertyIQ generates professional buyer reports in multiple formats.
+
+## Interactive Dashboard
+
+Designed for real-time exploration of assessment results.
+
+Provides:
+
+- Buyer Protection Score
+- Pricing Intelligence
+- Government Intelligence
+- Market Context
+- Buyer Advisory
+- Recommendation Confidence
+
+---
+
+## HTML Report
+
+Optimized for browser viewing and sharing.
+
+Includes:
+
+- Executive Summary
+- Pricing Analysis
+- Government Intelligence
+- Market Context
+- Buyer Advisory
+- Final Recommendation
+
+---
+
+## PDF Report
+
+Designed for printing and professional sharing.
+
+Includes:
+
+- Premium cover page
+- Buyer Protection Score
+- Property Overview
+- Market Context
+- Negotiation Strategy
+- Executive Summary
+- Disclaimer
+
+---
+
+# Testing
+
+PropertyIQ includes automated unit tests covering the core assessment engines.
+
+Run the complete suite:
+
+```bash
+python3 -m pytest
+```
+
+Current status:
+
+```
+31 Passed
+0 Failed
+```
+
+---
+
+# Example Workflow
+
+```text
+Enter Property Details
+          │
+          ▼
+Run Assessment
+          │
+          ▼
+Review Buyer Protection Score
+          │
+          ▼
+Analyze Pricing Intelligence
+          │
+          ▼
+Review Government Intelligence
+          │
+          ▼
+Evaluate Negotiation Guidance
+          │
+          ▼
+Download Buyer Protection Report
+```
