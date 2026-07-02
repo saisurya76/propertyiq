@@ -176,9 +176,29 @@ Designed for buyers, investors, consultants, and advisors.
 
 > **📷 Screenshot Placeholder**
 
-```
-![Dashboard](docs/images/dashboard-overview.png)
-```
+# Dashboard Preview
+
+![Dashboard Overview](docs/images/dashboard-overview.png)
+
+### Pricing Intelligence
+
+![Pricing Intelligence](docs/images/pricing-intelligence.png)
+
+### Government Intelligence
+
+![Government Intelligence](docs/images/government-intelligence.png)
+
+### Market Context
+
+![Market Context](docs/images/market-context.png)
+
+### Negotiation Advisor
+
+![Negotiation Advisor](docs/images/negotiation-advisor.png)
+
+### PDF Report
+
+![PDF Report](docs/images/pdf-cover.png)
 
 Recommended screenshots:
 
