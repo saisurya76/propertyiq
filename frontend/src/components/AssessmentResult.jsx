@@ -126,16 +126,75 @@ function AssessmentResult({
 
       <div className="score-section">
 
-        <div className="score">
-          {result.score}
-        </div>
+        <div
+          style={{
+            maxWidth: "700px",
+            margin: "0 auto 25px",
+            padding: "28px",
+            background: "#ffffff",
+            border: "2px solid #1e3a8a",
+            borderRadius: "18px",
+            textAlign: "center"
+          }}
+        >
 
-        <div className="score-label">
-          Buyer Protection Score
-        </div>
+          <div
+            style={{
+              fontSize: "13px",
+              letterSpacing: "2px",
+              color: "#64748b",
+              fontWeight: "700"
+            }}
+          >
+            PROPERTYIQ DECISION
+          </div>
 
-        <div className="rating-pill">
-          {result.rating}
+          <div
+            style={{
+              fontSize: "34px",
+              fontWeight: "800",
+              marginTop: "12px",
+              color: "#0f172a"
+            }}
+          >
+            {result.recommendation}
+          </div>
+
+          <div
+            style={{
+              fontSize: "58px",
+              fontWeight: "800",
+              color: "#1e3a8a",
+              marginTop: "18px"
+            }}
+          >
+            {result.score}
+          </div>
+
+          <div
+            style={{
+              fontSize: "18px",
+              color: "#64748b",
+              marginTop: "6px"
+            }}
+          >
+            Buyer Protection Score
+          </div>
+
+          <div
+            style={{
+              display: "inline-block",
+              marginTop: "16px",
+              padding: "8px 18px",
+              borderRadius: "20px",
+              background: "#dcfce7",
+              fontWeight: "700",
+              color: "#166534"
+            }}
+          >
+            {result.rating}
+          </div>
+
         </div>
 
         <div
