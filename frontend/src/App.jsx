@@ -44,6 +44,38 @@ function App() {
     });
   };
 
+  const buildRequestPayload = () => ({
+    country: formData.country,
+    stateProvince: formData.stateProvince || "",
+
+    city: formData.city,
+
+    propertyName: formData.propertyName,
+    developerName: formData.developerName,
+
+    quotedPrice: Number(formData.quotedPrice),
+
+    unitArea: Number(formData.areaValue),
+
+    areaUnit: formData.areaUnit,
+
+    monthlyRent: Number(formData.monthlyRent || 0),
+
+    totalUnits: Number(formData.totalUnits || 100),
+
+    unsoldUnits: Number(formData.unsoldUnits || 20),
+
+    projectsCompleted: Number(formData.projectsCompleted || 10),
+
+    projectsDelayed: Number(formData.projectsDelayed || 1),
+
+    yearsInBusiness: Number(formData.yearsInBusiness || 15),
+
+    regulatoryViolations: Number(
+      formData.regulatoryViolations || 0
+    )
+  });
+
   const generateAssessment = async () => {
     if (loading) return;
     if (
@@ -66,47 +98,9 @@ function App() {
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            country: formData.country,
-            stateProvince: formData.stateProvince,
-            city: formData.city,
-
-            propertyName:
-              formData.propertyName,
-
-            developerName:
-              formData.developerName,
-
-            quotedPrice:
-              Number(formData.quotedPrice),
-
-            unitArea:
-              Number(formData.areaValue),
-
-            areaUnit:
-              formData.areaUnit,
-
-            monthlyRent:
-              Number(formData.monthlyRent || 0),
-
-            totalUnits:
-              Number(formData.totalUnits || 100),
-
-            unsoldUnits:
-              Number(formData.unsoldUnits || 20),
-
-            projectsCompleted:
-              Number(formData.projectsCompleted || 10),
-
-            projectsDelayed:
-              Number(formData.projectsDelayed || 1),
-
-            yearsInBusiness:
-              Number(formData.yearsInBusiness || 15),
-
-            regulatoryViolations:
-              Number(formData.regulatoryViolations || 0)
-          })
+          body: JSON.stringify(
+              buildRequestPayload()
+          )
         }
       );
 
