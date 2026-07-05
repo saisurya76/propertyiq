@@ -28,7 +28,7 @@ function AssessmentResult({
       setReportLoading(true);
 
       const response = await fetch(
-        "http://127.0.0.1:8000/generate-report",
+        "https://propertyiq-api-q21y.onrender.com/generate-report",
         {
           method: "POST",
 
