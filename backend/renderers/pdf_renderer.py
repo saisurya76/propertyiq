@@ -618,7 +618,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "BUYER ADVISORY",
+            "NEGOTIATION ADVISOR",
             section_style
         )
     )
@@ -628,27 +628,8 @@ def generate_pdf(
     )
 
     story.append(
-        Paragraph(
-            "<b>Negotiation Advisor</b>",
-            styles["BodyText"]
-        )
-    )
-
-    story.append(
-        Spacer(1, 6)
-    )
-
-    story.append(
-        Paragraph(
-            (
-                "Strong Buyer Position"
-                if assessment.negotiation_position == "STRONG"
-                else
-                "Moderate Buyer Position"
-                if assessment.negotiation_position == "FAIR"
-                else
-                "Limited Buyer Position"
-            ),
+       Paragraph(
+            assessment.negotiation_position,
             score_heading_style
         )
     )

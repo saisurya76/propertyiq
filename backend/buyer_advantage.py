@@ -39,15 +39,15 @@ def assess_buyer_advantage(
     elif inventory_risk == "HIGH":
         score += 20
 
-    elif inventory_risk == "MEDIUM":
+    elif inventory_risk == "MODERATE":
         score += 10
 
     # Negotiation Advantage
 
-    if negotiation_position == "STRONG":
+    if negotiation_position == "Strong Buyer Position":
         score += 20
 
-    elif negotiation_position == "FAIR":
+    elif negotiation_position == "Balanced Negotiation Position":
         score += 10
 
     # Buyer Protection Bonus

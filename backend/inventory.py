@@ -21,6 +21,16 @@ def assess_inventory_risk(
             "Total units must be greater than zero."
         )
 
+    if unsold_units < 0:
+        raise ValueError(
+            "Unsold units cannot be negative."
+        )
+
+    if unsold_units > total_units:
+        raise ValueError(
+            "Unsold units cannot exceed total units."
+        )
+
     unsold_percent = (
         unsold_units / total_units
     ) * 100

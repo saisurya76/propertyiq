@@ -10,7 +10,7 @@ function PropertyForm({
       <h2>Property Assessment</h2>
 
       <p className="required-note">
-        Fields marked <strong>*</strong> are required.
+       Only fields marked <strong>*</strong> are required. All other fields improve assessment accuracy.
       </p>
 
       {/* Property Information */}
@@ -76,7 +76,7 @@ function PropertyForm({
               name="propertyName"
               value={formData.propertyName}
               onChange={handleChange}
-              placeholder="Aparna Sarovar Zenith"
+              placeholder="Enter property name"
             />
           </div>
 
@@ -100,7 +100,7 @@ function PropertyForm({
               name="quotedPrice"
               value={formData.quotedPrice}
               onChange={handleChange}
-              placeholder="18000000"
+              placeholder="Enter quoted price"
             />
           </div>
 
@@ -112,7 +112,7 @@ function PropertyForm({
               name="areaValue"
               value={formData.areaValue}
               onChange={handleChange}
-              placeholder="1800"
+              placeholder="Enter built-up area"
             />
           </div>
 
@@ -140,7 +140,7 @@ function PropertyForm({
               name="monthlyRent"
               value={formData.monthlyRent}
               onChange={handleChange}
-              placeholder="45000"
+              placeholder="Expected monthly rent"
             />
           </div>
 
@@ -163,7 +163,7 @@ function PropertyForm({
               name="developerName"
               value={formData.developerName}
               onChange={handleChange}
-              placeholder="Aparna Constructions"
+              placeholder="Enter builder or developer name"
             />
           </div>
 
@@ -175,7 +175,7 @@ function PropertyForm({
               name="projectsCompleted"
               value={formData.projectsCompleted}
               onChange={handleChange}
-              placeholder="20"
+              placeholder="Number of completed projects"
             />
           </div>
 
@@ -187,7 +187,7 @@ function PropertyForm({
               name="projectsDelayed"
               value={formData.projectsDelayed}
               onChange={handleChange}
-              placeholder="1"
+              placeholder="Projects delivered late"
             />
           </div>
 
@@ -199,7 +199,7 @@ function PropertyForm({
               name="yearsInBusiness"
               value={formData.yearsInBusiness}
               onChange={handleChange}
-              placeholder="25"
+              placeholder="Years in business"
             />
           </div>
 
@@ -211,7 +211,7 @@ function PropertyForm({
               name="regulatoryViolations"
               value={formData.regulatoryViolations}
               onChange={handleChange}
-              placeholder="0"
+              placeholder="Known regulatory violations"
             />
           </div>
 
@@ -235,7 +235,7 @@ function PropertyForm({
               name="totalUnits"
               value={formData.totalUnits}
               onChange={handleChange}
-              placeholder="500"
+              placeholder="Total project units"
             />
           </div>
 
@@ -247,7 +247,7 @@ function PropertyForm({
               name="unsoldUnits"
               value={formData.unsoldUnits}
               onChange={handleChange}
-              placeholder="120"
+              placeholder="Current unsold units"
             />
           </div>
 
@@ -270,7 +270,7 @@ function PropertyForm({
             name="additionalInformation"
             value={formData.additionalInformation}
             onChange={handleChange}
-            placeholder="Provide any additional information that may help evaluate this property."
+            placeholder="Share any additional details that may influence the assessment (optional)."
             rows="6"
           />
 
@@ -287,7 +287,7 @@ function PropertyForm({
 
         {loading
           ? "Analyzing..."
-          : "Generate Assessment"}
+          : "Generate PropertyIQ Report"}
       </button>
 
     </div>

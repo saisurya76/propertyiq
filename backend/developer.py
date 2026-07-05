@@ -14,6 +14,26 @@ def assess_developer(
     rera_violations: int
 ) -> DeveloperResult:
 
+    if projects_completed < 0:
+        raise ValueError(
+            "Projects completed cannot be negative."
+        )
+
+    if projects_delayed < 0:
+        raise ValueError(
+            "Projects delayed cannot be negative."
+        )
+
+    if years_in_business < 0:
+        raise ValueError(
+            "Years in business cannot be negative."
+        )
+
+    if rera_violations < 0:
+        raise ValueError(
+            "Regulatory violations cannot be negative."
+        )
+
     total_projects = (
         projects_completed +
         projects_delayed
