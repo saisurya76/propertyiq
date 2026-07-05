@@ -6,6 +6,10 @@ from backend.government_intelligence import (
     GovernmentIntelligence
 )
 
+from backend.decision_intelligence import (
+    DecisionResult
+)
+
 @dataclass
 class PropertyAssessment:
     property_name: str
@@ -19,10 +23,6 @@ class PropertyAssessment:
     fair_value: float
 
     quoted_price_per_sqft: float
-    fair_value_per_sqft: float
-
-    quoted_price_per_sqft: float
-
     fair_value_per_sqft: float
 
     unit_area: float
@@ -71,6 +71,8 @@ class PropertyAssessment:
     comparables: list
 
     market_average_price_per_sqft: float
+
+    decision: DecisionResult
 
 
 def create_assessment(
@@ -129,7 +131,10 @@ def create_assessment(
 
     comparables: list,
 
-    market_average_price_per_sqft: float
+    market_average_price_per_sqft: float,
+
+    decision: DecisionResult
+    
 ) -> PropertyAssessment:
 
     return PropertyAssessment(
@@ -214,5 +219,7 @@ def create_assessment(
         comparables=comparables,
 
         market_average_price_per_sqft=
-            market_average_price_per_sqft
+            market_average_price_per_sqft,
+
+        decision=decision    
     )

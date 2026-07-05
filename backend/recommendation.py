@@ -99,7 +99,7 @@ def get_recommendation_reasons(
     # Buyer Protection
 
     reasons.append(
-        f"Buyer Protection Score: {buyer_protection_score}"
+        f"Buyer Protection Score: {buyer_protection_score:.2f}"
     )
 
     return reasons

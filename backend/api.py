@@ -272,7 +272,25 @@ def assess(data: PropertyRequest):
 
             "overall":
                 assessment.findings.overall_finding
-        }
+        },
+
+        "decision": {
+
+            "propertyQuality":
+                assessment.decision.property_quality,
+
+            "dealQuality":
+                assessment.decision.deal_quality,
+
+            "category":
+                assessment.decision.category,
+
+            "action":
+                assessment.decision.action,
+
+            "narrative":
+                assessment.decision.narrative
+        },
     }
 
 

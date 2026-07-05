@@ -32,7 +32,7 @@ def assess_negotiation_position(
         ]
     ):
 
-        position = "STRONG"
+        position = "Strong Buyer Position"
 
         reason = (
             "Property is priced above estimated fair value "
@@ -42,7 +42,7 @@ def assess_negotiation_position(
 
     elif overpricing > 5:
 
-        position = "FAIR"
+        position = "Balanced Negotiation Position"
 
         reason = (
             "Property shows moderate pricing pressure. "
@@ -52,7 +52,7 @@ def assess_negotiation_position(
 
     else:
 
-        position = "WEAK"
+        position = "Limited Buyer Leverage"
 
         reason = (
             "Property appears reasonably priced relative "

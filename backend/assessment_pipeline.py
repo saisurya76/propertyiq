@@ -12,6 +12,10 @@ from backend.recommendation_confidence import (
     assess_recommendation_confidence
 )
 
+from backend.decision_intelligence import (
+    generate_decision
+)
+
 from backend.comparables import (
     get_comparables,
     average_price_per_sqft
@@ -288,6 +292,17 @@ def run_assessment(
         recommendation=recommendation
     )
 
+    # Decision
+
+    decision = generate_decision(
+        recommendation=recommendation,
+        buyer_protection_score=bps.score,
+        overpricing_percent=overpricing,
+        developer_rating=developer.rating,
+        inventory_risk=inventory.risk_level,
+        negotiation_position=negotiation.position
+    )
+
     # Assessment
 
     return create_assessment(
@@ -375,5 +390,7 @@ def run_assessment(
         comparables=comparables,
 
         market_average_price_per_sqft=
-            market_average_price_per_sqft
+            market_average_price_per_sqft,
+
+        decision=decision    
     )

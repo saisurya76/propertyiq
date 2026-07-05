@@ -28,7 +28,7 @@ function AssessmentResult({
       setReportLoading(true);
 
       const response = await fetch(
-        "https://propertyiq-api-q21y.onrender.com/generate-report",
+        "http://127.0.0.1:8000/generate-report",
         {
           method: "POST",
 
@@ -146,21 +146,101 @@ function AssessmentResult({
               fontWeight: "700"
             }}
           >
-            PROPERTYIQ DECISION
+            PROPERTYIQ DECISION SUMMARY
           </div>
 
           <div
             style={{
-              fontSize: "34px",
-              fontWeight: "800",
-              marginTop: "12px",
-              color: "#0f172a"
+              marginTop: "20px",
+              padding: "18px",
+              background: "#f8fafc",
+              borderRadius: "12px",
+              textAlign: "left"
             }}
           >
-            {result.recommendation}
+
+            <div
+              style={{
+                fontSize: "20px",
+                fontWeight: "700",
+                marginBottom: "12px",
+                color: "#1e3a8a"
+              }}
+            >
+              {result.decision.category}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                marginTop: "14px",
+                marginBottom: "18px",
+                flexWrap: "wrap"
+              }}
+            >
+
+              <div
+                style={{
+                  background: "#dcfce7",
+                  color: "#166534",
+                  padding: "8px 14px",
+                  borderRadius: "20px",
+                  fontWeight: "700",
+                  fontSize: "14px"
+                }}
+              >
+                ✓ {result.decision.propertyQuality}
+              </div>
+
+              <div
+                style={{
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  padding: "8px 14px",
+                  borderRadius: "20px",
+                  fontWeight: "700",
+                  fontSize: "14px"
+                }}
+              >
+                ⚠ {result.decision.dealQuality}
+              </div>
+
+            </div>    
+
+            <div
+              style={{
+                color: "#475569",
+                lineHeight: "1.8",
+                fontSize: "15px"
+              }}
+            >
+              {result.decision.narrative}
+            </div>
+
           </div>
 
           <div
+          style={{
+            marginTop: "18px",
+            fontSize: "15px",
+            color: "#475569"
+          }}
+        >
+          <strong>Recommended Action</strong>
+
+          <div
+            style={{
+              fontSize: "22px",
+              fontWeight: "700",
+              marginTop: "6px"
+            }}
+          >
+            {result.decision.action}
+          </div>
+        </div>
+
+           <div
             style={{
               fontSize: "58px",
               fontWeight: "800",
@@ -193,7 +273,8 @@ function AssessmentResult({
             }}
           >
             {result.rating}
-          </div>
+          </div>    
+
 
         </div>
 
@@ -438,13 +519,7 @@ function AssessmentResult({
             marginBottom: "15px"
           }}
         >
-          {
-            result.negotiationPosition === "STRONG"
-              ? "Strong Buyer Position"
-              : result.negotiationPosition === "FAIR"
-              ? "Moderate Buyer Position"
-              : "Limited Buyer Position"
-          }
+          {result.negotiationPosition}
         </div>
 
         <p
