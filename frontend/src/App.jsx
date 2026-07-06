@@ -51,6 +51,7 @@ function App() {
     city: formData.city,
 
     propertyName: formData.propertyName,
+    
     developerName: formData.developerName,
 
     quotedPrice: Number(formData.quotedPrice),
@@ -61,19 +62,36 @@ function App() {
 
     monthlyRent: Number(formData.monthlyRent || 0),
 
-    totalUnits: Number(formData.totalUnits || 100),
+    totalUnits:
+      formData.totalUnits === ""
+        ? null
+        : Number(formData.totalUnits),
 
-    unsoldUnits: Number(formData.unsoldUnits || 20),
+    unsoldUnits:
+      formData.unsoldUnits === ""
+        ? null
+        : Number(formData.unsoldUnits),
 
-    projectsCompleted: Number(formData.projectsCompleted || 10),
+    projectsCompleted:
+      formData.projectsCompleted === ""
+        ? null
+        : Number(formData.projectsCompleted),
 
-    projectsDelayed: Number(formData.projectsDelayed || 1),
+    projectsDelayed:
+      formData.projectsDelayed === ""
+        ? null
+        : Number(formData.projectsDelayed),
 
-    yearsInBusiness: Number(formData.yearsInBusiness || 15),
+    yearsInBusiness:
+      formData.yearsInBusiness === ""
+        ? null
+        : Number(formData.yearsInBusiness),
 
-    regulatoryViolations: Number(
-      formData.regulatoryViolations || 0
-    )
+    regulatoryViolations:
+      formData.regulatoryViolations === ""
+        ? null
+        : Number(formData.regulatoryViolations),
+    
   });
 
   const generateAssessment = async () => {

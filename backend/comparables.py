@@ -45,7 +45,10 @@ def get_comparables(
     city: str
 ):
 
-    city = city.lower().strip()
+    if not city:
+        return []
+
+    city = city.strip().lower()
 
     if city == "hyderabad":
         return HYDERABAD_COMPARABLES

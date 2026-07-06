@@ -25,6 +25,9 @@ def inventory_score(
         "SEVERE": 40
     }
 
+    if risk_level == "NOT_ASSESSED":
+        return 0
+
     return mapping.get(
         risk_level.upper(),
         40

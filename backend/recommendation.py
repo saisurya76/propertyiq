@@ -86,15 +86,31 @@ def get_recommendation_reasons(
 
     # Inventory
 
-    reasons.append(
-        f"Inventory Risk: {inventory_risk}"
-    )
+    if inventory_risk == "NOT_ASSESSED":
+
+        reasons.append(
+            "Inventory assessment was not performed because project inventory information was not provided."
+        )
+
+    else:
+
+        reasons.append(
+            f"Inventory Risk: {inventory_risk}"
+        )
 
     # Developer
 
-    reasons.append(
-        f"Developer Rating: {developer_rating}"
-    )
+    if developer_rating == "NOT_ASSESSED":
+
+        reasons.append(
+            "Developer assessment was not performed because developer performance information was not provided."
+        )
+
+    else:
+
+        reasons.append(
+            f"Developer Rating: {developer_rating}"
+        )
 
     # Buyer Protection
 

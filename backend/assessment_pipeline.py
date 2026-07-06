@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from backend.government_intelligence import (
     assess_government_intelligence
@@ -97,13 +98,13 @@ class PropertyInput:
 
     monthly_rent: float
 
-    total_units: int
-    unsold_units: int
+    total_units: Optional[int]
+    unsold_units: Optional[int]
 
-    projects_completed: int
-    projects_delayed: int
-    years_in_business: int
-    rera_violations: int
+    projects_completed: Optional[int]
+    projects_delayed: Optional[int]
+    years_in_business: Optional[int]
+    rera_violations: Optional[int]
 
 
 def run_assessment(
@@ -178,18 +179,71 @@ def run_assessment(
 
     # Inventory Assessment
 
-    inventory = assess_inventory_risk(
-        property_input.total_units,
-        property_input.unsold_units
-    )
+    if (
+        property_input.total_units is not None and
+        property_input.unsold_units is not None
+    ):
+        inventory = assess_inventory_risk(
+            property_input.total_units,
+            property_input.unsold_units
+        )
+    else:
+        inventory = None
 
     # Developer Assessment
 
-    developer = assess_developer(
-        property_input.projects_completed,
-        property_input.projects_delayed,
-        property_input.years_in_business,
-        property_input.rera_violations
+    if all(
+        value is not None
+        for value in [
+            property_input.projects_completed,
+            property_input.projects_delayed,
+            property_input.years_in_business,
+            property_input.rera_violations
+        ]
+    ):
+        developer = assess_developer(
+            property_input.projects_completed,
+            property_input.projects_delayed,
+            property_input.years_in_business,
+            property_input.rera_violations
+        )
+    else:
+        developer = None
+
+    inventory_risk = (
+        inventory.risk_level
+        if inventory is not None
+        else "NOT_ASSESSED"
+    )
+
+    inventory_score_value = (
+        inventory_score(inventory_risk)
+        if inventory is not None
+        else None
+    )
+
+    developer_rating = (
+        developer.rating
+        if developer is not None
+        else "NOT_ASSESSED"
+    )
+
+    developer_score = (
+        developer.score
+        if developer is not None
+        else None
+    )
+
+    inventory_score_output = (
+        inventory_score_value
+        if inventory_score_value is not None
+        else 0.0
+    )
+
+    developer_score_output = (
+        developer_score
+        if developer_score is not None
+        else 0.0
     )
 
     # Component Scores
@@ -198,24 +252,20 @@ def run_assessment(
         overpricing
     )
 
-    inventory_score_value = inventory_score(
-        inventory.risk_level
-    )
-
     # Buyer Protection Score
 
     bps = calculate_buyer_protection_score(
         valuation_score=valuation_score_value,
         inventory_score=inventory_score_value,
-        developer_score=developer.score
+        developer_score=developer_score
     )
 
     # Recommendation
 
     recommendation = get_recommendation(
         overpricing_percent=overpricing,
-        inventory_risk=inventory.risk_level,
-        developer_rating=developer.rating,
+        inventory_risk=inventory_risk,
+        developer_rating=developer_rating,
         buyer_protection_score=bps.score
     )
 
@@ -239,19 +289,17 @@ def run_assessment(
                 fair_value,
 
             inventory_risk=
-                inventory.risk_level
+                inventory_risk
         )
     )
 
     # Buyer Advantage
 
-    buyer_advantage = (
-        assess_buyer_advantage(
-            overpricing_percent=overpricing,
-            inventory_risk=inventory.risk_level,
-            negotiation_position=negotiation.position,
-            buyer_protection_score=bps.score
-        )
+    buyer_advantage = assess_buyer_advantage(
+        overpricing_percent=overpricing,
+        inventory_risk=inventory_risk,
+        negotiation_position=negotiation.position,
+        buyer_protection_score=bps.score
     )
 
     # Recommendation Confidence
@@ -259,7 +307,7 @@ def run_assessment(
     recommendation_confidence = (
         assess_recommendation_confidence(
             buyer_protection_score=bps.score,
-            developer_score=developer.score,
+            developer_score=developer_score,
             inventory_score=inventory_score_value,
             valuation_score=valuation_score_value
         )
@@ -287,8 +335,8 @@ def run_assessment(
 
     findings = generate_findings(
         overpricing_percent=overpricing,
-        inventory_risk=inventory.risk_level,
-        developer_rating=developer.rating,
+        inventory_risk=inventory_risk,
+        developer_rating=developer_rating,
         recommendation=recommendation
     )
 
@@ -298,8 +346,8 @@ def run_assessment(
         recommendation=recommendation,
         buyer_protection_score=bps.score,
         overpricing_percent=overpricing,
-        developer_rating=developer.rating,
-        inventory_risk=inventory.risk_level,
+        developer_rating=developer_rating,
+        inventory_risk=inventory_risk,
         negotiation_position=negotiation.position
     )
 
@@ -329,13 +377,13 @@ def run_assessment(
 
         overpricing_percent=overpricing,
 
-        inventory_risk=inventory.risk_level,
+        inventory_risk=inventory_risk,
 
-        developer_rating=developer.rating,
+        developer_rating=developer_rating,
 
         valuation_score=valuation_score_value,
-        inventory_score=inventory_score_value,
-        developer_score=developer.score,
+        inventory_score=inventory_score_output,
+        developer_score=developer_score_output,
 
         buyer_protection_score=bps.score,
         buyer_protection_rating=bps.rating,

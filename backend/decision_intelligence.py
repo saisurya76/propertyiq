@@ -45,16 +45,19 @@ def generate_decision(
     # -----------------------------------
 
     if developer_rating == "EXCELLENT":
-
         property_quality = "GOOD PROJECT"
 
     elif developer_rating == "GOOD":
-
         property_quality = "REASONABLE PROJECT"
 
-    else:
+    elif developer_rating == "AVERAGE":
+        property_quality = "AVERAGE PROJECT"
 
+    elif developer_rating == "WEAK":
         property_quality = "HIGH RISK PROJECT"
+
+    else:
+        property_quality = "PROJECT QUALITY NOT ASSESSED"
 
     # -----------------------------------
     # Deal Quality
@@ -96,10 +99,22 @@ def generate_decision(
             "The developer has a generally positive delivery history, though some execution risks remain."
         )
 
-    else:
+    elif developer_rating == "AVERAGE":
+
+        parts.append(
+            "The developer demonstrates mixed historical performance and warrants additional due diligence."
+        )
+
+    elif developer_rating == "WEAK":
 
         parts.append(
             "The developer profile introduces meaningful execution risk and warrants careful due diligence."
+        )
+
+    else:
+
+        parts.append(
+            "Developer assessment could not be completed because developer performance information was not provided."
         )
 
     # Inventory
@@ -116,10 +131,22 @@ def generate_decision(
             "Inventory levels remain balanced and provide some flexibility during negotiations."
         )
 
-    else:
+    elif inventory_risk == "HIGH":
 
         parts.append(
             "Elevated inventory levels increase buyer negotiating leverage."
+        )
+
+    elif inventory_risk == "SEVERE":
+
+        parts.append(
+            "High unsold inventory creates meaningful buyer negotiating leverage."
+        )
+
+    else:
+
+        parts.append(
+            "Inventory assessment could not be completed because project inventory data was not provided."
         )
 
     # Pricing
@@ -183,13 +210,38 @@ def generate_decision(
             "PropertyIQ does not recommend proceeding with this purchase at the current asking price."
         )
 
-    parts.append(
-        f"Overall, PropertyIQ considers this to be a "
-        f"{property_quality.lower()}. "
-        f"However, the current asking price is above "
-        f"PropertyIQ's estimated fair value. "
-        f"{advice}"
+    if property_quality == "PROJECT QUALITY NOT ASSESSED":
+
+        summary = (
+            "Overall, PropertyIQ could not assess project quality because sufficient developer information was not provided. "
+        )
+
+    else:
+
+        summary = (
+            f"Overall, PropertyIQ considers this to be a {property_quality.lower()}. "
+        )
+
+    if overpricing_percent <= 5:
+
+        pricing_summary = (
+            "The current asking price is broadly aligned with "
+            "PropertyIQ's estimated fair value. "
+        )
+
+    else:
+
+        pricing_summary = (
+            "However, the current asking price is above "
+            "PropertyIQ's estimated fair value. "
+        )
+
+    summary += (
+        pricing_summary +
+        advice
     )
+
+    parts.append(summary)
 
     narrative = " ".join(parts)
 

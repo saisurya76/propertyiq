@@ -64,10 +64,19 @@ def assess_buyer_advantage(
 
         rating = "EXCEPTIONAL BUYER OPPORTUNITY"
 
-        reason = (
-            "Pricing, inventory conditions, and negotiation "
-            "leverage strongly favor the buyer."
-        )
+        if inventory_risk == "NOT_ASSESSED":
+
+            reason = (
+                "Pricing and negotiation leverage strongly "
+                "favor the buyer."
+            )
+
+        else:
+
+            reason = (
+                "Pricing, inventory conditions, and negotiation "
+                "leverage strongly favor the buyer."
+            )
 
     elif score >= 75:
 

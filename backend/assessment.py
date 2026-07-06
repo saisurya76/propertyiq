@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from backend.findings import FindingsResult
 
@@ -35,8 +36,8 @@ class PropertyAssessment:
     developer_rating: str
 
     valuation_score: float
-    inventory_score: float
-    developer_score: float
+    inventory_score: Optional[float]
+    developer_score: Optional[float]
 
     buyer_protection_score: float
     buyer_protection_rating: str
@@ -99,8 +100,8 @@ def create_assessment(
     developer_rating: str,
 
     valuation_score: float,
-    inventory_score: float,
-    developer_score: float,
+    inventory_score: Optional[float],
+    developer_score: Optional[float],
 
     buyer_protection_score: float,
     buyer_protection_rating: str,

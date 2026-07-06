@@ -61,45 +61,63 @@ def generate_findings(
 
     # Inventory
 
-    inventory_map = {
-        "LOW":
-            "Inventory levels appear healthy with limited supply risk.",
+    if inventory_risk == "NOT_ASSESSED":
 
-        "MODERATE":
-            "Inventory levels indicate moderate supply risk.",
+        inventory = (
+            "Inventory assessment could not be completed because "
+            "project inventory data was not provided."  
+        )
 
-        "HIGH":
-            "Inventory levels indicate elevated supply risk and may impact short-term appreciation.",
+    else:
 
-        "SEVERE":
-            "Inventory levels indicate significant oversupply risk."
-    }
+        inventory_map = {
+            "LOW":
+                "Inventory levels appear healthy with limited supply risk.",
 
-    inventory = inventory_map.get(
-        inventory_risk.upper(),
-        "Inventory information unavailable."
-    )
+            "MODERATE":
+                "Inventory levels indicate moderate supply risk.",
+
+            "HIGH":
+                "Inventory levels indicate elevated supply risk and may impact short-term appreciation.",
+
+            "SEVERE":
+                "Inventory levels indicate significant oversupply risk."
+        }
+
+        inventory = inventory_map.get(
+            inventory_risk.upper(),
+            "Inventory information unavailable."
+        )
 
     # Developer
 
-    developer_map = {
-        "EXCELLENT":
-            "The developer demonstrates a strong delivery track record and favorable operating history.",
+    if developer_rating == "NOT_ASSESSED":
 
-        "GOOD":
-            "The developer demonstrates generally positive execution performance.",
+        developer = (
+            "Developer assessment could not be completed because "
+            "developer performance information was not provided."
+        )
 
-        "AVERAGE":
-            "The developer demonstrates mixed historical performance.",
+    else:
 
-        "WEAK":
-            "The developer presents elevated execution risk."
-    }
+        developer_map = {
+            "EXCELLENT":
+                "The developer demonstrates a strong delivery track record and favorable operating history.",
 
-    developer = developer_map.get(
-        developer_rating.upper(),
-        "Developer information unavailable."
-    )
+            "GOOD":
+                "The developer demonstrates generally positive execution performance.",
+
+            "AVERAGE":
+                "The developer demonstrates mixed historical performance.",
+
+            "WEAK":
+                "The developer presents elevated execution risk."
+        }
+
+        developer = developer_map.get(
+            developer_rating.upper(),
+            "Developer information unavailable."
+        )
 
     overall = (
         f"PropertyIQ recommendation: {recommendation}."

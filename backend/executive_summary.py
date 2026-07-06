@@ -33,27 +33,55 @@ def generate_executive_summary(
             f"{abs(price_gap)}% Below Fair Value"
         )
 
+    if developer_rating == "NOT_ASSESSED":
+
+        developer_text = (
+            "Developer Assessment:\n"
+            "Not Performed"
+        )
+
+    else:
+
+        developer_text = (
+            f"Developer Rating:\n"
+            f"{developer_rating}"
+        )
+
+
+    if inventory_risk == "NOT_ASSESSED":
+
+        inventory_text = (
+            "Inventory Assessment:\n"
+            "Not Performed"
+        )
+
+    else:
+
+        inventory_text = (
+            f"Inventory Risk:\n"
+            f"{inventory_risk}"
+        )
+
+
     summary = f"""
-Property: {property_name}
+    Property: {property_name}
 
-Quoted Price: {format_currency(quoted_price)}
+    Quoted Price: {format_currency(quoted_price)}
 
-Estimated Fair Value: {format_currency(fair_value)}
+    Estimated Fair Value: {format_currency(fair_value)}
 
-Price Position: {price_position}
+    Price Position: {price_position}
 
-Buyer Protection Score:
-{buyer_protection_score}/100
-({buyer_protection_rating})
+    Buyer Protection Score:
+    {buyer_protection_score}/100
+    ({buyer_protection_rating})
 
-Developer Rating:
-{developer_rating}
+    {developer_text}
 
-Inventory Risk:
-{inventory_risk}
+    {inventory_text}
 
-Recommended Action:
-{recommendation}
-"""
+    Recommended Action:
+    {recommendation}
+    """
 
     return summary.strip()

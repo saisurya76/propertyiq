@@ -240,7 +240,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "Independent recommendation generated from valuation analysis, inventory risk assessment, and developer quality review.",
+            "Independent recommendation generated using all available PropertyIQ assessment models.",
             recommendation_text_style
         )
     )
@@ -400,19 +400,41 @@ def generate_pdf(
         )
     )
 
-    story.append(
-        Paragraph(
-            f"Inventory Risk: {assessment.inventory_score:.2f}",
-            styles["BodyText"]
-        )
-    )
+    if assessment.inventory_score is None:
 
-    story.append(
-        Paragraph(
-            f"Developer Quality: {assessment.developer_score:.2f}",
-            styles["BodyText"]
+        story.append(
+            Paragraph(
+                "Inventory Risk: Not Assessed",
+                styles["BodyText"]
+            )
         )
-    )
+
+    else:
+
+        story.append(
+            Paragraph(
+                f"Inventory Risk: {assessment.inventory_score:.2f}",
+                styles["BodyText"]
+            )
+        )
+
+    if assessment.developer_score is None:
+
+        story.append(
+            Paragraph(
+                "Developer Quality: Not Assessed",
+                styles["BodyText"]
+            )
+        )
+
+    else:
+
+        story.append(
+            Paragraph(
+                f"Developer Quality: {assessment.developer_score:.2f}",
+                styles["BodyText"]
+            )
+        )
 
     story.append(
         Spacer(1, 8)
@@ -528,21 +550,21 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "Valuation Analysis — 50%",
+            "Valuation Analysis",
             styles["BodyText"]
         )
     )
 
     story.append(
         Paragraph(
-            "Inventory Risk — 30%",
+            "Inventory Assessment (when available)",
             styles["BodyText"]
         )
     )
 
     story.append(
         Paragraph(
-            "Developer Quality — 20%",
+            "Developer Assessment (when available)",
             styles["BodyText"]
         )
     )
@@ -578,7 +600,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "These weights represent the current PropertyIQ assessment methodology and may evolve as additional market intelligence and performance data become available.",
+            "PropertyIQ automatically adjusts the Buyer Protection Score using all available assessment models. When inventory or developer information is unavailable, the score is calculated using the remaining available evidence.",
             styles["BodyText"]
         )
     )

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-
+from typing import Optional
 from pydantic import BaseModel
 
 from backend.assessment_pipeline import (
@@ -53,14 +53,14 @@ class PropertyRequest(BaseModel):
 
     monthlyRent: float = 0
 
-    totalUnits: int = 100
-    unsoldUnits: int = 20
+    totalUnits: Optional[int] = None
+    unsoldUnits: Optional[int] = None
 
-    projectsCompleted: int = 10
-    projectsDelayed: int = 1
+    projectsCompleted: Optional[int] = None
+    projectsDelayed: Optional[int] = None
 
-    yearsInBusiness: int = 15
-    regulatoryViolations: int = 0
+    yearsInBusiness: Optional[int] = None
+    regulatoryViolations: Optional[int] = None
 
     areaUnit: str = "sqft"
 
@@ -101,9 +101,7 @@ def build_assessment(data: PropertyRequest):
 
     property_input = build_property_input(data)
 
-    return run_assessment(
-        property_input
-    )
+    return run_assessment(property_input)
 
 @app.post("/assess")
 def assess(data: PropertyRequest):

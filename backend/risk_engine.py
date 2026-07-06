@@ -11,18 +11,32 @@ def identify_risks(
             "Property appears materially overpriced."
         )
 
-    if inventory_risk in [
+    if inventory_risk == "NOT_ASSESSED":
+
+        risks.append(
+            "Inventory risk could not be assessed because project inventory data was not provided."
+        )
+
+    elif inventory_risk in [
         "HIGH",
         "SEVERE"
     ]:
+
         risks.append(
             "Elevated inventory levels may impact appreciation and resale."
         )
 
-    if developer_rating in [
+    if developer_rating == "NOT_ASSESSED":
+
+        risks.append(
+            "Developer risk could not be assessed because developer information was not provided."
+        )
+
+    elif developer_rating in [
         "AVERAGE",
         "WEAK"
     ]:
+
         risks.append(
             "Developer execution history warrants additional diligence."
         )

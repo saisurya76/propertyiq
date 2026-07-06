@@ -687,14 +687,18 @@ function AssessmentResult({
         <div className="metric-card">
           <h4>Developer Rating</h4>
           <p>
-            {result.developerRating}
+            {result.developerRating === "NOT_ASSESSED"
+              ? "Not Assessed"
+              : result.developerRating}
           </p>
         </div>
 
         <div className="metric-card">
           <h4>Inventory Risk</h4>
           <p>
-            {result.inventoryRisk}
+            {result.inventoryRisk === "NOT_ASSESSED"
+              ? "Not Assessed"
+              : result.inventoryRisk}
           </p>
         </div>
 

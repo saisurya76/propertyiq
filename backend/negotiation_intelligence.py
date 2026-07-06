@@ -34,11 +34,20 @@ def assess_negotiation_position(
 
         position = "Strong Buyer Position"
 
-        reason = (
-            "Property is priced above estimated fair value "
-            "and inventory levels are elevated, creating "
-            "favorable negotiation leverage for buyers."
-        )
+        if inventory_risk == "NOT_ASSESSED":
+
+            reason = (
+                "Property is priced above estimated fair value, "
+                "creating favorable negotiation leverage for buyers."
+            )
+
+        else:
+
+            reason = (
+                "Property is priced above estimated fair value "
+                "and inventory levels are elevated, creating "
+                "favorable negotiation leverage for buyers."
+            )
 
     elif overpricing > 5:
 

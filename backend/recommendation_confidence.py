@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+from typing import Optional
 
 @dataclass
 class RecommendationConfidence:
@@ -10,18 +10,28 @@ class RecommendationConfidence:
 
 def assess_recommendation_confidence(
     buyer_protection_score: float,
-    developer_score: float,
-    inventory_score: float,
+    developer_score: Optional[float],
+    inventory_score: Optional[float],
     valuation_score: float
 ):
 
+    scores = [
+        buyer_protection_score,
+        valuation_score
+    ]
+
+    if developer_score is not None:
+        scores.append(
+            developer_score
+        )
+
+    if inventory_score is not None:
+        scores.append(
+            inventory_score
+        )
+
     score = round(
-        (
-            buyer_protection_score +
-            developer_score +
-            inventory_score +
-            valuation_score
-        ) / 4,
+        sum(scores) / len(scores),
         2
     )
 
@@ -31,8 +41,7 @@ def assess_recommendation_confidence(
 
         reason = (
             "PropertyIQ's recommendation is supported by "
-            "strong and consistent signals across all "
-            "assessment models."
+            "strong and consistent evidence."
         )
 
     elif score >= 80:
@@ -40,9 +49,8 @@ def assess_recommendation_confidence(
         rating = "HIGH"
 
         reason = (
-            "The recommendation is supported by multiple "
-            "independent assessment models with good "
-            "overall agreement."
+            "Most available assessment models support "
+            "the recommendation."
         )
 
     elif score >= 70:
@@ -50,8 +58,8 @@ def assess_recommendation_confidence(
         rating = "MODERATE"
 
         reason = (
-            "Most assessment models support the recommendation, "
-            "though some uncertainty remains."
+            "The available evidence generally supports "
+            "the recommendation."
         )
 
     elif score >= 60:
@@ -59,8 +67,8 @@ def assess_recommendation_confidence(
         rating = "LOW"
 
         reason = (
-            "Assessment results are mixed. Additional due "
-            "diligence is recommended."
+            "Available evidence is mixed. Additional "
+            "due diligence is recommended."
         )
 
     else:
@@ -68,8 +76,8 @@ def assess_recommendation_confidence(
         rating = "VERY LOW"
 
         reason = (
-            "Assessment signals are inconsistent. Exercise "
-            "additional caution before proceeding."
+            "Available evidence is limited or inconsistent. "
+            "Exercise additional caution."
         )
 
     return RecommendationConfidence(

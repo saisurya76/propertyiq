@@ -31,6 +31,9 @@ def rental_yield_value(
             "Target yield must be greater than zero."
         )
 
+    if monthly_rent <= 0:
+        return 0.0
+
     annual_rent = monthly_rent * 12
 
     fair_value = (
