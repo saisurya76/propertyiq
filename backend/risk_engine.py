@@ -14,7 +14,7 @@ def identify_risks(
     if inventory_risk == "NOT_ASSESSED":
 
         risks.append(
-            "Inventory risk could not be assessed because project inventory data was not provided."
+            "Inventory assessment was not performed because project inventory data was not provided."
         )
 
     elif inventory_risk in [
@@ -29,7 +29,7 @@ def identify_risks(
     if developer_rating == "NOT_ASSESSED":
 
         risks.append(
-            "Developer risk could not be assessed because developer information was not provided."
+            "Developer assessment was not performed because developer performance information was not provided."
         )
 
     elif developer_rating in [

@@ -621,7 +621,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            f"• Property is priced {position_text.lower()}.",
+            f"• Property is {position_text.lower()}."
             styles["BodyText"]
         )
     )

@@ -37,7 +37,7 @@ def generate_executive_summary(
 
         developer_text = (
             "Developer Assessment:\n"
-            "Not Performed"
+            "Not Assessed"
         )
 
     else:
@@ -52,7 +52,7 @@ def generate_executive_summary(
 
         inventory_text = (
             "Inventory Assessment:\n"
-            "Not Performed"
+            "Not Assessed"
         )
 
     else:
