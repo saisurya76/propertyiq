@@ -1,13 +1,15 @@
-export const FRAUD_COLORS = {
+export const GEO_COLORS = {
 
     VERY_HIGH: "#dc2626",
 
-    HIGH: "#ea580c",
+    HIGH: "#f97316",
 
     MEDIUM: "#facc15",
 
     LOW: "#22c55e",
 
-    VERY_LOW: "#e5e7eb"
+    VERY_LOW: "#e5e7eb",
+
+    UNKNOWN: "#cbd5e1"
 
 };
