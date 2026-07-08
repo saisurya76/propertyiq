@@ -13,7 +13,8 @@ class FraudStatus:
 
 @dataclass
 class FraudType:
-    name: str
+    id: str
+    display_name: str
     description: str
 
 
@@ -21,7 +22,7 @@ class FraudType:
 class FraudEvidence:
     evidence_id: str
 
-    fraud_type: str
+    fraud_type_id: str
 
     country: str
     state: str

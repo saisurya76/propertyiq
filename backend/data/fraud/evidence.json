@@ -1,0 +1,28 @@
+[
+  {
+    "evidence_id": "IND-TG-HYD-000001",
+
+    "country": "IN",
+    "state": "Telangana",
+    "city": "Hyderabad",
+    "locality": "Gachibowli",
+
+    "fraud_type_id": "REVENUE_RECORD_MANIPULATION",
+
+    "source_type": "Government",
+
+    "source_name": "PropertyIQ Sample",
+
+    "published_date": "2026-07-08T00:00:00",
+
+    "retrieved_date": "2026-07-08T16:00:00",
+
+    "confidence": 0.95,
+
+    "citation": "Illustrative sample evidence.",
+
+    "url": "https://example.com",
+
+    "summary": "Sample evidence used for testing the Fraud Intelligence engine."
+  }
+]

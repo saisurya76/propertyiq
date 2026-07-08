@@ -13,52 +13,63 @@ from backend.fraud_intelligence.models import FraudType
 FRAUD_TYPES = [
 
     FraudType(
-        name="Title Chain Risk",
+        id="TITLE_CHAIN_RISK",
+        display_name="Title Chain Risk",
         description="Historical ownership chain inconsistencies or uncertainty."
     ),
 
     FraudType(
-        name="Revenue Record Manipulation",
+        id="REVENUE_RECORD_MANIPULATION",
+        display_name="Revenue Record Manipulation",
         description="Manipulation or inconsistency in government land or revenue records."
     ),
 
     FraudType(
-        name="Government Land Disputes",
+        id="GOVERNMENT_LAND_DISPUTES",
+        display_name="Government Land Disputes",
         description="Claims involving government-owned or assigned land."
     ),
 
     FraudType(
-        name="Multiple Sale Fraud",
+        id="MULTIPLE_SALE_FRAUD",
+        display_name="Multiple Sale Fraud",
         description="Same property allegedly sold or promised to multiple buyers."
     ),
 
     FraudType(
-        name="Forged Documents",
+        id="FORGED_DOCUMENTS",
+        display_name="Forged Documents",
         description="Forgery involving sale deeds, title deeds, GPA, POA or supporting documents."
     ),
 
     FraudType(
-        name="Mortgage Fraud",
+        id="MORTGAGE_FRAUD",
+        display_name="Mortgage Fraud",
         description="Property sold despite existing mortgage or financial encumbrance."
     ),
 
     FraudType(
-        name="Illegal Layouts",
+        id="ILLEGAL_LAYOUTS",
+        display_name="Illegal Layouts",
         description="Unauthorized layouts or plotting without statutory approvals."
     ),
 
     FraudType(
-        name="Builder Fraud",
+        id="BUILDER_FRAUD",
+        display_name="Builder Fraud",
         description="Developer misconduct identified through regulatory or judicial records."
     ),
 
     FraudType(
-        name="Approval Misrepresentation",
+        id="APPROVAL_MISREPRESENTATION",
+        display_name="Approval Misrepresentation",
         description="Misrepresentation or absence of mandatory statutory approvals."
     ),
 
     FraudType(
-        name="Survey Manipulation",
+        id="SURVEY_MANIPULATION",
+        display_name="Survey Manipulation",
         description="Survey number, boundary or cadastral manipulation."
     )
+
 ]
