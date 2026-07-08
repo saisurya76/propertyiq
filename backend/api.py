@@ -167,6 +167,186 @@ def assess(data: PropertyRequest):
         "governmentBuyerObservation":
             assessment.government_intelligence.buyer_observation,    
 
+        "fraudIntelligence": {
+
+            "status":
+                assessment.fraud_intelligence.status.status,
+
+            "reportId":
+                assessment.fraud_intelligence.status.report_id,
+
+            "generatedAt":
+                assessment.fraud_intelligence.status.generated_at,
+
+            "evidenceLastSynced":
+                assessment.fraud_intelligence.status.evidence_last_synced,
+
+            #
+            # CITY
+            #
+
+            "city": [
+
+                {
+                    "id":
+                        item.fraud_type.id,
+
+                    "displayName":
+                        item.fraud_type.display_name,
+
+                    "description":
+                        item.fraud_type.description,
+
+                    "riskLevel":
+                        item.risk_level,
+
+                    "color":
+                        item.color,
+
+                    "evidenceCount":
+                        item.evidence_count,
+
+                    "applicable":
+                        item.applicable
+                }
+
+                for item in
+                assessment.fraud_intelligence.city
+            ],
+
+            "cityHeatmap":
+                assessment.fraud_intelligence.city_heatmap,
+
+            #
+            # COUNTRY
+            #
+
+            "country": [
+
+                {
+                    "id":
+                        item.fraud_type.id,
+
+                    "displayName":
+                        item.fraud_type.display_name,
+
+                    "description":
+                        item.fraud_type.description,
+
+                    "riskLevel":
+                        item.risk_level,
+
+                    "color":
+                        item.color,
+
+                    "evidenceCount":
+                        item.evidence_count,
+
+                    "applicable":
+                        item.applicable
+                }
+
+                for item in
+                assessment.fraud_intelligence.country
+            ],
+
+            "countryHeatmap":
+                assessment.fraud_intelligence.country_heatmap,
+
+            #
+            # GLOBAL
+            #
+
+            "globalTaxonomy": [
+
+                {
+                    "id":
+                        item.fraud_type.id,
+
+                    "displayName":
+                        item.fraud_type.display_name,
+
+                    "description":
+                        item.fraud_type.description,
+
+                    "riskLevel":
+                        item.risk_level,
+
+                    "color":
+                        item.color,
+
+                    "evidenceCount":
+                        item.evidence_count,
+
+                    "applicable":
+                        item.applicable
+                }
+
+                for item in
+                assessment.fraud_intelligence.global_taxonomy
+            ],
+
+            "globalHeatmap":
+                assessment.fraud_intelligence.global_heatmap,
+
+            #
+            # Evidence
+            #
+
+            "evidence": [
+
+                {
+                    "evidenceId":
+                        evidence.evidence_id,
+
+                    "fraudTypeId":
+                        evidence.fraud_type_id,
+
+                    "country":
+                        evidence.country,
+
+                    "state":
+                        evidence.state,
+
+                    "city":
+                        evidence.city,
+
+                    "locality":
+                        evidence.locality,
+
+                    "sourceType":
+                        evidence.source_type,
+
+                    "sourceName":
+                        evidence.source_name,
+
+                    "publishedDate":
+                        evidence.published_date,
+
+                    "retrievedDate":
+                        evidence.retrieved_date,
+
+                    "confidence":
+                        evidence.confidence,
+
+                    "citation":
+                        evidence.citation,
+
+                    "url":
+                        evidence.url,
+
+                    "summary":
+                        evidence.summary
+                }
+
+                for evidence in
+                assessment.fraud_intelligence.evidence
+            ],
+
+            "citations":
+                assessment.fraud_intelligence.citations
+        },    
+
         "inventoryRisk":
             assessment.inventory_risk,
 

@@ -39,3 +39,9 @@ def test_pipeline():
     assert assessment.property_name == "Aparna Sarovar Zenith"
 
     assert assessment.recommendation is not None
+
+    assert assessment.fraud_intelligence is not None
+    assert assessment.fraud_intelligence.status.status in (
+        "AVAILABLE",
+        "UNAVAILABLE"
+    )

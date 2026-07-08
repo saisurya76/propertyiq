@@ -77,6 +77,9 @@ from backend.assessment import (
     create_assessment
 )
 
+from backend.fraud_intelligence.engine import (
+    generate_fraud_report
+)
 
 @dataclass
 class PropertyInput:
@@ -331,6 +334,16 @@ def run_assessment(
         )
     )
 
+    #fraud_intelligence
+    fraud_intelligence = (
+        generate_fraud_report(
+            country=property_input.country,
+            state=property_input.state_province,
+            city=property_input.city,
+            locality=property_input.locality
+        )
+    )
+
     # Findings
 
     findings = generate_findings(
@@ -438,6 +451,9 @@ def run_assessment(
 
         government_intelligence=
             government_intelligence,
+            
+        fraud_intelligence=
+            fraud_intelligence,
 
         comparables=comparables,
 

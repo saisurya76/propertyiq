@@ -44,17 +44,51 @@ class FraudEvidence:
 
 
 @dataclass
+class FraudAssessment:
+
+    fraud_type: FraudType
+
+    risk_level: str
+
+    color: str
+
+    evidence_count: int
+
+    applicable: bool
+
+@dataclass
 class FraudReport:
+
     status: FraudStatus
 
-    fraud_types: List[FraudType]
+    #
+    # City Intelligence
+    #
+
+    city: List[FraudAssessment]
+
+    city_heatmap: Optional[dict]
+
+    #
+    # Country Intelligence
+    #
+
+    country: List[FraudAssessment]
+
+    country_heatmap: Optional[dict]
+
+    #
+    # Global Intelligence
+    #
+
+    global_taxonomy: List[FraudAssessment]
+
+    global_heatmap: Optional[dict]
+
+    #
+    # Supporting Evidence
+    #
 
     evidence: List[FraudEvidence]
-
-    locality_heatmap: Optional[bytes]
-
-    country_heatmap: Optional[bytes]
-
-    global_heatmap: Optional[bytes]
 
     citations: List[str]

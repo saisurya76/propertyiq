@@ -11,6 +11,11 @@ from backend.decision_intelligence import (
     DecisionResult
 )
 
+from backend.fraud_intelligence.models import (
+    FraudReport
+)
+
+
 @dataclass
 class PropertyAssessment:
     property_name: str
@@ -45,7 +50,7 @@ class PropertyAssessment:
     buyer_protection_rating: str
 
     recommendation: str
-    
+
     deal_quality: str
     deal_quality_reason: str
 
@@ -68,6 +73,8 @@ class PropertyAssessment:
     findings: FindingsResult
 
     government_intelligence: GovernmentIntelligence
+
+    fraud_intelligence: FraudReport
 
     # Market Intelligence
 
@@ -134,12 +141,14 @@ def create_assessment(
 
     government_intelligence: GovernmentIntelligence,
 
+    fraud_intelligence: FraudReport,
+
     comparables: list,
 
     market_average_price_per_sqft: float,
 
     decision: DecisionResult
-    
+
 ) -> PropertyAssessment:
 
     return PropertyAssessment(
@@ -152,7 +161,7 @@ def create_assessment(
 
         quoted_price=quoted_price,
         fair_value=fair_value,
-                
+
         quoted_price_per_sqft=
             quoted_price_per_sqft,
 
@@ -198,7 +207,7 @@ def create_assessment(
             high_offer,
 
         potential_savings=
-            potential_savings,    
+            potential_savings,
 
         buyer_advantage_score=
             buyer_advantage_score,
@@ -216,17 +225,20 @@ def create_assessment(
             recommendation_confidence_rating,
 
         recommendation_confidence_reason=
-            recommendation_confidence_reason,        
+            recommendation_confidence_reason,
 
         findings=findings,
 
         government_intelligence=
             government_intelligence,
 
+        fraud_intelligence=
+            fraud_intelligence,
+
         comparables=comparables,
 
         market_average_price_per_sqft=
             market_average_price_per_sqft,
 
-        decision=decision    
+        decision=decision
     )

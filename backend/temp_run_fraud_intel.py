@@ -1,12 +1,8 @@
-from backend.fraud_intelligence.evidence_loader import load_evidence
-from backend.fraud_intelligence.evidence_search import search_evidence
-
-records = load_evidence(
-    "backend/data/fraud/evidence.json"
+from backend.fraud_intelligence.engine import (
+    generate_fraud_report
 )
 
-matches = search_evidence(
-    records,
+report = generate_fraud_report(
 
     country="IN",
 
@@ -18,11 +14,53 @@ matches = search_evidence(
 )
 
 print()
-
-print(f"Found {len(matches)} matching evidence record(s)")
+print("========== STATUS ==========")
+print(report.status)
 
 print()
+print("========== CITY ==========")
 
-for item in matches:
+for item in report.city:
 
+    print(
+        f"{item.fraud_type.display_name:<40}"
+        f"{item.risk_level:<10}"
+        f"{item.color:<8}"
+        f"Evidence={item.evidence_count}"
+    )
+
+print()
+print("========== COUNTRY ==========")
+
+for item in report.country:
+
+    print(
+        f"{item.fraud_type.display_name:<40}"
+        f"{item.risk_level:<10}"
+        f"{item.color:<8}"
+        f"Evidence={item.evidence_count}"
+    )
+
+print()
+print("========== GLOBAL ==========")
+
+for item in report.global_taxonomy:
+
+    print(
+        f"{item.fraud_type.display_name:<40}"
+        f"{item.risk_level:<10}"
+        f"{item.color:<8}"
+        f"Evidence={item.evidence_count}"
+    )
+
+print()
+print("========== EVIDENCE ==========")
+
+for item in report.evidence:
+    print(item)
+
+print()
+print("========== CITATIONS ==========")
+
+for item in report.citations:
     print(item)
