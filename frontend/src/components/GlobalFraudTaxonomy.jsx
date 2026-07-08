@@ -22,7 +22,7 @@ export default function GlobalFraudTaxonomy({ data }) {
           fontWeight: "700"
         }}
       >
-        GLOBAL FRAUD TAXONOMY
+        GLOBAL FRAUD RISK MATRIX
       </div>
 
       <div

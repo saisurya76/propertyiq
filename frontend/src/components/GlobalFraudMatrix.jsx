@@ -1,7 +1,9 @@
 export default function GlobalFraudMatrix({ data }) {
 
-  const countries = data?.countries ?? [];
-  const fraudTypes = data?.fraudTypes ?? [];
+ const matrix = data?.globalMatrix;
+ const countries = matrix?.countries ?? [];
+ const fraudTypes = matrix?.fraudTypes ?? [];
+ const cells = matrix?.cells ?? [];
 
   return (
 
@@ -41,18 +43,18 @@ export default function GlobalFraudMatrix({ data }) {
 
             {countries.map((country) => (
 
-              <th
-                key={country.code}
-                style={{
-                  padding: "12px",
-                  textAlign: "center",
-                  whiteSpace: "nowrap"
-                }}
-              >
-                {country.name}
-              </th>
+                <th
+                    key={country}
+                    style={{
+                    padding: "12px",
+                    textAlign: "center",
+                    whiteSpace: "nowrap"
+                    }}
+                >
+                    {country}
+                </th>
 
-            ))}
+                ))}
 
           </tr>
 
@@ -90,19 +92,45 @@ export default function GlobalFraudMatrix({ data }) {
 
               </td>
 
-              {countries.map((country) => (
+              {countries.map((country) => {
 
-                <td
-                  key={country.code}
-                  style={{
-                    textAlign: "center",
-                    padding: "12px"
-                  }}
-                >
-                  —
-                </td>
+                const cell =
+                    cells.find(
 
-              ))}
+                    c =>
+
+                        c.country === country &&
+
+                        c.fraudTypeId === fraud.id
+
+                    );
+
+                return (
+
+                    <td
+                    key={country}
+                    style={{
+                        textAlign: "center",
+                        padding: "12px",
+                        fontSize: "22px"
+                    }}
+                    >
+
+                    {cell?.color === "RED" && "🔴"}
+
+                    {cell?.color === "ORANGE" && "🟠"}
+
+                    {cell?.color === "YELLOW" && "🟡"}
+
+                    {cell?.color === "GREEN" && "🟢"}
+
+                    {!cell && "⚪"}
+
+                    </td>
+
+                );
+
+                })}
 
             </tr>
 

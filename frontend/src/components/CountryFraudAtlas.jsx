@@ -1,3 +1,5 @@
+import CountryFraudMap from "./CountryFraudMap";
+
 export default function CountryFraudAtlas({ data }) {
 
   return (
@@ -51,22 +53,9 @@ export default function CountryFraudAtlas({ data }) {
 
         </div>
 
-        <div
-          style={{
-            height: "420px",
-            border: "2px dashed #cbd5e1",
-            borderRadius: "10px",
-            background: "#f8fafc",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "#64748b",
-            fontSize: "18px",
-            fontWeight: "600"
-          }}
-        >
-          Dynamic Country Fraud Atlas
-        </div>
+        <CountryFraudMap
+            data={data}
+        />
 
         <div
           style={{

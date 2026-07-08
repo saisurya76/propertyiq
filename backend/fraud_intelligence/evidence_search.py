@@ -8,10 +8,44 @@ def _match(value: str, expected: str) -> bool:
     if expected is None:
         return True
 
-    if expected.strip() == "":
+    expected = expected.strip()
+
+    if expected == "":
         return True
 
-    return value.strip().lower() == expected.strip().lower()
+    #
+    # Unknown locality means
+    # city-level search
+    #
+
+    if expected.lower() == "unknown":
+        return True
+
+    value = value.strip()
+
+    #
+    # Country aliases
+    #
+
+    aliases = {
+        "india": "in",
+        "in": "in",
+        "usa": "us",
+        "united states": "us",
+        "us": "us"
+    }
+
+    left = aliases.get(
+        value.lower(),
+        value.lower()
+    )
+
+    right = aliases.get(
+        expected.lower(),
+        expected.lower()
+    )
+
+    return left == right
 
 
 def search_evidence(

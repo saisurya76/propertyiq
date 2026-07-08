@@ -1,6 +1,8 @@
 import CityFraudAtlas from "./CityFraudAtlas";
 import CountryFraudAtlas from "./CountryFraudAtlas";
 import GlobalFraudTaxonomy from "./GlobalFraudTaxonomy";
+import FraudEvidence from "./FraudEvidence";
+import FraudCitations from "./FraudCitations";
 
 function StatusCircle({ color }) {
 
@@ -194,7 +196,7 @@ export default function FraudIntelligence({ result }) {
       />
 
       <CityFraudAtlas
-        data={fraud.cityHeatmap}
+            data={fraud}
         />
 
       <FraudTable
@@ -203,7 +205,7 @@ export default function FraudIntelligence({ result }) {
       />
 
       <CountryFraudAtlas
-            data={fraud.countryHeatmap}
+            data={fraud}
         />
 
       <FraudTable
@@ -212,9 +214,17 @@ export default function FraudIntelligence({ result }) {
       />
 
       <GlobalFraudTaxonomy
-            data={fraud.globalHeatmap}
+            data={fraud}
         />
 
+        <FraudEvidence
+            data={fraud}
+        />
+
+        <FraudCitations
+            data={fraud}
+        />
+        
     </div>
 
   );

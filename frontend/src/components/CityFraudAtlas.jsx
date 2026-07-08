@@ -1,3 +1,5 @@
+import CityFraudHeatMap from "./CityFraudHeatMap";
+
 export default function CityFraudAtlas({ data }) {
 
   return (
@@ -20,7 +22,7 @@ export default function CityFraudAtlas({ data }) {
           fontWeight: "700"
         }}
       >
-        CITY FRAUD ATLAS
+        CITY FRAUD HEAT MAP
       </div>
 
       <div
@@ -51,22 +53,9 @@ export default function CityFraudAtlas({ data }) {
 
         </div>
 
-        <div
-          style={{
-            height: "420px",
-            border: "2px dashed #cbd5e1",
-            borderRadius: "10px",
-            background: "#f8fafc",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "#64748b",
-            fontSize: "18px",
-            fontWeight: "600"
-          }}
-        >
-          Dynamic City Fraud Atlas
-        </div>
+        <CityFraudHeatMap
+            data={data}
+        />
 
         <div
           style={{
