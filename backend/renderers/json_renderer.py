@@ -8,5 +8,6 @@ def render_json(
 
     return json.dumps(
         asdict(assessment),
-        indent=4
+        indent=4,
+        default=str
     )

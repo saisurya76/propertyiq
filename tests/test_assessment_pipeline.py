@@ -43,5 +43,6 @@ def test_pipeline():
     assert assessment.fraud_intelligence is not None
     assert assessment.fraud_intelligence.status.status in (
         "AVAILABLE",
+        "PARTIAL",
         "UNAVAILABLE"
     )

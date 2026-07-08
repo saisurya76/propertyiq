@@ -56,6 +56,18 @@ class FraudAssessment:
 
     applicable: bool
 
+@dataclass
+class GeoRiskRegion:
+
+    region_id: str
+
+    region_name: str
+
+    risk_level: str
+
+    color: str
+
+    incident_count: int = 0
 
 @dataclass
 class FraudMatrixCell:
@@ -88,7 +100,8 @@ class FraudReport:
 
     city: List[FraudAssessment]
 
-    city_heatmap: Optional[dict]
+    city_heatmap: List[GeoRiskRegion]
+
 
     #
     # Country Intelligence
@@ -96,7 +109,7 @@ class FraudReport:
 
     country: List[FraudAssessment]
 
-    country_heatmap: Optional[dict]
+    country_heatmap: List[GeoRiskRegion]
 
     #
     # Global Intelligence
@@ -104,7 +117,7 @@ class FraudReport:
 
     global_taxonomy: List[FraudAssessment]
 
-    global_heatmap: Optional[dict]
+    global_heatmap: List[GeoRiskRegion]
 
     #
     # Global Fraud Matrix
