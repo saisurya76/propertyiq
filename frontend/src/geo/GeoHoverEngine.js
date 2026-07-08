@@ -1,3 +1,7 @@
+import { createTooltip } from "./GeoTooltip";
+
+const tooltip = createTooltip();
+
 export function enableHover(svgRoot) {
 
     if (!svgRoot) {
@@ -14,14 +18,36 @@ export function enableHover(svgRoot) {
 
         path.addEventListener("mouseenter", () => {
 
-            path.dataset.previousFill = path.style.fill;
-
             path.style.stroke = "#0f172a";
             path.style.strokeWidth = "2";
 
-            console.log(
-                path.getAttribute("name")
-            );
+            tooltip.innerHTML = `
+
+                <div style="font-weight:700;font-size:15px">
+
+                    ${path.getAttribute("name")}
+
+                </div>
+
+                <div style="margin-top:8px;color:#64748b">
+
+                    Click for details
+
+                </div>
+
+            `;
+
+            tooltip.style.display = "block";
+
+        });
+
+        path.addEventListener("mousemove", (e) => {
+
+            tooltip.style.left =
+                (e.clientX + 15) + "px";
+
+            tooltip.style.top =
+                (e.clientY + 15) + "px";
 
         });
 
@@ -29,6 +55,8 @@ export function enableHover(svgRoot) {
 
             path.style.stroke = "#ffffff";
             path.style.strokeWidth = "1";
+
+            tooltip.style.display = "none";
 
         });
 
