@@ -64,3 +64,15 @@ print("========== CITATIONS ==========")
 
 for item in report.citations:
     print(item)
+
+print()
+
+print(report.global_matrix.countries)
+
+print()
+
+print(len(report.global_matrix.fraud_types))
+
+print()
+
+print(len(report.global_matrix.cells))    

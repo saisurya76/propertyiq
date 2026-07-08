@@ -1,3 +1,7 @@
+import CityFraudAtlas from "./CityFraudAtlas";
+import CountryFraudAtlas from "./CountryFraudAtlas";
+import GlobalFraudTaxonomy from "./GlobalFraudTaxonomy";
+
 function StatusCircle({ color }) {
 
   const colors = {
@@ -189,123 +193,27 @@ export default function FraudIntelligence({ result }) {
         items={fraud.city}
       />
 
-      <div
-        style={{
-            marginTop: "15px",
-            background: "#ffffff",
-            border: "1px solid #dbe4ef",
-            borderRadius: "14px",
-            overflow: "hidden"
-        }}
-        >
-
-        <div
-            style={{
-            background: "#0f172a",
-            color: "#ffffff",
-            padding: "14px 18px",
-            fontWeight: "700"
-            }}
-        >
-            CITY FRAUD ATLAS
-        </div>
-
-        <div
-            style={{
-            height: "420px",
-            background: "#f8fafc",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "#64748b"
-            }}
-        >
-            Dynamic City Fraud Atlas
-        </div>
-
-        </div>
+      <CityFraudAtlas
+        data={fraud.cityHeatmap}
+        />
 
       <FraudTable
         title="COUNTRY FRAUD INTELLIGENCE"
         items={fraud.country}
       />
 
-      <div
-        style={{
-            marginTop: "15px",
-            background: "#ffffff",
-            border: "1px solid #dbe4ef",
-            borderRadius: "14px",
-            overflow: "hidden"
-        }}
-        >
-
-        <div
-            style={{
-            background: "#0f172a",
-            color: "#ffffff",
-            padding: "14px 18px",
-            fontWeight: "700"
-            }}
-        >
-            COUNTRY FRAUD ATLAS
-        </div>
-
-        <div
-            style={{
-            height: "420px",
-            background: "#f8fafc",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "#64748b"
-            }}
-        >
-            Dynamic Country Fraud Atlas
-        </div>
-
-        </div>
+      <CountryFraudAtlas
+            data={fraud.countryHeatmap}
+        />
 
       <FraudTable
         title="GLOBAL FRAUD TAXONOMY"
         items={fraud.globalTaxonomy}
       />
 
-      <div
-        style={{
-            marginTop: "15px",
-            background: "#ffffff",
-            border: "1px solid #dbe4ef",
-            borderRadius: "14px",
-            overflow: "hidden"
-        }}
-        >
-
-        <div
-            style={{
-            background: "#0f172a",
-            color: "#ffffff",
-            padding: "14px 18px",
-            fontWeight: "700"
-            }}
-        >
-            GLOBAL FRAUD TAXONOMY
-        </div>
-
-        <div
-            style={{
-            height: "420px",
-            background: "#f8fafc",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "#64748b"
-            }}
-        >
-            Dynamic Global Fraud Taxonomy Matrix
-        </div>
-
-        </div>
+      <GlobalFraudTaxonomy
+            data={fraud.globalHeatmap}
+        />
 
     </div>
 

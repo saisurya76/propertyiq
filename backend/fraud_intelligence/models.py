@@ -56,6 +56,27 @@ class FraudAssessment:
 
     applicable: bool
 
+
+@dataclass
+class FraudMatrixCell:
+
+    country: str
+
+    fraud_type_id: str
+
+    risk_level: str
+
+    color: str
+
+@dataclass
+class GlobalFraudMatrix:
+
+    countries: List[str]
+
+    fraud_types: List[FraudType]
+
+    cells: List[FraudMatrixCell]
+
 @dataclass
 class FraudReport:
 
@@ -84,6 +105,11 @@ class FraudReport:
     global_taxonomy: List[FraudAssessment]
 
     global_heatmap: Optional[dict]
+
+    #
+    # Global Fraud Matrix
+    #
+    global_matrix: Optional[GlobalFraudMatrix]
 
     #
     # Supporting Evidence

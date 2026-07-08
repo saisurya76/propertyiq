@@ -290,6 +290,67 @@ def assess(data: PropertyRequest):
                 assessment.fraud_intelligence.global_heatmap,
 
             #
+            # GLOBAL MATRIX
+            #
+
+            "globalMatrix": (
+
+                None
+
+                if assessment.fraud_intelligence.global_matrix is None
+
+                else {
+
+                    "countries":
+                        assessment.fraud_intelligence
+                        .global_matrix
+                        .countries,
+
+                    "fraudTypes": [
+
+                        {
+                            "id":
+                                fraud.id,
+
+                            "displayName":
+                                fraud.display_name,
+
+                            "description":
+                                fraud.description
+                        }
+
+                        for fraud in
+                        assessment.fraud_intelligence
+                        .global_matrix
+                        .fraud_types
+                    ],
+
+                    "cells": [
+
+                        {
+                            "country":
+                                cell.country,
+
+                            "fraudTypeId":
+                                cell.fraud_type_id,
+
+                            "riskLevel":
+                                cell.risk_level,
+
+                            "color":
+                                cell.color
+                        }
+
+                        for cell in
+                        assessment.fraud_intelligence
+                        .global_matrix
+                        .cells
+                    ]
+                }
+
+            ),
+
+            #
             # Evidence
             #
 

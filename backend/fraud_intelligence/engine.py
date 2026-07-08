@@ -1,8 +1,11 @@
 from datetime import datetime
+from typing import List
 
 from backend.fraud_intelligence.models import (
     FraudStatus,
     FraudAssessment,
+    FraudMatrixCell,
+    GlobalFraudMatrix,
     FraudReport
 )
 
@@ -34,7 +37,7 @@ def generate_report_id():
     return f"PIQ-FI-{timestamp}"
 
 
-def build_assessments(evidence):
+def build_city_assessments(evidence):
 
     assessments = []
 
@@ -72,6 +75,59 @@ def build_assessments(evidence):
     return assessments
 
 
+def build_country_assessments(evidence):
+
+    return build_city_assessments(
+        evidence
+    )
+
+
+def build_global_assessments(evidence):
+
+    return build_city_assessments(
+        evidence
+    )
+
+def build_global_matrix(
+    assessments: List[FraudAssessment],
+    countries: List[str]
+) -> GlobalFraudMatrix:
+
+    cells = []
+
+    for country in countries:
+
+        for assessment in assessments:
+
+            cells.append(
+
+                FraudMatrixCell(
+
+                    country=country,
+
+                    fraud_type_id=
+                        assessment.fraud_type.id,
+
+                    risk_level=
+                        assessment.risk_level,
+
+                    color=
+                        assessment.color
+                )
+            )
+
+    return GlobalFraudMatrix(
+
+        countries=countries,
+
+        fraud_types=[
+            a.fraud_type
+            for a in assessments
+        ],
+
+        cells=cells
+    )
+
 def generate_fraud_report(
     country: str,
     state: str,
@@ -99,8 +155,25 @@ def generate_fraud_report(
         evidence
     )
 
-    assessments = build_assessments(
+    city_assessments = build_city_assessments(
         evidence
+    )
+
+    country_assessments = build_country_assessments(
+        evidence
+    )
+
+    global_assessments = build_global_assessments(
+        evidence
+    )
+
+    global_matrix = build_global_matrix(
+
+        assessments=global_assessments,
+
+        countries=[
+            country
+        ]
     )
 
     status = FraudStatus(
@@ -108,9 +181,12 @@ def generate_fraud_report(
         report_id=generate_report_id(),
 
         status=(
+
             "AVAILABLE"
+
             if evidence
-            else "UNAVAILABLE"
+
+            else "PARTIAL"
         ),
 
         generated_at=datetime.now(),
@@ -122,17 +198,19 @@ def generate_fraud_report(
 
         status=status,
 
-        city=assessments,
+        city=city_assessments,
 
         city_heatmap=None,
 
-        country=assessments,
+        country=country_assessments,
 
         country_heatmap=None,
 
-        global_taxonomy=assessments,
+        global_taxonomy=global_assessments,
 
         global_heatmap=None,
+
+        global_matrix=global_matrix,
 
         evidence=evidence,
 
