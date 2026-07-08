@@ -1,4 +1,5 @@
 import CountryFraudMap from "./CountryFraudMap";
+import { GeoMap } from "../geo";
 
 export default function CountryFraudAtlas({ data }) {
 
@@ -56,6 +57,16 @@ export default function CountryFraudAtlas({ data }) {
         <CountryFraudMap
             data={data}
         />
+
+       <div
+            style={{
+                marginTop: "30px"
+            }}
+        >
+
+            <GeoMap />
+
+        </div>
 
         <div
           style={{
