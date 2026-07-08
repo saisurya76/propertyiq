@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FraudIntelligence from "./FraudIntelligence";
 
 function AssessmentResult({
   result,
@@ -28,7 +29,7 @@ function AssessmentResult({
       setReportLoading(true);
 
       const response = await fetch(
-        "https://propertyiq-api-q21y.onrender.com/generate-report",
+        "http://127.0.0.1:8000/generate-report",
         {
           method: "POST",
 
@@ -1076,6 +1077,10 @@ function AssessmentResult({
         </button>
 
       </div>
+
+      <FraudIntelligence
+        result={result}
+      />
 
     </div>
   );
