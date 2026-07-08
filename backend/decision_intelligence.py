@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-
+from backend.deal_quality import (
+    get_deal_quality
+)
 
 @dataclass
 class DecisionResult:
@@ -63,21 +65,10 @@ def generate_decision(
     # Deal Quality
     # -----------------------------------
 
-    if overpricing_percent <= 5:
-
-        deal_quality = "GOOD DEAL"
-
-    elif overpricing_percent <= 15:
-
-        deal_quality = "FAIR DEAL"
-
-    elif overpricing_percent <= 30:
-
-        deal_quality = "POOR VALUE"
-
-    else:
-
-        deal_quality = "NOT ATTRACTIVE AT CURRENT PRICE"
+    deal_quality, _ = get_deal_quality(
+        overpricing_percent=overpricing_percent,
+        buyer_protection_score=buyer_protection_score
+    )
 
     # -----------------------------------
     # Narrative

@@ -19,6 +19,7 @@ class PropertyAssessment:
     country: str
     state_province: str
     city: str
+    property_type: str
 
     quoted_price: float
     fair_value: float
@@ -82,6 +83,7 @@ def create_assessment(
     country: str,
     state_province: str,
     city: str,
+    property_type: str,
 
     quoted_price: float,
     fair_value: float,
@@ -144,6 +146,7 @@ def create_assessment(
         country=country,
         state_province=state_province,
         city=city,
+        property_type=property_type,
 
         quoted_price=quoted_price,
         fair_value=fair_value,

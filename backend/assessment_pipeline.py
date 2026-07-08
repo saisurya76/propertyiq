@@ -327,7 +327,7 @@ def run_assessment(
                 property_input.property_type,
 
             unit_area=
-                property_input.unit_area
+                normalized_area
         )
     )
 
@@ -362,6 +362,9 @@ def run_assessment(
         state_province=property_input.state_province,
 
         city=property_input.city,
+
+        property_type=
+            property_input.property_type,
 
         quoted_price=property_input.quoted_price,
         fair_value=fair_value,

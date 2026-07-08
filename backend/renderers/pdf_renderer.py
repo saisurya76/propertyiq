@@ -207,6 +207,19 @@ def generate_pdf(
 
     story.append(
         Paragraph(
+            assessment.property_type,
+            ParagraphStyle(
+                "PropertyTypeStyle",
+                parent=styles["Heading3"],
+                fontName="DejaVuSans",
+                alignment=TA_CENTER,
+                textColor=colors.HexColor("#64748B")
+            )
+        )
+    )
+
+    story.append(
+        Paragraph(
             f"Developed by {assessment.developer_name}",
             developer_style
         )
@@ -269,35 +282,46 @@ def generate_pdf(
 
     story.append(
         Paragraph(
+            "PROPERTY QUALITY",
+            section_style
+        )
+    )
+
+    story.append(
+        Spacer(1, 6)
+    )
+
+    story.append(
+        Paragraph(
+            assessment.decision.property_quality,
+            score_heading_style
+        )
+    )
+
+    story.append(
+        Spacer(1, 16)
+    )
+
+    story.append(
+        Paragraph(
             "DEAL QUALITY",
             section_style
         )
     )
 
     story.append(
-        Spacer(1, 8)
+        Spacer(1, 6)
     )
 
     story.append(
         Paragraph(
-            assessment.deal_quality,
+            assessment.decision.deal_quality,
             score_heading_style
         )
     )
 
     story.append(
-        Paragraph(
-            assessment.deal_quality_reason,
-            styles["BodyText"]
-        )
-    )
-
-    story.append(
-        Spacer(1, 30)
-    )
-
-    story.append(
-        PageBreak()
+        Spacer(1, 16)
     )
 
     # PROPERTY OVERVIEW
@@ -335,15 +359,71 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            f"<b>Developer:</b> {assessment.developer_name}",
+            f"<b>Property Type:</b> {assessment.property_type}",
             styles["BodyText"]
         )
     )
 
     story.append(
         Paragraph(
-            f"<b>Area:</b> {assessment.unit_area:,.0f} {assessment.area_unit}",
+            f"<b>Developer:</b> {assessment.developer_name}",
             styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>Location</b>",
+            section_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"{assessment.city}, "
+            f"{assessment.state_province}, "
+            f"{assessment.country}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>PROPERTY DETAILS</b>",
+            section_style
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Area:</b> {assessment.unit_area:,.0f}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Area Unit:</b> {assessment.area_unit}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            "<b>VALUATION</b>",
+            section_style
         )
     )
 
@@ -369,23 +449,60 @@ def generate_pdf(
     )
 
     story.append(
-        Paragraph(
-            f"<b>Inventory Risk:</b> {assessment.inventory_risk}",
-            styles["BodyText"]
-        )
+        Spacer(1, 8)
     )
 
     story.append(
         Paragraph(
-            f"<b>Developer Rating:</b> {assessment.developer_rating}",
-            styles["BodyText"]
+            "<b>ASSESSMENTS</b>",
+            section_style
         )
     )
+
+    if assessment.inventory_risk == "NOT_ASSESSED":
+
+        story.append(
+            Paragraph(
+                "<b>Inventory Assessment:</b> Not Performed",
+                styles["BodyText"]
+            )
+        )
+
+    else:
+
+        story.append(
+            Paragraph(
+                f"<b>Inventory Assessment:</b> {assessment.inventory_risk}",
+                styles["BodyText"]
+            )
+        )
 
     story.append(
         Spacer(1, 20)
     )
 
+    if assessment.developer_rating == "NOT_ASSESSED":
+
+        story.append(
+            Paragraph(
+                "<b>Developer Assessment:</b> Not Performed",
+                styles["BodyText"]
+            )
+        )
+
+    else:
+
+        story.append(
+            Paragraph(
+                f"<b>Developer Assessment:</b> {assessment.developer_rating}",
+                styles["BodyText"]
+            )
+        )
+
+    story.append(
+        Spacer(1, 20)
+    )
+    
     story.append(
     Paragraph(
         "SCORE BREAKDOWN",
@@ -499,7 +616,14 @@ def generate_pdf(
 
             story.append(
                 Paragraph(
-                    f"{project.developer} | ₹{project.price_per_sqft:,.0f} / sqft",
+                    f"<b>Developer:</b> {project.developer}",
+                    styles["BodyText"]
+                )
+            )
+
+            story.append(
+                Paragraph(
+                    f"<b>Market Asking Price:</b> ₹{project.price_per_sqft:,.0f} / sqft",
                     styles["BodyText"]
                 )
             )
