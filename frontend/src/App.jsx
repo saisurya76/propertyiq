@@ -51,6 +51,7 @@ function App() {
     city: formData.city,
 
     propertyName: formData.propertyName,
+    propertyType: formData.propertyType,
     
     developerName: formData.developerName,
 

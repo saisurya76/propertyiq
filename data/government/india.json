@@ -1,10 +1,22 @@
 {
-    "Telangana": {
-        "Hyderabad": {
-            "Apartment": {
-                "government_rate": 6500,
-                "reference_name": "Government Guideline Value"
-            }
-        }
+  "Telangana": {
+    "Hyderabad": {
+
+      "Apartment": {
+        "government_rate": 6500,
+        "reference_name": "Government Guideline Value"
+      },
+
+      "Villa": {
+        "government_rate": 6500,
+        "reference_name": "Government Guideline Value"
+      },
+
+      "Plot / Land": {
+        "government_rate": 6500,
+        "reference_name": "Government Guideline Value"
+      }
+
     }
+  }
 }

@@ -29,6 +29,7 @@ class PropertyAssessment:
 
     unit_area: float
     area_unit: str
+    normalized_area: float
 
     overpricing_percent: float
 
@@ -94,6 +95,7 @@ def create_assessment(
 
     unit_area: float,
     area_unit: str,
+    normalized_area: float,
 
     overpricing_percent: float,
 
@@ -159,6 +161,7 @@ def create_assessment(
 
         unit_area=unit_area,
         area_unit=area_unit,
+        normalized_area=normalized_area,
 
         overpricing_percent=overpricing_percent,
 

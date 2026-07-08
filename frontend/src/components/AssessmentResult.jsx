@@ -48,6 +48,9 @@ function AssessmentResult({
             propertyName:
               formData.propertyName,
 
+            propertyType: 
+              formData.propertyType,
+
             developerName:
               formData.developerName,
 
@@ -368,15 +371,31 @@ function AssessmentResult({
 
             The quoted price is approximately{" "}
             <strong>
-              {(
-                (
-                  (Number(formData.quotedPrice) - result.fairValue)
-                  / result.fairValue
-                ) * 100
-              ).toFixed(2)}%
+              {(() => {
+
+                  const difference =
+                      (
+                          (Number(formData.quotedPrice) - result.fairValue)
+                          / result.fairValue
+                      ) * 100;
+
+                  if (difference >= 0) {
+                      return (
+                          <>
+                              <strong>{difference.toFixed(2)}%</strong> above the estimated fair value.
+                          </>
+                      );
+                  }
+
+                  return (
+                      <>
+                          <strong>{Math.abs(difference).toFixed(2)}%</strong> below the estimated fair value.
+                      </>
+                  );
+
+              })()}
             </strong>
             {" "}
-            above the estimated fair value.
 
             Government guidance values are primarily used
             for property registration and should not be
@@ -825,7 +844,11 @@ function AssessmentResult({
     <p>
       {formatIndianCurrency(
         result.marketAveragePricePerSqft *
-        Number(formData.areaValue || 0)
+        (
+            formData.areaUnit === "acre"
+                ? Number(formData.areaValue) * 43560
+                : Number(formData.areaValue || 0)
+        )
       )}
     </p>
 

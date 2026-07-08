@@ -44,6 +44,7 @@ class PropertyRequest(BaseModel):
     country: str
     stateProvince: str
     city: str
+    propertyType: str
 
     propertyName: str
     developerName: str
@@ -73,7 +74,7 @@ def build_property_input(data: PropertyRequest):
         city=data.city,
         locality="Unknown",
 
-        property_type="Apartment",
+        property_type=data.propertyType,
 
         property_name=data.propertyName,
         developer_name=data.developerName,

@@ -575,6 +575,73 @@ def generate_pdf(
         Spacer(1, 20)
     )
 
+
+    # GOVERNMENT INTELLIGENCE
+
+    story.append(
+        Paragraph(
+            "GOVERNMENT INTELLIGENCE",
+            section_style
+        )
+    )
+
+    story.append(
+        Spacer(1, 8)
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Government Guidance Rate:</b> ₹{assessment.government_intelligence.government_rate_per_unit:,.0f} / sqft",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Estimated Government Value:</b> "
+            f"{format_currency(assessment.government_intelligence.government_property_value)}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Government Source:</b> "
+            f"{assessment.government_intelligence.reference_name}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"<b>Data Confidence:</b> "
+            f"{assessment.government_intelligence.confidence}",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 6)
+    )
+
+    story.append(
+        Paragraph(
+            assessment.government_intelligence.buyer_observation,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            assessment.government_intelligence.disclaimer,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 20)
+    )
+
         # MARKET CONTEXT
 
     if assessment.comparables:
@@ -596,7 +663,7 @@ def generate_pdf(
         story.append(
             Paragraph(
                 f"Market Asking Value: "
-                f"{format_currency(assessment.market_average_price_per_sqft * assessment.unit_area)}",
+                f"{format_currency(assessment.market_average_price_per_sqft * assessment.normalized_area)}",
                 styles["BodyText"]
             )
         )

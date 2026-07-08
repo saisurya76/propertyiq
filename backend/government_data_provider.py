@@ -17,11 +17,15 @@ def get_government_rate(
     property_type: str
 ) -> float:
 
+    country_file = (
+        country.lower().replace(" ", "_") + ".json"
+    )
+
     data_file = (
         Path(__file__).parent.parent
         / "data"
         / "government"
-        / "india.json"
+        / country_file
     )
 
     with open(data_file, "r") as f:

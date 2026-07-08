@@ -377,6 +377,7 @@ def run_assessment(
 
         unit_area=property_input.unit_area,
         area_unit=property_input.area_unit,
+        normalized_area=normalized_area,
 
         overpricing_percent=overpricing,
 
