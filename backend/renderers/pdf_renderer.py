@@ -5,6 +5,16 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image
 import os
 
+INDIA_FRAUD_REPORT_URL = (
+    "https://app.propertyiqweb.com/fraud/"
+    "india_real_estate_fraud_atlas.html"
+)
+
+GLOBAL_FRAUD_REPORT_URL = (
+    "https://app.propertyiqweb.com/fraud/"
+    "real_estate_fraud_snapshot.html"
+)
+
 FONT_PATH = os.path.join(
     os.path.dirname(__file__),
     "..",
@@ -1079,10 +1089,10 @@ def generate_pdf(
 
     from PIL import Image as PILImage
 
-    for title, image_path in [
-        ("REAL ESTATE FRAUD ATLAS OF INDIA", INDIA_FRAUD_ATLAS),
-        ("GLOBAL FRAUD TAXONOMY HEAT MAP", GLOBAL_FRAUD_TAXONOMY),
-        ("FRAUD EVIDENCE SOURCES", FRAUD_EVIDENCE_SOURCES),
+    for title, image_path, report_url in [
+        ("REAL ESTATE FRAUD ATLAS OF INDIA", INDIA_FRAUD_ATLAS,INDIA_FRAUD_REPORT_URL),
+        ("GLOBAL FRAUD TAXONOMY HEAT MAP", GLOBAL_FRAUD_TAXONOMY,GLOBAL_FRAUD_REPORT_URL),
+        ("FRAUD EVIDENCE SOURCES", FRAUD_EVIDENCE_SOURCES,None),
     ]:
 
         story.append(PageBreak())
@@ -1117,5 +1127,26 @@ def generate_pdf(
                 height=img_height * scale
             )
         )
+
+        if report_url:
+
+            story.append(
+                Spacer(1, 12)
+            )
+
+            story.append(
+                Paragraph(
+                    f'<link href="{report_url}">'
+                    'Open Full Fraud Intelligence Report ↗'
+                    '</link>',
+                    ParagraphStyle(
+                        "FraudReportLink",
+                        parent=styles["BodyText"],
+                        alignment=TA_CENTER,
+                        textColor=colors.HexColor("#EA580C"),
+                        fontName="DejaVuSans",
+                    )
+                )
+            )
 
     doc.build(story)

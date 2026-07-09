@@ -2,6 +2,14 @@ import indiaFraudAtlas from "../assets/fraud/india_fraud_atlas.png";
 import globalFraudTaxonomy from "../assets/fraud/global_fraud_taxonomy.png";
 import fraudEvidenceSources from "../assets/fraud/fraud_evidence_sources.png";
 
+const reportLinkStyle = {
+    color: "#ea580c",
+    fontWeight: "600",
+    textDecoration: "none",
+    fontSize: "15px",
+    transition: "all 0.2s ease"
+};
+
 function FraudIntelligenceStatic() {
 
     return (
@@ -49,6 +57,32 @@ function FraudIntelligenceStatic() {
                 }}
             />
 
+            <div
+                style={{
+                    marginTop: "14px",
+                    marginBottom: "40px",
+                    textAlign: "center"
+                }}
+            >
+                <a
+                    href="/fraud/india_real_estate_fraud_atlas.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={reportLinkStyle}
+                    onMouseEnter={(e) => {
+                        e.target.style.color = "#c2410c";
+                        e.target.style.textDecoration = "underline";
+                    }}
+
+                    onMouseLeave={(e) => {
+                        e.target.style.color = "#ea580c";
+                        e.target.style.textDecoration = "none";
+                    }}
+                >
+                    Open Full Fraud Intelligence Report for India ↗
+                </a>
+            </div>
+
             <img
                 src={globalFraudTaxonomy}
                 alt="Global Fraud Taxonomy"
@@ -59,6 +93,32 @@ function FraudIntelligenceStatic() {
                     boxShadow: "0 3px 12px rgba(0,0,0,.12)"
                 }}
             />
+
+            <div
+                style={{
+                    marginTop: "14px",
+                    marginBottom: "40px",
+                    textAlign: "center"
+                }}
+            >
+                <a
+                    href="/fraud/real_estate_fraud_snapshot.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={reportLinkStyle}
+                    onMouseEnter={(e) => {
+                        e.target.style.color = "#c2410c";
+                        e.target.style.textDecoration = "underline";
+                    }}
+
+                    onMouseLeave={(e) => {
+                        e.target.style.color = "#ea580c";
+                        e.target.style.textDecoration = "none";
+                    }}
+                >
+                    Open Full Fraud Intelligence Report - Global ↗
+                </a>
+            </div>
 
              <img
                 src={fraudEvidenceSources}
