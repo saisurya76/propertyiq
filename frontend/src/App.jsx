@@ -147,7 +147,7 @@ function App() {
   return (
     <div className="app">
 
-      <div className="hero">
+      <div className="hero hero-banner">
 
        <div className="hero-brand">
         PROPERTYIQ

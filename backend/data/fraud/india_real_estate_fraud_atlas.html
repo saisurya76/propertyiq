@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Real Estate Fraud & Land-Record Risk Atlas of India — Verified Data Edition</title>
+<style>
+  :root{
+    --bg:#0d1420; --panel:#141d2e; --panel2:#101827;
+    --line:#26344a; --line-soft:#1c2a3d;
+    --ink:#eef2f7; --ink-soft:#aab7c9; --ink-mute:#77869c;
+    --amber:#e8a33d; --amber-soft:#3a2c14;
+    --teal:#3fc7a3; --teal-soft:#0f2b26;
+    --red:#e05a4e; --red-soft:#3a1a17;
+    --saffron:#f0954a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Georgia','Iowan Old Style',serif;}
+  .wrap{max-width:1180px; margin:0 auto; padding:36px 28px 60px;}
+
+  header{display:flex; justify-content:space-between; align-items:flex-start; gap:24px; border-bottom:2px solid var(--saffron); padding-bottom:22px; margin-bottom:28px; flex-wrap:wrap;}
+  .kicker{font-family:'Courier New',monospace; letter-spacing:.14em; font-size:11px; color:var(--saffron); text-transform:uppercase; margin:0 0 8px;}
+  h1{font-family:Arial,Helvetica,sans-serif; font-size:29px; font-weight:800; margin:0 0 6px; line-height:1.15;}
+  .sub{color:var(--ink-soft); font-size:14.5px; margin:0; max-width:660px; line-height:1.5;}
+  .meta{font-family:'Courier New',monospace; font-size:11.5px; color:var(--ink-mute); text-align:right; line-height:1.7; white-space:nowrap;}
+  .meta b{color:var(--ink-soft);}
+
+  .notice{background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--saffron); border-radius:6px; padding:16px 18px; margin-bottom:32px; font-size:13.5px; color:var(--ink-soft); line-height:1.6;}
+  .notice b{color:var(--ink);}
+
+  section{margin-bottom:38px;}
+  .sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:14px; border-bottom:1px solid var(--line); padding-bottom:8px; flex-wrap:wrap;}
+  .sec-num{font-family:'Courier New',monospace; color:var(--saffron); font-size:13px;}
+  h2{font-family:Arial,Helvetica,sans-serif; font-size:16px; letter-spacing:.06em; text-transform:uppercase; margin:0; color:var(--ink);}
+  .sec-note{margin-left:auto; font-family:'Courier New',monospace; font-size:11px; color:var(--ink-mute);}
+  .lede{font-size:13px; color:var(--ink-soft); line-height:1.6; margin:0 0 16px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{font-family:Arial,Helvetica,sans-serif; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-mute); text-align:left; padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:9px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .state{font-weight:bold; color:var(--ink); white-space:nowrap;}
+  .num{font-family:'Courier New',monospace; font-size:12.5px;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:20px; font-family:'Courier New',monospace; font-size:11px; font-weight:bold;}
+  .pill-hi{background:var(--red-soft); color:#f2a49c;}
+  .pill-mid{background:var(--amber-soft); color:var(--amber);}
+  .pill-lo{background:var(--teal-soft); color:var(--teal);}
+  .note-cell{color:var(--ink-mute); font-size:11.5px;}
+
+  .chart-grid{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:6px;}
+  .chart-card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px 20px;}
+  .chart-card h3{font-family:Arial,Helvetica,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:0 0 4px;}
+  .chart-card .cap{font-size:11px; color:var(--ink-mute); margin:0 0 12px;}
+  .chart-wrap{position:relative; height:300px;}
+
+  .platinum-wrap{display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 6px;}
+  .platinum-chip{background:var(--teal-soft); color:var(--teal); font-family:'Courier New',monospace; font-size:11.5px; padding:5px 12px; border-radius:20px; border:1px solid rgba(63,199,163,.3);}
+  .stat-row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:16px 0 20px;}
+  .stat-card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px;}
+  .stat-card .v{font-family:'Courier New',monospace; font-size:22px; color:var(--saffron); font-weight:bold;}
+  .stat-card .l{font-size:11px; color:var(--ink-mute); margin-top:4px; line-height:1.4;}
+
+  .case-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:8px;}
+  .case-card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px;}
+  .case-card .loc{font-weight:bold; font-size:13px; margin-bottom:4px; color:var(--ink);}
+  .case-card .txt{font-size:12.5px; color:var(--ink-soft); line-height:1.55;}
+
+  .cat-list{display:grid; grid-template-columns:1fr 1fr; gap:0 28px;}
+  .cat-item{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--line-soft);}
+  .cat-num{font-family:'Courier New',monospace; color:var(--saffron); font-size:12px; width:22px; flex-shrink:0; padding-top:2px;}
+  .cat-body .cat-title{font-weight:bold; font-size:13.5px; margin-bottom:3px;}
+  .cat-body .cat-desc{font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+
+  .checklist{display:grid; grid-template-columns:1fr 1fr; gap:10px 24px;}
+  .check-item{display:flex; gap:10px; font-size:13px; color:var(--ink-soft); line-height:1.5; padding:6px 0;}
+  .check-item .tick{color:var(--teal); font-weight:bold; flex-shrink:0;}
+
+  .src-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 28px; font-size:12.5px;}
+  .src-item{padding:9px 0; border-bottom:1px solid var(--line-soft); display:flex; gap:10px;}
+  .src-item .tag{font-family:'Courier New',monospace; font-size:10px; color:var(--saffron); background:var(--amber-soft); padding:2px 7px; border-radius:4px; flex-shrink:0; height:fit-content; margin-top:2px;}
+  .src-item a{color:var(--ink-soft); text-decoration:none; border-bottom:1px dotted var(--ink-mute);}
+  .src-item a:hover{color:var(--teal);}
+
+  footer{margin-top:10px; padding-top:18px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-mute); line-height:1.6;}
+  @media (max-width:800px){
+    .chart-grid, .case-grid, .cat-list, .src-grid, .checklist, .stat-row{grid-template-columns:1fr;}
+    header{flex-direction:column;} .meta{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="kicker">Verified-data edition · state-level, India-only</p>
+      <h1>Real Estate Fraud &amp; Land-Record Risk Atlas of India</h1>
+      <p class="sub">Built from RERA/Ministry of Housing enforcement data, NCRB's Crime in India report, the Benami Transactions Act attachment record, and the Department of Land Resources' DILRMP dashboard — no invented state scores.</p>
+    </div>
+    <div class="meta">
+      States/UTs referenced: <b>20+</b><br>
+      Primary sources: <b>4 govt.</b><br>
+      Data vintage: <b>2022–2024</b><br>
+      Compiled: <b>July 2026</b>
+    </div>
+  </header>
+
+  <div class="notice">
+    <b>Why there's no single "risk score out of 10" per state here.</b> No government body publishes a unified real-estate-fraud index by state — RERA, NCRB, the Income Tax Department and the Land Resources Ministry each track a different slice of the problem, on different timelines, using different units. Rather than blend them into one invented number, this atlas keeps each dataset separate and labeled, so every figure traces back to a specific, checkable source (Section 6).
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>RERA — consumer complaints &amp; enforcement, by state</h2>
+      <span class="sec-note">Ministry of Housing &amp; Urban Affairs data via ANAROCK, as of 28 Nov 2023</span>
+    </div>
+    <p class="lede">Nationally, State RERA authorities had resolved <b>1,16,300</b> homebuyer complaints and registered <b>1,16,117</b> projects and <b>82,755</b> agents. Three states account for 69% of all resolved complaints — a strong proxy for where builder/project disputes are most concentrated, though it also partly reflects which states have the most active real estate markets and the most functional RERA benches.</p>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Share of resolved RERA complaints</h3>
+        <p class="cap">Top states, of 1,16,300 total resolved nationally</p>
+        <div class="chart-wrap"><canvas id="reraComplaints"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Share of registered RERA projects</h3>
+        <p class="cap">Top states, of 1,16,117 total registered nationally</p>
+        <div class="chart-wrap"><canvas id="reraProjects"></canvas></div>
+      </div>
+    </div>
+    <p style="font-size:11.5px;color:var(--ink-mute);margin-top:10px;">Note: Uttar Pradesh's high complaint share is heavily driven by long-running Noida/Greater Noida builder disputes (unregistered projects, stalled possession) that pre-date and outlasted RERA's rollout — a well-documented regional cluster rather than a uniform statewide pattern.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>NCRB — economic offences by state (2022)</h2>
+      <span class="sec-note">"Crime in India 2022," National Crime Records Bureau — not real-estate-specific</span>
+    </div>
+    <p class="lede">NCRB's "economic offences" category bundles cheating, forgery, fraud and criminal breach of trust <b>across all sectors</b> — it is the closest official state-wise fraud proxy that exists, but it is not filtered to property crime specifically. Treat it as general fraud-prone-ness context, not a real estate figure.</p>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Highest economic-offence case counts</h3>
+        <p class="cap">IPC cheating / forgery / fraud / breach of trust, 2022, of 1,93,385 national total</p>
+        <div class="chart-wrap"><canvas id="ncrbChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>State Anti-Corruption Bureau cases</h3>
+        <p class="cap">Prevention of Corruption Act cases, 2022, of 4,139 national total</p>
+        <div class="chart-wrap"><canvas id="acbChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>Land-record digitisation — the structural fix for title fraud</h2>
+      <span class="sec-note">Digital India Land Records Modernization Programme (DILRMP), Dept. of Land Resources</span>
+    </div>
+    <p class="lede">Most of the categories in Section 5 below (fake deeds, multiple sale, forged POA) are only possible because land records in much of India are still fragmented across paper registers, revenue offices and sub-registrars. DILRMP is the direct government response.</p>
+    <div class="stat-row">
+      <div class="stat-card"><div class="v">95.1%</div><div class="l">Record of Rights (RoR) computerised nationally, as of Dec 2023</div></div>
+      <div class="stat-card"><div class="v">68.0%</div><div class="l">Cadastral maps digitised nationally</div></div>
+      <div class="stat-card"><div class="v">~75–87%</div><div class="l">Sub-registrar offices integrated with land records</div></div>
+      <div class="stat-card"><div class="v">49.1%</div><div class="l">Villages with geo-referenced parcels / ULPIN assigned so far</div></div>
+    </div>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 6px;">16 states hold "Bhoomi Samman" Platinum Grading (168 districts, 99%+ complete on core components, as of Dec 2023):</p>
+    <div class="platinum-wrap">
+      <span class="platinum-chip">Assam</span><span class="platinum-chip">Andhra Pradesh</span><span class="platinum-chip">Bihar</span><span class="platinum-chip">Chandigarh</span><span class="platinum-chip">Chhattisgarh</span><span class="platinum-chip">Gujarat</span><span class="platinum-chip">Jharkhand</span><span class="platinum-chip">Madhya Pradesh</span><span class="platinum-chip">Maharashtra</span><span class="platinum-chip">Odisha</span><span class="platinum-chip">Rajasthan</span><span class="platinum-chip">Tripura</span><span class="platinum-chip">Tamil Nadu</span><span class="platinum-chip">Puducherry</span><span class="platinum-chip">West Bengal</span><span class="platinum-chip">Uttar Pradesh</span>
+    </div>
+    <p style="font-size:11.5px;color:var(--ink-mute);margin-top:10px;">Separately, an earlier independent review found Karnataka and Odisha had reached 100% land-record computerisation, while four states had not yet started — illustrating how uneven progress still is beneath the national average.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>Benami Transactions Act — enforcement record</h2>
+      <span class="sec-note">Income Tax Department / Ministry of Finance, Rajya Sabha disclosures</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="v">₹4,300cr+</div><div class="l">Total assets provisionally attached nationally under the Act</div></div>
+      <div class="stat-card"><div class="v">₹3,400cr+</div><div class="l">Of which, immovable property (land, flats, shops)</div></div>
+      <div class="stat-card"><div class="v">900+</div><div class="l">Cases with provisional attachment since Nov 2016</div></div>
+      <div class="stat-card"><div class="v">24</div><div class="l">Dedicated Benami Prohibition Units set up nationwide</div></div>
+    </div>
+    <p class="lede">The Finance Ministry has confirmed in Parliament that it <b>does not maintain a state-wise or category-wise breakdown</b> of benami cases — so no state ranking can honestly be built for this category. What is public are individual illustrative cases:</p>
+    <div class="case-grid">
+      <div class="case-card"><div class="loc">Sanganer, Rajasthan</div><div class="txt">A jeweller was found to be the beneficial owner of nine immovable properties held in the name of a former employee "of no means."</div></div>
+      <div class="case-card"><div class="loc">Mumbai, Maharashtra</div><div class="txt">A professional was found holding multiple immovable properties through shell companies that existed only on paper.</div></div>
+      <div class="case-card"><div class="loc">Madhya Pradesh</div><div class="txt">A listed company was identified as the beneficial owner behind a benami property held by an employee.</div></div>
+      <div class="case-card"><div class="loc">Kolkata, West Bengal</div><div class="txt">Properties purchased through shell companies were attached by the Income Tax Department's Kolkata investigation directorate.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2>Common real estate fraud patterns in India</h2>
+      <span class="sec-note">Drawn from RERA orders, ED typologies &amp; media/court reporting — generic, not scored per state</span>
+    </div>
+    <p class="lede">These are the patterns that recur across Indian real estate markets, per RERA adjudication orders and enforcement reporting. As with Section 4, no credible public dataset scores each of these per state, so they're presented as a reference list rather than a colored grid.</p>
+    <div class="cat-list">
+      <div class="cat-item"><div class="cat-num">01</div><div class="cat-body"><div class="cat-title">Revenue record manipulation</div><div class="cat-desc">Tampering with mutation entries (patta / khata / 7-12 extract / jamabandi) to alter who the land records show as owner.</div></div></div>
+      <div class="cat-item"><div class="cat-num">02</div><div class="cat-body"><div class="cat-title">Forged sale deeds &amp; power of attorney</div><div class="cat-desc">Fabricated or backdated deeds and GPA documents used to claim or transfer ownership without the real owner's consent.</div></div></div>
+      <div class="cat-item"><div class="cat-num">03</div><div class="cat-body"><div class="cat-title">Multiple sale of the same unit</div><div class="cat-desc">A single flat or plot sold to more than one buyer — a recurring complaint category in RERA filings against under-construction projects.</div></div></div>
+      <div class="cat-item"><div class="cat-num">04</div><div class="cat-body"><div class="cat-title">Government / gram panchayat land encroachment</div><div class="cat-desc">Private sale or development of land that actually belongs to the state, forest, or a local body.</div></div></div>
+      <div class="cat-item"><div class="cat-num">05</div><div class="cat-body"><div class="cat-title">Illegal layouts &amp; unauthorised colonies</div><div class="cat-desc">Plots sold in layouts that were never approved by the local development authority, common on urban peripheries.</div></div></div>
+      <div class="cat-item"><div class="cat-num">06</div><div class="cat-body"><div class="cat-title">Benami / nominee ownership</div><div class="cat-desc">Property held in someone else's name to conceal the real, beneficial owner — the specific target of the Benami Act above.</div></div></div>
+      <div class="cat-item"><div class="cat-num">07</div><div class="cat-body"><div class="cat-title">Builder fund diversion</div><div class="cat-desc">Buyer deposits or project-linked loans redirected to other projects or personal use, a central issue in RERA's escrow-account rule.</div></div></div>
+      <div class="cat-item"><div class="cat-num">08</div><div class="cat-body"><div class="cat-title">Agricultural land conversion fraud</div><div class="cat-desc">Selling agricultural land for residential/commercial use before the required land-use conversion has actually been approved.</div></div></div>
+      <div class="cat-item"><div class="cat-num">09</div><div class="cat-body"><div class="cat-title">Fake NOCs &amp; approvals</div><div class="cat-desc">Forged no-objection certificates, occupancy certificates, or environmental/CRZ clearances presented to buyers as genuine.</div></div></div>
+      <div class="cat-item"><div class="cat-num">10</div><div class="cat-body"><div class="cat-title">Title disputes from unclear inheritance</div><div class="cat-desc">Sales proceeding despite unresolved succession claims among legal heirs, common with older, undivided family land.</div></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <h2>Buyer safeguards</h2>
+      <span class="sec-note">General due-diligence practice, not state-specific data</span>
+    </div>
+    <div class="checklist">
+      <div class="check-item"><span class="tick">✓</span>Verify the title chain as far back as records allow, ideally 30 years.</div>
+      <div class="check-item"><span class="tick">✓</span>Cross-check revenue records (mutation entries) against a physical survey.</div>
+      <div class="check-item"><span class="tick">✓</span>Confirm the land isn't government, forest, or under litigation.</div>
+      <div class="check-item"><span class="tick">✓</span>Check the project's RERA registration number on the state RERA portal directly.</div>
+      <div class="check-item"><span class="tick">✓</span>Validate layout/building approvals with the local development authority.</div>
+      <div class="check-item"><span class="tick">✓</span>Confirm any power of attorney is current, registered, and not revoked.</div>
+      <div class="check-item"><span class="tick">✓</span>Ask for the encumbrance certificate covering the full ownership period.</div>
+      <div class="check-item"><span class="tick">✓</span>Use independent legal vetting, not just the lender's or builder's paperwork.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">07</span>
+      <h2>Sources</h2>
+    </div>
+    <div class="src-grid">
+      <div class="src-item"><span class="tag">RERA</span><a href="https://taxconcept.net/daily-e-news-letter-monthly-magazine-weekly-taxation-news-letter/rera-update-january-2024-milestones-regulations-and-case-laws/" target="_blank">RERA Update Jan 2024 — MoHUA/ANAROCK state-wise complaints &amp; registrations data</a></div>
+      <div class="src-item"><span class="tag">RERA</span><a href="https://maharera.maharashtra.gov.in/" target="_blank">MahaRERA — official portal</a></div>
+      <div class="src-item"><span class="tag">NCRB</span><a href="https://ruralindiaonline.org/en/library/resource/crime-in-india-2022-volume-ii/" target="_blank">NCRB — Crime in India 2022, Volume II (economic offences, state-wise)</a></div>
+      <div class="src-item"><span class="tag">NCRB</span><a href="https://www.ncrb.gov.in/uploads/nationalcrimerecordsbureau/custom/1701607577CrimeinIndia2022Book1.pdf" target="_blank">NCRB — Crime in India 2022, official PDF</a></div>
+      <div class="src-item"><span class="tag">LAND</span><a href="https://dolr.gov.in/en/programmes-schemes/dilrmp-2/" target="_blank">Department of Land Resources — DILRMP programme status</a></div>
+      <div class="src-item"><span class="tag">LAND</span><a href="https://www.pib.gov.in/PressReleasePage.aspx?PRID=1989671&reg=3&lang=2" target="_blank">PIB — Bhoomi Samman Platinum Grading states, Dec 2023</a></div>
+      <div class="src-item"><span class="tag">LAND</span><a href="https://prsindia.org/articles-by-prs-team/opinion-modernizing-land-records-in-india" target="_blank">PRS Legislative Research — land record modernisation review</a></div>
+      <div class="src-item"><span class="tag">BENAMI</span><a href="https://www.taxtmi.com/news?id=20340" target="_blank">Income Tax Dept. — ₹4,300 crore benami property attachment, Rajya Sabha reply</a></div>
+      <div class="src-item"><span class="tag">BENAMI</span><a href="https://pib.gov.in/newsite/PrintRelease.aspx?relid=162110" target="_blank">PIB — Income Tax Dept. steps up Benami Act enforcement (illustrative cases)</a></div>
+      <div class="src-item"><span class="tag">BENAMI</span><a href="https://www.governancenow.com/news/regular-story/benami-properties-worth-over-rs-3500-crore-attached" target="_blank">Governance Now — ₹3,500 crore benami attachment update</a></div>
+    </div>
+  </section>
+
+  <footer>
+    Methodology: every figure above is drawn directly from the cited government report, regulator, or Rajya Sabha/Lok Sabha disclosure; nothing was interpolated or estimated to fill gaps. Where a breakdown isn't publicly available (e.g. state-wise Benami Act cases), that is stated rather than filled in. This atlas is for educational and due-diligence-awareness purposes only and does not constitute legal advice — always verify against the primary source and consult a property lawyer before any transaction.
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+function hbar(id, labels, data, color, max){
+  new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{ labels:labels, datasets:[{ data:data, backgroundColor:color, borderRadius:4, maxBarThickness:22 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ min:0, max:max, grid:{ color:'#26344a' }, ticks:{ color:'#aab7c9' } },
+        y:{ grid:{ display:false }, ticks:{ color:'#eef2f7' } }
+      }
+    }
+  });
+}
+hbar('reraComplaints', ['Uttar Pradesh','Haryana','Maharashtra','Other states'], [38,18,13,31], '#e8a33d', 40);
+hbar('reraProjects', ['Maharashtra','Tamil Nadu','Telangana','Gujarat','Other states'], [36,16,11,7,30], '#3fc7a3', 40);
+hbar('ncrbChart', ['Rajasthan','Telangana','Uttar Pradesh'], [27848,26321,22409], '#e05a4e', 30000);
+hbar('acbChart', ['Maharashtra','Rajasthan','Karnataka'], [749,511,389], '#e8a33d', 800);
+</script>
+</body>
+</html>

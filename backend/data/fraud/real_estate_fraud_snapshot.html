@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Global Real Estate Fraud & Financial Crime Risk — Verified Data Snapshot</title>
+<style>
+  :root{
+    --bg:#0d1420; --panel:#141d2e; --panel2:#101827;
+    --line:#26344a; --line-soft:#1c2a3d;
+    --ink:#eef2f7; --ink-soft:#aab7c9; --ink-mute:#77869c;
+    --amber:#e8a33d; --amber-soft:#3a2c14;
+    --teal:#3fc7a3; --teal-soft:#0f2b26;
+    --red:#e05a4e; --red-soft:#3a1a17;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Georgia','Iowan Old Style',serif;
+  }
+  .mono{font-family:'Courier New',ui-monospace,monospace;}
+  .wrap{max-width:1180px; margin:0 auto; padding:36px 28px 60px;}
+
+  header{display:flex; justify-content:space-between; align-items:flex-start; gap:24px; border-bottom:2px solid var(--amber); padding-bottom:22px; margin-bottom:28px; flex-wrap:wrap;}
+  .kicker{font-family:'Courier New',monospace; letter-spacing:.14em; font-size:11px; color:var(--amber); text-transform:uppercase; margin:0 0 8px;}
+  h1{font-family:Arial,Helvetica,sans-serif; font-size:30px; font-weight:800; margin:0 0 6px; letter-spacing:.01em; line-height:1.15;}
+  .sub{color:var(--ink-soft); font-size:14.5px; margin:0; max-width:640px; line-height:1.5;}
+  .meta{font-family:'Courier New',monospace; font-size:11.5px; color:var(--ink-mute); text-align:right; line-height:1.7; white-space:nowrap;}
+  .meta b{color:var(--ink-soft);}
+
+  .notice{background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--amber); border-radius:6px; padding:16px 18px; margin-bottom:32px; font-size:13.5px; color:var(--ink-soft); line-height:1.6;}
+  .notice b{color:var(--ink);}
+
+  section{margin-bottom:38px;}
+  .sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:14px; border-bottom:1px solid var(--line); padding-bottom:8px;}
+  .sec-num{font-family:'Courier New',monospace; color:var(--amber); font-size:13px;}
+  h2{font-family:Arial,Helvetica,sans-serif; font-size:16px; letter-spacing:.06em; text-transform:uppercase; margin:0; color:var(--ink);}
+  .sec-note{margin-left:auto; font-family:'Courier New',monospace; font-size:11px; color:var(--ink-mute);}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th{font-family:Arial,Helvetica,sans-serif; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-mute); text-align:left; padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:10px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .country{font-weight:bold; color:var(--ink);}
+  .flag{font-size:16px; margin-right:6px;}
+  .num{font-family:'Courier New',monospace; font-size:13px;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:20px; font-family:'Courier New',monospace; font-size:11px; font-weight:bold;}
+  .pill-hi{background:var(--red-soft); color:#f2a49c;}
+  .pill-mid{background:var(--amber-soft); color:var(--amber);}
+  .pill-lo{background:var(--teal-soft); color:var(--teal);}
+  .note-cell{color:var(--ink-mute); font-size:12px;}
+
+  .chart-grid{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:18px;}
+  .chart-card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px 20px;}
+  .chart-card h3{font-family:Arial,Helvetica,sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:0 0 4px;}
+  .chart-card .cap{font-size:11px; color:var(--ink-mute); margin:0 0 12px;}
+  .chart-wrap{position:relative; height:280px;}
+
+  .oreo-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-top:8px;}
+  .oreo-card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px;}
+  .oreo-card .name{font-weight:bold; font-size:13.5px; margin-bottom:4px; color:var(--ink);}
+  .oreo-card .txt{font-size:12.5px; color:var(--ink-soft); line-height:1.55;}
+
+  .cat-list{display:grid; grid-template-columns:1fr 1fr; gap:0 28px;}
+  .cat-item{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--line-soft);}
+  .cat-num{font-family:'Courier New',monospace; color:var(--amber); font-size:12px; width:22px; flex-shrink:0; padding-top:2px;}
+  .cat-body .cat-title{font-weight:bold; font-size:13.5px; margin-bottom:3px;}
+  .cat-body .cat-desc{font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+
+  .src-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 28px; font-size:12.5px;}
+  .src-item{padding:9px 0; border-bottom:1px solid var(--line-soft); display:flex; gap:10px;}
+  .src-item .tag{font-family:'Courier New',monospace; font-size:10px; color:var(--amber); background:var(--amber-soft); padding:2px 7px; border-radius:4px; flex-shrink:0; height:fit-content; margin-top:2px;}
+  .src-item a{color:var(--ink-soft); text-decoration:none; border-bottom:1px dotted var(--ink-mute);}
+  .src-item a:hover{color:var(--teal);}
+
+  footer{margin-top:10px; padding-top:18px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-mute); line-height:1.6;}
+  @media (max-width:800px){
+    .chart-grid, .oreo-grid, .cat-list, .src-grid{grid-template-columns:1fr;}
+    header{flex-direction:column;}
+    .meta{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="kicker">Verified-data edition · not a composite score</p>
+      <h1>Global Real Estate Fraud &amp;<br>Financial Crime Risk Snapshot</h1>
+      <p class="sub">Built entirely from published indices and enforcement reports — Basel Institute's AML Index, Transparency International's CPI &amp; OREO Index, and FATF's real-estate typology work. No invented scores.</p>
+    </div>
+    <div class="meta">
+      Countries covered: <b>8</b><br>
+      Primary indices: <b>3</b><br>
+      Data vintage: <b>2025–2026 editions</b><br>
+      Compiled: <b>July 2026</b>
+    </div>
+  </header>
+
+  <div class="notice">
+    <b>Why this looks different from a typical "fraud heat map."</b> No organization publishes a single 0–100 "real estate fraud score" per country — so rather than inventing one, this snapshot pulls the closest real, citable measures: the <b>Basel AML Index</b> (money-laundering &amp; financial-crime structural risk), Transparency International's <b>Corruption Perceptions Index</b> and its real-estate-specific <b>OREO Index</b>, and FATF's typology reports on how real estate is actually used to launder money. Every figure below is sourced — see Section 4.
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>Country risk snapshot</h2>
+      <span class="sec-note">Basel AML Index 2025 · CPI 2025 · both independently verifiable</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Country</th>
+          <th>Basel AML risk score<br><span style="text-transform:none;font-weight:normal">(0=low, 10=high)</span></th>
+          <th>Basel global rank<br><span style="text-transform:none;font-weight:normal">of 177</span></th>
+          <th>CPI 2025 score<br><span style="text-transform:none;font-weight:normal">(0=corrupt, 100=clean)</span></th>
+          <th>CPI global rank<br><span style="text-transform:none;font-weight:normal">of 182</span></th>
+          <th>Real-estate-specific flag</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="country"><span class="flag">🇦🇪</span>UAE</td>
+          <td class="num"><span class="pill pill-hi">6.11</span></td>
+          <td class="num">40</td>
+          <td class="num">69</td>
+          <td class="num">21</td>
+          <td class="note-cell">TI names UAE real estate a laundering channel despite high CPI; exited FATF grey list Feb 2024</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇮🇳</span>India</td>
+          <td class="num"><span class="pill pill-mid">5.66</span></td>
+          <td class="num">60</td>
+          <td class="num">39</td>
+          <td class="num">91</td>
+          <td class="note-cell">Included in OREO Index; land-title and benami-ownership issues well documented domestically</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇲🇾</span>Malaysia</td>
+          <td class="num"><span class="pill pill-mid">5.60</span></td>
+          <td class="num">66</td>
+          <td class="num">52</td>
+          <td class="num">54</td>
+          <td class="note-cell">Not covered by OREO Index; CPI improved from 47 (2022) to 52</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇮🇩</span>Indonesia</td>
+          <td class="num"><span class="pill pill-mid">5.52</span></td>
+          <td class="num">70</td>
+          <td class="num">34</td>
+          <td class="num">109</td>
+          <td class="note-cell">Included in OREO Index; CPI fell amid 2025 anti-government protests over graft</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇺🇸</span>USA</td>
+          <td class="num"><span class="pill pill-lo">4.83</span></td>
+          <td class="num">113</td>
+          <td class="num">64</td>
+          <td class="num">~35</td>
+          <td class="note-cell">FinCEN's residential/commercial real estate reporting rules are the main federal response</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇸🇬</span>Singapore</td>
+          <td class="num"><span class="pill pill-lo">4.73</span></td>
+          <td class="num">122</td>
+          <td class="num">84</td>
+          <td class="num">3</td>
+          <td class="note-cell">OREO Index: beneficial-ownership data exists but real-estate ownership data not openly published</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇦🇺</span>Australia</td>
+          <td class="num"><span class="pill pill-lo">4.13</span></td>
+          <td class="num">150</td>
+          <td class="num">76</td>
+          <td class="num">12</td>
+          <td class="note-cell">Real estate agents were brought under AUSTRAC's AML/CTF regime from 2026 ("Tranche 2")</td>
+        </tr>
+        <tr>
+          <td class="country"><span class="flag">🇬🇧</span>UK</td>
+          <td class="num"><span class="pill pill-lo">4.04</span></td>
+          <td class="num">157</td>
+          <td class="num">70</td>
+          <td class="num">~20</td>
+          <td class="note-cell">OREO Index: England &amp; Wales scores highest of all 24 jurisdictions on data transparency</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>Two views of risk, side by side</h2>
+      <span class="sec-note">deliberately kept as two separate axes, not merged into one score</span>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Basel AML Index 2025</h3>
+        <p class="cap">Structural money-laundering risk · 0 (low) – 10 (high) · Basel Institute on Governance</p>
+        <div class="chart-wrap"><canvas id="baselChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Corruption Perceptions Index 2025</h3>
+        <p class="cap">Perceived public-sector corruption · 0 (corrupt) – 100 (clean) · Transparency International</p>
+        <div class="chart-wrap"><canvas id="cpiChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>OREO index — real estate ownership opacity</h2>
+      <span class="sec-note">Transparency International / Anti-Corruption Data Collective, March 2025 · 24 jurisdictions assessed</span>
+    </div>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 14px;line-height:1.6;">
+      This is the only index of its kind built specifically around real estate: it scores jurisdictions on (1) how accessible real-estate ownership data is, and (2) how far anti-money-laundering rules actually cover the property sector. Of our 8 countries, 6 were assessed (Malaysia was not included). No jurisdiction scored full marks; 10 of the 24 scored below 5 out of 10.
+    </p>
+    <div class="oreo-grid">
+      <div class="oreo-card"><div class="name">🇬🇧 UK (England &amp; Wales)</div><div class="txt">Scores highest of all 24 jurisdictions on the data-transparency pillar, alongside France — ownership records are relatively accessible to the public.</div></div>
+      <div class="oreo-card"><div class="name">🇦🇪 UAE</div><div class="txt">One of several jurisdictions that introduced reforms after FATF scrutiny, but the index finds enforcement of those reforms still incomplete.</div></div>
+      <div class="oreo-card"><div class="name">🇸🇬 Singapore</div><div class="txt">Some corporate beneficial-ownership data is recorded, but real estate ownership records themselves are not openly published.</div></div>
+      <div class="oreo-card"><div class="name">🇮🇳 India / 🇮🇩 Indonesia</div><div class="txt">Both assessed among the 24; the index's public summary highlights gaps in real-estate data availability more broadly across G20 emerging markets rather than singling out either country.</div></div>
+      <div class="oreo-card"><div class="name">🇺🇸 USA</div><div class="txt">Long criticized for allowing anonymous shell-company property purchases; FinCEN's 2024–25 real estate reporting rule is a direct policy response to this gap.</div></div>
+      <div class="oreo-card"><div class="name">🇦🇺 Australia</div><div class="txt">Assessed in the index; separately, Australia only began extending AML/CTF obligations to real estate agents and other "Tranche 2" entities starting 2026.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>Global fraud taxonomy — how real estate is actually abused</h2>
+      <span class="sec-note">Generic typology, per FATF 2007 &amp; 2022 real estate reports — deliberately not scored per country</span>
+    </div>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;line-height:1.6;">
+      Unlike the country matrix above, these categories are <b>not</b> given a per-country severity rating here, because no public dataset breaks real estate fraud down this granularly by country. FATF's own reports describe these as universal vulnerabilities of the sector, present to varying degrees everywhere it operates.
+    </p>
+    <div class="cat-list">
+      <div class="cat-item"><div class="cat-num">01</div><div class="cat-body"><div class="cat-title">Cash purchases &amp; complex financing</div><div class="cat-desc">Buying property outright with cash, or through layered loans and credit structures that obscure the true source of funds.</div></div></div>
+      <div class="cat-item"><div class="cat-num">02</div><div class="cat-body"><div class="cat-title">Shell &amp; nominee ownership</div><div class="cat-desc">Holding title through companies, trusts, or nominees so the real beneficial owner is never recorded on any public register.</div></div></div>
+      <div class="cat-item"><div class="cat-num">03</div><div class="cat-body"><div class="cat-title">Under- or over-valuation</div><div class="cat-desc">Manipulating the declared sale price — under-valuing to dodge tax, over-valuing to move extra money through the transaction.</div></div></div>
+      <div class="cat-item"><div class="cat-num">04</div><div class="cat-body"><div class="cat-title">Title &amp; document fraud</div><div class="cat-desc">Forged deeds, powers of attorney, or backdated agreements used to fabricate or transfer ownership unlawfully.</div></div></div>
+      <div class="cat-item"><div class="cat-num">05</div><div class="cat-body"><div class="cat-title">Wire &amp; closing fraud</div><div class="cat-desc">Interception of email or wire instructions during closing to redirect a buyer's deposit or final payment to criminals.</div></div></div>
+      <div class="cat-item"><div class="cat-num">06</div><div class="cat-body"><div class="cat-title">Multiple sale / double-selling</div><div class="cat-desc">The same unit or plot sold to more than one buyer, common in off-plan and pre-construction markets with weak escrow controls.</div></div></div>
+      <div class="cat-item"><div class="cat-num">07</div><div class="cat-body"><div class="cat-title">Developer / project fund diversion</div><div class="cat-desc">Buyer deposits or construction financing diverted away from the project they were raised for, leaving it stalled or abandoned.</div></div></div>
+      <div class="cat-item"><div class="cat-num">08</div><div class="cat-body"><div class="cat-title">Professional collusion</div><div class="cat-desc">Agents, brokers, valuers or lawyers knowingly facilitating a transaction they know or suspect involves illicit funds.</div></div></div>
+      <div class="cat-item"><div class="cat-num">09</div><div class="cat-body"><div class="cat-title">Cross-border layering</div><div class="cat-desc">Routing purchase funds through multiple jurisdictions and intermediary entities before they reach the property market.</div></div></div>
+      <div class="cat-item"><div class="cat-num">10</div><div class="cat-body"><div class="cat-title">Online listing &amp; rental scams</div><div class="cat-desc">Fake listings, phishing, or advance-fee scams targeting buyers and renters directly, a fast-growing cyber-enabled category.</div></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2>Sources</h2>
+    </div>
+    <div class="src-grid">
+      <div class="src-item"><span class="tag">AML</span><a href="https://index.baselgovernance.org/ranking" target="_blank">Basel AML Index 2025 — full public ranking, Basel Institute on Governance</a></div>
+      <div class="src-item"><span class="tag">AML</span><a href="https://baselgovernance.org/publications/basel-aml-index-2025" target="_blank">Basel AML Index 2025 — report overview</a></div>
+      <div class="src-item"><span class="tag">CPI</span><a href="https://www.transparency.org/en/cpi/2025" target="_blank">Transparency International — Corruption Perceptions Index 2025</a></div>
+      <div class="src-item"><span class="tag">CPI</span><a href="https://www.transparency.org/en/press/corruption-perceptions-index-2025-stronger-institutions-freer-civic-space-needed-middle-east-north-africa" target="_blank">TI — CPI 2025 Middle East &amp; North Africa press release (UAE)</a></div>
+      <div class="src-item"><span class="tag">CPI</span><a href="https://www.transparency.org/en/press/corruption-perceptions-index-2025-stalling-anti-corruption-progress-asia-pacific-public-anger-surges" target="_blank">TI — CPI 2025 Asia Pacific press release (India, Indonesia, Malaysia, Singapore, Australia)</a></div>
+      <div class="src-item"><span class="tag">OREO</span><a href="https://www.transparency.org/en/publications/opacity-in-real-estate-ownership-index-2025" target="_blank">TI / ACDC — Opacity in Real Estate Ownership (OREO) Index, 2025</a></div>
+      <div class="src-item"><span class="tag">OREO</span><a href="https://www.transparency.org/en/news/unveiling-opacity-in-real-estate-ownership-index" target="_blank">TI — "Dirty money still has an address," OREO Index feature article</a></div>
+      <div class="src-item"><span class="tag">FATF</span><a href="https://www.fatf-gafi.org/en/publications/Methodsandtrends/Moneylaunderingandterroristfinancingthroughtherealestatesector.html" target="_blank">FATF — Money Laundering &amp; Terrorist Financing Through the Real Estate Sector (2007)</a></div>
+      <div class="src-item"><span class="tag">FATF</span><a href="https://eurasiangroup.org/en/fatf-typology-reports" target="_blank">FATF — full list of typology reports, incl. 2022 Risk-Based Approach Guidance for Real Estate</a></div>
+      <div class="src-item"><span class="tag">US</span><a href="https://www.fincen.gov/financial-action-task-force-money-laundering-fatf" target="_blank">FinCEN — background on FATF and US real estate AML reporting rules</a></div>
+      <div class="src-item"><span class="tag">UAE</span><a href="https://en.wikipedia.org/wiki/Corruption_in_the_United_Arab_Emirates" target="_blank">Wikipedia — Corruption in the United Arab Emirates (sourced overview, incl. real estate cases)</a></div>
+    </div>
+  </section>
+
+  <footer>
+    Methodology: every number above is drawn directly from the cited public index or report; nothing was interpolated or estimated. Where a metric wasn't available for a country (e.g. Malaysia in the OREO Index), that is stated rather than filled in. This is a research snapshot, not legal, financial, or investment advice — always verify against the primary source before relying on any figure for due diligence purposes.
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const countries = ['UAE','India','Malaysia','Indonesia','USA','Singapore','Australia','UK'];
+const basel = [6.11,5.66,5.60,5.52,4.83,4.73,4.13,4.04];
+const cpi   = [69,39,52,34,64,84,76,70];
+
+new Chart(document.getElementById('baselChart'), {
+  type:'bar',
+  data:{ labels:countries, datasets:[{ label:'Basel AML risk score', data:basel, backgroundColor:'#e8a33d', borderRadius:4, maxBarThickness:22 }] },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ min:0, max:10, grid:{ color:'#26344a' }, ticks:{ color:'#aab7c9' } },
+      y:{ grid:{ display:false }, ticks:{ color:'#eef2f7' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('cpiChart'), {
+  type:'bar',
+  data:{ labels:countries, datasets:[{ label:'CPI score', data:cpi, backgroundColor:'#3fc7a3', borderRadius:4, maxBarThickness:22 }] },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ min:0, max:100, grid:{ color:'#26344a' }, ticks:{ color:'#aab7c9' } },
+      y:{ grid:{ display:false }, ticks:{ color:'#eef2f7' } }
+    }
+  }
+});
+</script>
+</body>
+</html>

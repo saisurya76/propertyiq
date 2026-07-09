@@ -1,3 +1,18 @@
+*{
+    box-sizing:border-box;
+}
+
+html,
+body{
+    width:100%;
+    overflow-x:hidden;
+}
+
+#root{
+    width:100%;
+    overflow-x:hidden;
+}
+
 body {
   margin: 0;
   background: #f7f8fa;
@@ -9,34 +24,159 @@ body {
     sans-serif;
 }
 
-.app {
-  max-width: 1100px;
-  margin: auto;
-  padding: 40px 20px;
+.app{
+
+    width:100%;
+
+    max-width:1200px;
+
+    margin:0 auto;
+
+    padding:32px;
+
+    overflow:hidden;
+
 }
 
 .hero {
-  text-align: center;
-  margin-bottom: 40px;
+
+  text-align:center;
+
+  margin-bottom:40px;
+
 }
 
-.hero-brand {
-  font-size: 14px;
-  letter-spacing: 4px;
-  font-weight: 700;
-  color: #6b7280;
+.hero-banner{
+
+    width:100%;
+
+    max-width:100%;
+    
+    min-height:320px;
+
+    height:70vw;
+
+    max-height:500px;
+
+    padding:70px 40px;
+
+    border-radius:24px;
+
+    background:#0b2545;
+
+    /* Add your city image here */
+
+    background-image:url("./assets/hero-banner5.jpg");
+
+    background-size:cover;
+
+    background-position:center;
+
+    background-repeat:no-repeat;
+
+    position:relative;
+
+    overflow:hidden;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
 }
 
-.hero h1 {
-  font-size: 56px;
-  margin: 10px 0;
+.hero-banner::before{
+
+    content:"";
+
+    position:absolute;
+
+    inset:0;
+
+    background:linear-gradient(
+        rgba(7,18,34,.22),
+        rgba(7,18,34,.48)
+    );
+
 }
 
-.hero p {
-  max-width: 700px;
-  margin: auto;
-  color: #6b7280;
-  line-height: 1.6;
+.hero-banner>*{
+
+    position:relative;
+
+    z-index:2;
+
+}
+
+.hero-brand{
+
+    font-size:15px;
+
+    letter-spacing:4px;
+
+    font-weight:700;
+
+    color:#dbeafe;
+
+    text-transform:uppercase;
+
+}
+
+.hero-subtitle{
+
+    margin-top:12px;
+
+    font-size:clamp(18px,2vw,24px);
+
+    font-weight:500;
+
+    color:#ffffff;
+
+    opacity:.95;
+
+}
+
+.hero h1{
+
+    margin:22px 0 18px;
+
+    font-size:clamp(38px,6vw,68px);
+
+    font-weight:800;
+
+    line-height:1.05;
+
+    letter-spacing:-2px;
+
+    color:#ffffff;
+
+    opacity:1;
+
+    visibility:visible;
+
+    display:block;
+
+    text-shadow:
+
+        0 3px 14px rgba(0,0,0,.45);
+
+}
+
+.hero p{
+
+    max-width:700px;
+
+    margin:0 auto;
+
+    color:#f3f4f6;
+
+    font-size:clamp(16px,1.6vw,21px);
+
+    line-height:1.8;
+
 }
 
 .card {
@@ -45,7 +185,7 @@ body {
   padding: 30px;
   margin-bottom: 25px;
   box-shadow:
-    0 10px 30px rgba(0,0,0,0.05);
+    0 8px 24px rgba(15,23,42,.08);
 }
 
 .form-grid {
@@ -455,9 +595,41 @@ textarea:focus {
 
 @media (max-width: 768px) {
 
-  .hero h1 {
-    font-size: 40px;
+  .app{
+
+      padding:16px;
+
   }
+
+  .hero-banner{
+
+    min-height:360px;
+
+    height:70vw;
+
+    max-height:500px;
+
+    padding:32px 20px;
+
+}
+
+.hero-subtitle{
+
+    font-size:18px;
+
+}
+
+.hero h1{
+
+    font-size:38px;
+
+}
+
+.hero p{
+
+    font-size:16px;
+
+}
 
   .form-section-title {
     font-size: 20px;
