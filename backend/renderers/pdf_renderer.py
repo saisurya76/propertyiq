@@ -2,6 +2,8 @@ import os
 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Image
+import os
 
 FONT_PATH = os.path.join(
     os.path.dirname(__file__),
@@ -78,7 +80,16 @@ def generate_pdf(
     output_file
 ):
 
-    doc = SimpleDocTemplate(output_file)
+    from reportlab.lib.pagesizes import landscape, A4
+
+    doc = SimpleDocTemplate(
+        output_file,
+        pagesize=landscape(A4),
+        leftMargin=18,
+        rightMargin=18,
+        topMargin=18,
+        bottomMargin=18
+    )
 
     styles = getSampleStyleSheet()
 
@@ -156,6 +167,35 @@ def generate_pdf(
     )
 
     story = []
+
+    # atlas images
+    CURRENT_DIR = os.path.dirname(__file__)
+
+    INDIA_FRAUD_ATLAS = os.path.abspath(
+        os.path.join(
+            CURRENT_DIR,
+            "..",
+            "..",
+            "frontend",
+            "src",
+            "assets",
+            "fraud",
+            "india_fraud_atlas.png"
+        )
+    )
+
+    GLOBAL_FRAUD_TAXONOMY = os.path.abspath(
+        os.path.join(
+            CURRENT_DIR,
+            "..",
+            "..",
+            "frontend",
+            "src",
+            "assets",
+            "fraud",
+            "global_fraud_taxonomy.png"
+        )
+    )
 
     # COVER PAGE
 
@@ -1019,5 +1059,49 @@ def generate_pdf(
             styles["BodyText"]
         )
     )
+
+    #
+# FRAUD INTELLIGENCE
+#
+
+    from PIL import Image as PILImage
+
+    for title, image_path in [
+        ("REAL ESTATE FRAUD ATLAS OF INDIA", INDIA_FRAUD_ATLAS),
+        ("GLOBAL FRAUD TAXONOMY HEAT MAP", GLOBAL_FRAUD_TAXONOMY),
+    ]:
+
+        story.append(PageBreak())
+
+        story.append(
+            Paragraph(
+                title,
+                section_style
+            )
+        )
+
+        story.append(
+            Spacer(1, 10)
+        )
+
+        img = PILImage.open(image_path)
+
+        img_width, img_height = img.size
+
+        max_width = 760
+        max_height = 500
+
+        scale = min(
+            max_width / img_width,
+            max_height / img_height
+        )
+
+        story.append(
+            Image(
+                image_path,
+                width=img_width * scale,
+                height=img_height * scale
+            )
+        )
 
     doc.build(story)

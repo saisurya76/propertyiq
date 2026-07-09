@@ -1,5 +1,5 @@
 import { useState } from "react";
-import FraudIntelligence from "./FraudIntelligence";
+import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 
 function AssessmentResult({
   result,
@@ -1078,9 +1078,8 @@ function AssessmentResult({
 
       </div>
 
-      <FraudIntelligence
-        result={result}
-      />
+
+      <FraudIntelligenceStatic />
 
     </div>
   );

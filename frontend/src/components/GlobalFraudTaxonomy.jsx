@@ -31,28 +31,7 @@ export default function GlobalFraudTaxonomy({ data }) {
         }}
       >
 
-        <div
-          style={{
-            display: "flex",
-            gap: "20px",
-            flexWrap: "wrap",
-            marginBottom: "20px",
-            fontSize: "14px"
-          }}
-        >
-
-          <span>🔴 Very High</span>
-
-          <span>🟠 High</span>
-
-          <span>🟡 Medium</span>
-
-          <span>🟢 Low</span>
-
-          <span>⚪ Very Low</span>
-
-        </div>
-
+      
         <GlobalFraudMatrix
             data={data}
         />
