@@ -1,5 +1,6 @@
 import indiaFraudAtlas from "../assets/fraud/india_fraud_atlas.png";
 import globalFraudTaxonomy from "../assets/fraud/global_fraud_taxonomy.png";
+import fraudEvidenceSources from "../assets/fraud/fraud_evidence_sources.png";
 
 function FraudIntelligenceStatic() {
 
@@ -51,6 +52,17 @@ function FraudIntelligenceStatic() {
             <img
                 src={globalFraudTaxonomy}
                 alt="Global Fraud Taxonomy"
+                style={{
+                    width: "100%",
+                    marginBottom: "40px",
+                    borderRadius: "10px",
+                    boxShadow: "0 3px 12px rgba(0,0,0,.12)"
+                }}
+            />
+
+             <img
+                src={fraudEvidenceSources}
+                alt="Fraud Evidence Sources"
                 style={{
                     width: "100%",
                     borderRadius: "10px",

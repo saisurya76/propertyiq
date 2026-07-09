@@ -197,6 +197,19 @@ def generate_pdf(
         )
     )
 
+    FRAUD_EVIDENCE_SOURCES = os.path.abspath(
+        os.path.join(
+            CURRENT_DIR,
+            "..",
+            "..",
+            "frontend",
+            "src",
+            "assets",
+            "fraud",
+            "fraud_evidence_sources.png"
+        )
+    )
+
     # COVER PAGE
 
     story.append(
@@ -1069,6 +1082,7 @@ def generate_pdf(
     for title, image_path in [
         ("REAL ESTATE FRAUD ATLAS OF INDIA", INDIA_FRAUD_ATLAS),
         ("GLOBAL FRAUD TAXONOMY HEAT MAP", GLOBAL_FRAUD_TAXONOMY),
+        ("FRAUD EVIDENCE SOURCES", FRAUD_EVIDENCE_SOURCES),
     ]:
 
         story.append(PageBreak())
