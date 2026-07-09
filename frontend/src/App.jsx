@@ -149,8 +149,16 @@ function App() {
 
       <div className="hero hero-banner">
 
-       <div className="hero-brand">
-        PROPERTYIQ
+       <div className="hero-brand-row">
+
+        <div className="hero-brand">
+          PROPERTYIQ
+        </div>
+
+        <span className="beta-badge">
+          BETA
+        </span>
+
       </div>
 
       <div className="hero-subtitle">

@@ -125,6 +125,49 @@ body {
 
 }
 
+.hero-brand-row{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:12px;
+
+    flex-wrap:wrap;
+
+}
+
+.beta-badge{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    padding:5px 12px;
+
+    border-radius:999px;
+
+    background:#fbbf24;
+
+    color:#111827;
+
+    font-size:11px;
+
+    font-weight:800;
+
+    letter-spacing:1px;
+
+    text-transform:uppercase;
+
+    box-shadow:
+        0 2px 8px rgba(0,0,0,.18);
+
+}
+
 .hero-subtitle{
 
     margin-top:12px;

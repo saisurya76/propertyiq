@@ -117,6 +117,14 @@ def generate_pdf(
         textColor=colors.HexColor("#0F172A")
     )
 
+    brand_style = ParagraphStyle(
+        "BrandStyle",
+        parent=styles["Title"],
+        fontName="DejaVuSans",
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#0F172A")
+    )
+
     developer_style = ParagraphStyle(
         "DeveloperStyle",
         parent=styles["Heading3"],
@@ -224,8 +232,9 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "PROPERTYIQ",
-            title_style
+            'PROPERTYIQ&nbsp;&nbsp;&nbsp;'
+            '<font backcolor="#FBBF24" color="#111827"><b>&nbsp;BETA&nbsp;</b></font>',
+            brand_style
         )
     )
 
