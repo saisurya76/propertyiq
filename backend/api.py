@@ -44,12 +44,15 @@ class PropertyRequest(BaseModel):
     country: str
     stateProvince: str
     city: str
+    location: str
     propertyType: str
 
     propertyName: str
     developerName: str
 
     quotedPrice: float
+    governmentGuidance: float
+    marketAverage: float
     unitArea: float
 
     monthlyRent: float = 0
@@ -72,7 +75,7 @@ def build_property_input(data: PropertyRequest):
         country=data.country,
         state_province=data.stateProvince,
         city=data.city,
-        locality="Unknown",
+        locality=data.location,
 
         property_type=data.propertyType,
 
@@ -81,6 +84,9 @@ def build_property_input(data: PropertyRequest):
 
         quoted_price=data.quotedPrice,
         currency="INR",
+
+        government_guidance=data.governmentGuidance,
+        market_average=data.marketAverage,
 
         unit_area=data.unitArea,
         area_unit=data.areaUnit,

@@ -20,6 +20,9 @@ def test_pipeline():
         quoted_price=18000000,
         currency="INR",
 
+        government_guidance=6500,
+        market_average=10125,
+
         unit_area=1800,
         area_unit="sqft",
 

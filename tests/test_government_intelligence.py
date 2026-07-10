@@ -10,7 +10,8 @@ def test_government_intelligence():
         state_province="Telangana",
         city="Hyderabad",
         property_type="Apartment",
-        unit_area=1200
+        unit_area=1200,
+        government_rate=6500
     )
 
     assert (

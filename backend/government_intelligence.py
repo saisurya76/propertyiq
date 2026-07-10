@@ -24,15 +24,9 @@ def assess_government_intelligence(
     state_province: str,
     city: str,
     property_type: str,
-    unit_area: float
+    unit_area: float,
+    government_rate: float
 ) -> GovernmentIntelligence:
-
-    government_rate = get_government_rate(
-        country,
-        state_province,
-        city,
-        property_type
-    )
 
     government_value = (
         government_rate * unit_area

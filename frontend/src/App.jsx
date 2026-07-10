@@ -10,7 +10,9 @@ function App() {
     country: "India",
     stateProvince: "Telangana",
     city: "Hyderabad",
-
+    location: "",
+    governmentGuidance: "",
+    marketAverage: "",
     propertyType: "Apartment",
 
     propertyName: "",
@@ -49,6 +51,16 @@ function App() {
     stateProvince: formData.stateProvince || "",
 
     city: formData.city,
+    location: formData.location,
+    governmentGuidance:
+      formData.governmentGuidance === ""
+        ? null
+        : Number(formData.governmentGuidance),
+
+    marketAverage:
+      formData.marketAverage === ""
+        ? null
+        : Number(formData.marketAverage),
 
     propertyName: formData.propertyName,
     propertyType: formData.propertyType,
@@ -98,13 +110,25 @@ function App() {
   const generateAssessment = async () => {
     if (loading) return;
     if (
+      !formData.country ||
+      !formData.stateProvince ||
       !formData.city ||
+      !formData.location ||
+
+      !formData.propertyType ||
+
       !formData.propertyName ||
       !formData.developerName ||
+
       !formData.quotedPrice ||
-      !formData.areaValue
+
+      !formData.areaValue ||
+
+      !formData.governmentGuidance ||
+
+      !formData.marketAverage
     ) {
-      alert("Please complete all required fields.");
+      alert("Please complete all mandatory valuation fields.");
       return;
     }
 

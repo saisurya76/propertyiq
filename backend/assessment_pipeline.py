@@ -22,12 +22,6 @@ from backend.comparables import (
     average_price_per_sqft
 )
 
-from configs.defaults import (
-    DEFAULT_COMPARABLE_PRICES,
-    DEFAULT_TARGET_YIELD,
-    DEFAULT_REPLACEMENT_COST
-)
-
 from backend.valuation_models import (
     comparable_sales_value,
     rental_yield_value,
@@ -81,6 +75,10 @@ from backend.fraud_intelligence.engine import (
     generate_fraud_report
 )
 
+from backend.unit_rate_conversion import (
+    to_rate_per_sqft
+)
+
 @dataclass
 class PropertyInput:
     country: str
@@ -95,6 +93,9 @@ class PropertyInput:
 
     quoted_price: float
     currency: str
+
+    government_guidance: float
+    market_average: float
 
     unit_area: float
     area_unit: str
@@ -121,6 +122,16 @@ def run_assessment(
         property_input.area_unit
     )
 
+    normalized_government_rate = to_rate_per_sqft(
+        property_input.government_guidance,
+        property_input.area_unit
+    )
+
+    normalized_market_rate = to_rate_per_sqft(
+        property_input.market_average,
+        property_input.area_unit
+    )
+
     quoted_price_per_sqft = (
         property_input.quoted_price /
         normalized_area
@@ -144,21 +155,25 @@ def run_assessment(
 
     comparable_value = comparable_sales_value(
         normalized_area,
-        DEFAULT_COMPARABLE_PRICES
+        [normalized_market_rate]
     )
 
     # Rental Yield Value
 
-    rental_value = rental_yield_value(
-        property_input.monthly_rent,
-        DEFAULT_TARGET_YIELD
-    )
+    if property_input.monthly_rent > 0:
+
+        rental_value = rental_yield_value(
+            property_input.monthly_rent,
+            4.0
+        )
+
+    else:
+
+        rental_value = 0.0
 
     # Replacement Cost Value
 
-    replacement_value = replacement_cost_value(
-        **DEFAULT_REPLACEMENT_COST
-    )
+    replacement_value = 0.0
 
     # Weighted Fair Value
 
@@ -330,7 +345,10 @@ def run_assessment(
                 property_input.property_type,
 
             unit_area=
-                normalized_area
+                normalized_area,
+
+            government_rate=
+                normalized_government_rate
         )
     )
 

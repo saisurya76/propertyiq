@@ -52,6 +52,17 @@ function PropertyForm({
           </div>
 
           <div className="form-field">
+            <label>Location *</label>
+
+            <input
+              name="location"
+              value={formData.location}
+              onChange={handleChange}
+              placeholder="Locality / Layout / Sector / Village"
+            />
+          </div>
+
+          <div className="form-field">
             <label>Property Type *</label>
 
             <select
@@ -102,6 +113,37 @@ function PropertyForm({
               onChange={handleChange}
               placeholder="Enter quoted price"
             />
+          </div>
+
+          <div className="form-field">
+            <label>
+             Government Guidance *
+            </label>
+
+            <input
+              type="number"
+              name="governmentGuidance"
+              placeholder="Official guidance value per selected area unit"
+              value={formData.governmentGuidance}
+              onChange={handleChange}
+            />
+
+          </div>
+
+          <div className="form-field">
+            <label>Market Average *</label>
+
+            <input
+              type="number"
+              name="marketAverage"
+              value={formData.marketAverage}
+              onChange={handleChange}
+              placeholder="Current market rate per selected area unit"
+            />
+
+            <small className="field-help">
+              Current market rate for similar properties in this location.
+            </small>
           </div>
 
           <div className="form-field">
