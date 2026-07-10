@@ -75,19 +75,33 @@ def replacement_cost_value(
         2
     )
 
-def weighted_fair_value(
+def calculate_fair_value(
+    government_value: float,
     comparable_value: float,
-    rental_value: float,
-    replacement_value: float
+    rental_value: float = 0.0,
+    replacement_value: float = 0.0
 ) -> float:
 
-    fair_value = (
-        comparable_value * 0.45
-        + rental_value * 0.25
-        + replacement_value * 0.30
-    )
+    values = []
+
+    if government_value > 0:
+        values.append(government_value)
+
+    if comparable_value > 0:
+        values.append(comparable_value)
+
+    if rental_value > 0:
+        values.append(rental_value)
+
+    if replacement_value > 0:
+        values.append(replacement_value)
+
+    if not values:
+        raise ValueError(
+            "No valuation models available."
+        )
 
     return round(
-        fair_value,
+        sum(values) / len(values),
         2
     )

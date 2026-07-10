@@ -1,4 +1,5 @@
 from backend.valuation_models import (
+    calculate_fair_value,
     comparable_sales_value
 )
 
@@ -47,16 +48,17 @@ def test_replacement_cost_value():
     assert value == 15000000.0
 
 from backend.valuation_models import (
-    weighted_fair_value
+    calculate_fair_value
 )
 
 
-def test_weighted_fair_value():
+def test_calculate_fair_value():
 
-    value = weighted_fair_value(
-        comparable_value=17700000,
-        rental_value=13500000,
-        replacement_value=15000000
+    fair_value = calculate_fair_value(
+        government_value=9000000,
+        comparable_value=11000000,
+        rental_value=0,
+        replacement_value=0
     )
 
-    assert value == 15840000.0
+    assert fair_value == 10000000

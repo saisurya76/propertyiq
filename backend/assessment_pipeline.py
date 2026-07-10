@@ -26,7 +26,7 @@ from backend.valuation_models import (
     comparable_sales_value,
     rental_yield_value,
     replacement_cost_value,
-    weighted_fair_value
+    calculate_fair_value
 )
 
 from backend.unit_conversion import (
@@ -177,7 +177,8 @@ def run_assessment(
 
     # Weighted Fair Value
 
-    fair_value = weighted_fair_value(
+    fair_value = calculate_fair_value(
+        government_value=government_value,
         comparable_value=comparable_value,
         rental_value=rental_value,
         replacement_value=replacement_value
@@ -350,6 +351,11 @@ def run_assessment(
             government_rate=
                 normalized_government_rate
         )
+    )
+
+    government_value = (
+        government_intelligence
+        .government_property_value
     )
 
     #fraud_intelligence
