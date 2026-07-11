@@ -29,7 +29,7 @@ function AssessmentResult({
       setReportLoading(true);
 
       const response = await fetch(
-        "http://127.0.0.1:8000/generate-report",
+        "https://propertyiq-api-q21y.onrender.com/generate-report",
         {
           method: "POST",
 
@@ -46,6 +46,9 @@ function AssessmentResult({
             city:
                 formData.city,
 
+            location:
+                formData.location,
+
             propertyName:
               formData.propertyName,
 
@@ -57,6 +60,12 @@ function AssessmentResult({
 
             quotedPrice:
               Number(formData.quotedPrice),
+
+            governmentGuidance:
+              Number(formData.governmentGuidance),
+
+            marketAverage:
+              Number(formData.marketAverage),
 
             unitArea:
               Number(formData.areaValue),
@@ -342,7 +351,7 @@ function AssessmentResult({
           </div>
 
           <div className="finding-item">
-            <strong>Market Average</strong>
+            <strong>City Comparable Benchmark</strong>
             <p>
               ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
             </p>
@@ -821,13 +830,13 @@ function AssessmentResult({
 <div className="findings-card">
 
   <div className="findings-title">
-    MARKET BENCHMARKS
+    CITY COMPARABLE BENCHMARKS
   </div>
 
   <div className="finding-item">
 
     <strong>
-      Average Market Asking Price
+      Average City Comparable Price
     </strong>
 
     <p>
@@ -839,17 +848,13 @@ function AssessmentResult({
   <div className="finding-item">
 
     <strong>
-      Market Asking Value
+      Comparable Market Value
     </strong>
 
     <p>
       {formatIndianCurrency(
-        result.marketAveragePricePerSqft *
-        (
-            formData.areaUnit === "acre"
-                ? Number(formData.areaValue) * 43560
-                : Number(formData.areaValue || 0)
-        )
+          result.marketAveragePricePerSqft *
+          result.normalizedArea
       )}
     </p>
 
@@ -885,9 +890,10 @@ function AssessmentResult({
     }}
   >
 
-    PropertyIQ Fair Value is derived using
-    comparable sales, rental yield, and
-    replacement cost models.
+    PropertyIQ Fair Value is derived using the user-provided market average together with 
+    applicable valuation models such as rental yield when sufficient 
+    evidence is available. Government Guidance is reported separately as regulatory 
+    reference information and is not used to determine Fair Value.
 
     <br /><br />
 
@@ -951,15 +957,21 @@ function AssessmentResult({
   <div className="finding-item">
 
     <strong>
-      Valuation Model
+      Valuation Approach
     </strong>
 
     <p>
-      Comparable Sales
+      User Market Average
       <br />
-      Rental Yield
       <br />
-      Replacement Cost
+
+      Supporting Valuation Models
+      <br />
+      • Comparable Sales (when available)
+      <br />
+      • Rental Yield (when available)
+      <br />
+      • Replacement Cost (when available)
     </p>
 
   </div>

@@ -492,6 +492,9 @@ def assess(data: PropertyRequest):
         "marketAveragePricePerSqft":
             assessment.market_average_price_per_sqft,
 
+        "normalizedArea":
+            assessment.normalized_area,
+
         "comparables": [
             {
                 "projectName":

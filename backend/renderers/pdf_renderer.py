@@ -720,21 +720,21 @@ def generate_pdf(
 
         story.append(
             Paragraph(
-                "MARKET CONTEXT",
+                "CITY COMPARABLE BENCHMARKS",
                 section_style
             )
         )
 
         story.append(
             Paragraph(
-                f"Average Market Asking Price: ₹{assessment.market_average_price_per_sqft:,.0f} / sqft",
+                f"Average City Comparable Price: ₹{assessment.market_average_price_per_sqft:,.0f} / sqft",
                 styles["BodyText"]
             )
         )
 
         story.append(
             Paragraph(
-                f"Market Asking Value: "
+                f"Comparable Market Value: "
                 f"{format_currency(assessment.market_average_price_per_sqft * assessment.normalized_area)}",
                 styles["BodyText"]
             )
@@ -762,7 +762,7 @@ def generate_pdf(
 
             story.append(
                 Paragraph(
-                    f"<b>Market Asking Price:</b> ₹{project.price_per_sqft:,.0f} / sqft",
+                    f"<b>Comparable Price:</b> ₹{project.price_per_sqft:,.0f} / sqft",
                     styles["BodyText"]
                 )
             )
@@ -777,7 +777,7 @@ def generate_pdf(
 
         story.append(
             Paragraph(
-                "PropertyIQ Fair Value is derived using comparable sales, rental yield, and replacement cost models.",
+                "PropertyIQ Fair Value is derived using the user-provided market average together with applicable valuation models such as rental yield when sufficient evidence is available. Government Guidance is reported separately as regulatory reference information and is not used to determine Fair Value.",
                 styles["BodyText"]
             )
         )

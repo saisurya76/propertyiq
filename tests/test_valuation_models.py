@@ -55,10 +55,9 @@ from backend.valuation_models import (
 def test_calculate_fair_value():
 
     fair_value = calculate_fair_value(
-        government_value=9000000,
         comparable_value=11000000,
         rental_value=0,
         replacement_value=0
     )
 
-    assert fair_value == 10000000
+    assert fair_value == 11000000

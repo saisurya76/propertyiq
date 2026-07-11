@@ -132,6 +132,32 @@ def run_assessment(
         property_input.area_unit
     )
 
+    government_intelligence = (
+        assess_government_intelligence(
+            country=property_input.country,
+
+            state_province=
+                property_input.state_province,
+
+            city=
+                property_input.city,
+
+            property_type=
+                property_input.property_type,
+
+            unit_area=
+                normalized_area,
+
+            government_rate=
+                normalized_government_rate
+        )
+    )
+
+    government_value = (
+        government_intelligence
+        .government_property_value
+    )
+
     quoted_price_per_sqft = (
         property_input.quoted_price /
         normalized_area
@@ -160,7 +186,10 @@ def run_assessment(
 
     # Rental Yield Value
 
-    if property_input.monthly_rent > 0:
+    if (
+        property_input.property_type != "Plot / Land"
+        and property_input.monthly_rent > 0
+    ):
 
         rental_value = rental_yield_value(
             property_input.monthly_rent,
@@ -178,7 +207,6 @@ def run_assessment(
     # Weighted Fair Value
 
     fair_value = calculate_fair_value(
-        government_value=government_value,
         comparable_value=comparable_value,
         rental_value=rental_value,
         replacement_value=replacement_value
@@ -330,32 +358,6 @@ def run_assessment(
             inventory_score=inventory_score_value,
             valuation_score=valuation_score_value
         )
-    )
-
-    government_intelligence = (
-        assess_government_intelligence(
-            country=property_input.country,
-
-            state_province=
-                property_input.state_province,
-
-            city=
-                property_input.city,
-
-            property_type=
-                property_input.property_type,
-
-            unit_area=
-                normalized_area,
-
-            government_rate=
-                normalized_government_rate
-        )
-    )
-
-    government_value = (
-        government_intelligence
-        .government_property_value
     )
 
     #fraud_intelligence

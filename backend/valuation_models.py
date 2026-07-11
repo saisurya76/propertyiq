@@ -76,16 +76,12 @@ def replacement_cost_value(
     )
 
 def calculate_fair_value(
-    government_value: float,
     comparable_value: float,
     rental_value: float = 0.0,
     replacement_value: float = 0.0
 ) -> float:
 
     values = []
-
-    if government_value > 0:
-        values.append(government_value)
 
     if comparable_value > 0:
         values.append(comparable_value)
