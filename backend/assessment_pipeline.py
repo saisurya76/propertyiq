@@ -168,7 +168,8 @@ def run_assessment(
     # Market Intelligence
 
     comparables = get_comparables(
-    property_input.city
+        property_input.city,
+        property_input.property_type
     )
 
     market_average_price_per_sqft = (

@@ -6,6 +6,7 @@ class ComparableProject:
     project_name: str
     developer: str
     city: str
+    property_type: str
     price_per_sqft: float
 
 
@@ -15,6 +16,7 @@ HYDERABAD_COMPARABLES = [
         "Aparna Zenon",
         "Aparna",
         "Hyderabad",
+        "Apartment",
         9800
     ),
 
@@ -22,6 +24,7 @@ HYDERABAD_COMPARABLES = [
         "Prestige High Fields",
         "Prestige",
         "Hyderabad",
+        "Apartment",
         10200
     ),
 
@@ -29,6 +32,7 @@ HYDERABAD_COMPARABLES = [
         "My Home Bhooja",
         "My Home",
         "Hyderabad",
+        "Apartment",
         11000
     ),
 
@@ -36,13 +40,15 @@ HYDERABAD_COMPARABLES = [
         "Lansum Elena",
         "Lansum",
         "Hyderabad",
+        "Apartment",
         9500
     )
 ]
 
 
 def get_comparables(
-    city: str
+    city: str,
+    property_type: str
 ):
 
     if not city:
@@ -50,10 +56,15 @@ def get_comparables(
 
     city = city.strip().lower()
 
-    if city == "hyderabad":
-        return HYDERABAD_COMPARABLES
+    if city != "hyderabad":
+        return []
 
-    return []
+    return [
+        c
+        for c in HYDERABAD_COMPARABLES
+        if c.property_type.lower()
+        == property_type.lower()
+    ]
 
 
 def average_price_per_sqft(

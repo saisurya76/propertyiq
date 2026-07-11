@@ -840,7 +840,9 @@ function AssessmentResult({
     </strong>
 
     <p>
-      ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
+      {result.marketAveragePricePerSqft > 0
+        ? `₹${result.marketAveragePricePerSqft.toLocaleString("en-IN")} / sqft`
+        : "Not Available"}
     </p>
 
   </div>
@@ -852,13 +854,32 @@ function AssessmentResult({
     </strong>
 
     <p>
-      {formatIndianCurrency(
-          result.marketAveragePricePerSqft *
-          result.normalizedArea
-      )}
+      {result.marketAveragePricePerSqft > 0
+        ? formatIndianCurrency(
+            result.marketAveragePricePerSqft *
+            (
+              formData.areaUnit === "acre"
+                ? Number(formData.areaValue) * 43560
+                : Number(formData.areaValue || 0)
+            )
+          )
+        : "Not Available"}
     </p>
 
   </div>
+
+    {result.comparables?.length === 0 && (
+
+      <div
+        className="finding-item"
+      >
+        <p>
+          No comparable projects are currently
+          available for this property type.
+        </p>
+      </div>
+
+    )}
 
   {result.comparables?.map(
     (project, index) => (
