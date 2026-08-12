@@ -3,3 +3,5 @@ uvicorn==0.39.0
 pydantic==2.13.4
 reportlab==5.0.0
 pillow==11.3.0
+
+dodopayments==1.108.1

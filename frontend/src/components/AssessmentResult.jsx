@@ -23,128 +23,56 @@ function AssessmentResult({
     return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
   };
 
-  const downloadReport = async () => {
+  const startPayment = async () => {
     if (reportLoading) return;
 
     try {
-
       setReportLoading(true);
 
       const response = await fetch(
-        "https://propertyiq-api-q21y.onrender.com/generate-report",
+        "https://propertyiq-api-q21y.onrender.com/create-checkout",
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json"
           },
-
           body: JSON.stringify({
             country: formData.country,
-
-            stateProvince:
-                formData.stateProvince,
-
-            city:
-                formData.city,
-
-            location:
-                formData.location,
-
-            propertyName:
-              formData.propertyName,
-
-            propertyType: 
-              formData.propertyType,
-
-            developerName:
-              formData.developerName,
-
-            quotedPrice:
-              Number(formData.quotedPrice),
-
-            governmentGuidance:
-              Number(formData.governmentGuidance),
-
-            marketAverage:
-              Number(formData.marketAverage),
-
-            unitArea:
-              Number(formData.areaValue),
-
-            areaUnit:
-              formData.areaUnit,
-
-            monthlyRent:
-              Number(formData.monthlyRent || 0),
-
-            totalUnits:
-              formData.totalUnits === ""
-                  ? null
-                  : Number(formData.totalUnits),
-
-          unsoldUnits:
-              formData.unsoldUnits === ""
-                  ? null
-                  : Number(formData.unsoldUnits),
-
-          projectsCompleted:
-              formData.projectsCompleted === ""
-                  ? null
-                  : Number(formData.projectsCompleted),
-
-          projectsDelayed:
-              formData.projectsDelayed === ""
-                  ? null
-                  : Number(formData.projectsDelayed),
-
-          yearsInBusiness:
-              formData.yearsInBusiness === ""
-                  ? null
-                  : Number(formData.yearsInBusiness),
-
-          regulatoryViolations:
-              formData.regulatoryViolations === ""
-                  ? null
-                  : Number(formData.regulatoryViolations),
+            stateProvince: formData.stateProvince,
+            city: formData.city,
+            location: formData.location,
+            propertyName: formData.propertyName,
+            propertyType: formData.propertyType,
+            developerName: formData.developerName,
+            quotedPrice: Number(formData.quotedPrice),
+            governmentGuidance: Number(formData.governmentGuidance),
+            marketAverage: Number(formData.marketAverage),
+            unitArea: Number(formData.areaValue),
+            areaUnit: formData.areaUnit,
+            monthlyRent: Number(formData.monthlyRent || 0),
+            totalUnits: formData.totalUnits === "" ? null : Number(formData.totalUnits),
+            unsoldUnits: formData.unsoldUnits === "" ? null : Number(formData.unsoldUnits),
+            projectsCompleted: formData.projectsCompleted === "" ? null : Number(formData.projectsCompleted),
+            projectsDelayed: formData.projectsDelayed === "" ? null : Number(formData.projectsDelayed),
+            yearsInBusiness: formData.yearsInBusiness === "" ? null : Number(formData.yearsInBusiness),
+            regulatoryViolations: formData.regulatoryViolations === "" ? null : Number(formData.regulatoryViolations),
+            termsAccepted: true,
+            termsVersion: "PropertyIQ Report Terms v1.0"
           })
         }
       );
 
-      if (!response.ok) {
-          throw new Error("Failed to generate report.");
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload.checkoutUrl) {
+        throw new Error(payload.detail || "Unable to start payment.");
       }
 
-      const blob =
-        await response.blob();
-
-      const url =
-        window.URL.createObjectURL(blob);
-
-      const link =
-        document.createElement("a");
-
-      link.href = url;
-
-      link.download =
-        "PropertyIQ_Report.pdf";
-
-      document.body.appendChild(link);
-
-      link.click();
-
-      link.remove();
-
-      window.URL.revokeObjectURL(url);
-
+      window.location.href = payload.checkoutUrl;
     } catch (error) {
-
       console.error(error);
-
-      alert("Failed to generate PropertyIQ report.");
-    }
-    finally {
-        setReportLoading(false);
+      alert(error.message || "Unable to start PropertyIQ payment.");
+      setReportLoading(false);
     }
   };
 
@@ -1121,7 +1049,7 @@ function AssessmentResult({
           onCancel={() => setShowTerms(false)}
           onAccept={() => {
             setShowTerms(false);
-            downloadReport();
+            startPayment();
           }}
         />
       )}

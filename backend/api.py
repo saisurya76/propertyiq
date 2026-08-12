@@ -1,8 +1,19 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from typing import Optional
 from pydantic import BaseModel
+
+import os
+import uuid
+
+from dodopayments import DodoPayments
+
+from backend.payment_store import (
+    initialize_payment_store,
+    create_order,
+    attach_checkout_session,
+)
 
 from backend.assessment_pipeline import (
     PropertyInput,
@@ -30,6 +41,31 @@ from backend.renderers.pdf_renderer import (
 )
 
 app = FastAPI()
+
+initialize_payment_store()
+
+DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
+DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
+FRONTEND_URL = os.getenv("PROPERTYIQ_FRONTEND_URL", "https://app.propertyiqweb.com")
+DODO_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY", "")
+
+
+def get_dodo_client():
+    if not DODO_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY."
+        )
+    if not DODO_PRODUCT_ID:
+        raise HTTPException(
+            status_code=503,
+            detail="Dodo Payments is not configured. Set DODO_REPORT_PRODUCT_ID."
+        )
+
+    return DodoPayments(
+        bearer_token=DODO_API_KEY,
+        environment=DODO_ENVIRONMENT,
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,6 +103,11 @@ class PropertyRequest(BaseModel):
     regulatoryViolations: Optional[int] = None
 
     areaUnit: str = "sqft"
+
+
+class ReportCheckoutRequest(PropertyRequest):
+    termsAccepted: bool
+    termsVersion: str = "PropertyIQ Report Terms v1.0"
 
 
 def build_property_input(data: PropertyRequest):
@@ -540,6 +581,69 @@ def assess(data: PropertyRequest):
             "narrative":
                 assessment.decision.narrative
         },
+    }
+
+
+@app.post("/create-checkout")
+def create_checkout(data: ReportCheckoutRequest):
+    if data.country.strip().lower() != "india":
+        raise HTTPException(
+            status_code=400,
+            detail="Paid PropertyIQ reports are currently available only in India."
+        )
+
+    if not data.termsAccepted:
+        raise HTTPException(
+            status_code=400,
+            detail="PropertyIQ Report Terms & Conditions must be accepted before purchase."
+        )
+
+    order_id = f"PIQ-{uuid.uuid4().hex}"
+    payload = data.model_dump(exclude={"termsAccepted", "termsVersion"})
+
+    create_order(
+        order_id=order_id,
+        property_payload=payload,
+        terms_version=data.termsVersion,
+    )
+
+    client = get_dodo_client()
+
+    try:
+        session = client.checkout_sessions.create(
+            product_cart=[
+                {
+                    "product_id": DODO_PRODUCT_ID,
+                    "quantity": 1,
+                }
+            ],
+            metadata={
+                "order_id": order_id,
+                "terms_version": data.termsVersion,
+                "product": "propertyiq_report",
+                "country": "IN",
+                "currency": "INR",
+            },
+            return_url=f"{FRONTEND_URL.rstrip('/')}/?payment=return&order_id={order_id}",
+            cancel_url=f"{FRONTEND_URL.rstrip('/')}/?payment=cancelled&order_id={order_id}",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to create Dodo Payments checkout session."
+        ) from exc
+    finally:
+        client.close()
+
+    attach_checkout_session(order_id, session.session_id)
+
+    return {
+        "orderId": order_id,
+        "checkoutUrl": session.checkout_url,
+        "checkoutSessionId": session.session_id,
+        "currency": "INR",
+        "country": "IN",
+        "termsVersion": data.termsVersion,
     }
 
 
