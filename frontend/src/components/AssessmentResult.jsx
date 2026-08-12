@@ -1,5 +1,6 @@
 import { useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
+import TermsAndConditions from "./TermsAndConditions";
 
 function AssessmentResult({
   result,
@@ -8,6 +9,7 @@ function AssessmentResult({
   if (!result) return null;
 
   const [reportLoading, setReportLoading] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   const formatIndianCurrency = (value) => {
     if (value >= 10000000) {
@@ -1097,7 +1099,7 @@ function AssessmentResult({
 
         <button
           className="download-report-btn"
-          onClick={downloadReport}
+          onClick={() => setShowTerms(true)}
           disabled={reportLoading}
         >
           {reportLoading && (
@@ -1106,13 +1108,23 @@ function AssessmentResult({
 
           {reportLoading
             ? "Generating Report..."
-            : "Download PropertyIQ Report"}
+            : "Buy Report"}
         </button>
 
       </div>
 
 
       <FraudIntelligenceStatic />
+
+      {showTerms && (
+        <TermsAndConditions
+          onCancel={() => setShowTerms(false)}
+          onAccept={() => {
+            setShowTerms(false);
+            downloadReport();
+          }}
+        />
+      )}
 
     </div>
   );
