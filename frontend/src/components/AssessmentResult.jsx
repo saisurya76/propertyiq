@@ -1,6 +1,5 @@
 import { useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
-import TermsAndConditions from "./TermsAndConditions";
 
 function AssessmentResult({
   result,
@@ -9,7 +8,6 @@ function AssessmentResult({
   if (!result) return null;
 
   const [reportLoading, setReportLoading] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
 
   const formatIndianCurrency = (value) => {
     if (value >= 10000000) {
@@ -23,14 +21,14 @@ function AssessmentResult({
     return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
   };
 
-  const startPayment = async () => {
+  const downloadReport = async () => {
     if (reportLoading) return;
 
     try {
       setReportLoading(true);
 
       const response = await fetch(
-        "https://propertyiq-api-q21y.onrender.com/create-checkout",
+        "https://propertyiq-api-q21y.onrender.com/generate-report",
         {
           method: "POST",
           headers: {
@@ -55,23 +53,28 @@ function AssessmentResult({
             projectsCompleted: formData.projectsCompleted === "" ? null : Number(formData.projectsCompleted),
             projectsDelayed: formData.projectsDelayed === "" ? null : Number(formData.projectsDelayed),
             yearsInBusiness: formData.yearsInBusiness === "" ? null : Number(formData.yearsInBusiness),
-            regulatoryViolations: formData.regulatoryViolations === "" ? null : Number(formData.regulatoryViolations),
-            termsAccepted: true,
-            termsVersion: "PropertyIQ Report Terms v1.0"
+            regulatoryViolations: formData.regulatoryViolations === "" ? null : Number(formData.regulatoryViolations)
           })
         }
       );
 
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok || !payload.checkoutUrl) {
-        throw new Error(payload.detail || "Unable to start payment.");
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
       }
 
-      window.location.href = payload.checkoutUrl;
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "PropertyIQ_Report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert(error.message || "Unable to start PropertyIQ payment.");
+      alert("Failed to download report");
+    } finally {
       setReportLoading(false);
     }
   };
@@ -1027,7 +1030,7 @@ function AssessmentResult({
 
         <button
           className="download-report-btn"
-          onClick={() => setShowTerms(true)}
+          onClick={downloadReport}
           disabled={reportLoading}
         >
           {reportLoading && (
@@ -1036,7 +1039,7 @@ function AssessmentResult({
 
           {reportLoading
             ? "Generating Report..."
-            : "Buy Report"}
+            : "Download PropertyIQ Report"}
         </button>
 
       </div>
@@ -1044,15 +1047,6 @@ function AssessmentResult({
 
       <FraudIntelligenceStatic />
 
-      {showTerms && (
-        <TermsAndConditions
-          onCancel={() => setShowTerms(false)}
-          onAccept={() => {
-            setShowTerms(false);
-            startPayment();
-          }}
-        />
-      )}
 
     </div>
   );
