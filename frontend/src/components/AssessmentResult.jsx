@@ -25,57 +25,124 @@ function AssessmentResult({
     if (reportLoading) return;
 
     try {
+
       setReportLoading(true);
 
       const response = await fetch(
         "https://propertyiq-api-q21y.onrender.com/generate-report",
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json"
           },
+
           body: JSON.stringify({
             country: formData.country,
-            stateProvince: formData.stateProvince,
-            city: formData.city,
-            location: formData.location,
-            propertyName: formData.propertyName,
-            propertyType: formData.propertyType,
-            developerName: formData.developerName,
-            quotedPrice: Number(formData.quotedPrice),
-            governmentGuidance: Number(formData.governmentGuidance),
-            marketAverage: Number(formData.marketAverage),
-            unitArea: Number(formData.areaValue),
-            areaUnit: formData.areaUnit,
-            monthlyRent: Number(formData.monthlyRent || 0),
-            totalUnits: formData.totalUnits === "" ? null : Number(formData.totalUnits),
-            unsoldUnits: formData.unsoldUnits === "" ? null : Number(formData.unsoldUnits),
-            projectsCompleted: formData.projectsCompleted === "" ? null : Number(formData.projectsCompleted),
-            projectsDelayed: formData.projectsDelayed === "" ? null : Number(formData.projectsDelayed),
-            yearsInBusiness: formData.yearsInBusiness === "" ? null : Number(formData.yearsInBusiness),
-            regulatoryViolations: formData.regulatoryViolations === "" ? null : Number(formData.regulatoryViolations)
+
+            stateProvince:
+                formData.stateProvince,
+
+            city:
+                formData.city,
+
+            location:
+                formData.location,
+
+            propertyName:
+              formData.propertyName,
+
+            propertyType: 
+              formData.propertyType,
+
+            developerName:
+              formData.developerName,
+
+            quotedPrice:
+              Number(formData.quotedPrice),
+
+            governmentGuidance:
+              Number(formData.governmentGuidance),
+
+            marketAverage:
+              Number(formData.marketAverage),
+
+            unitArea:
+              Number(formData.areaValue),
+
+            areaUnit:
+              formData.areaUnit,
+
+            monthlyRent:
+              Number(formData.monthlyRent || 0),
+
+            totalUnits:
+              formData.totalUnits === ""
+                  ? null
+                  : Number(formData.totalUnits),
+
+          unsoldUnits:
+              formData.unsoldUnits === ""
+                  ? null
+                  : Number(formData.unsoldUnits),
+
+          projectsCompleted:
+              formData.projectsCompleted === ""
+                  ? null
+                  : Number(formData.projectsCompleted),
+
+          projectsDelayed:
+              formData.projectsDelayed === ""
+                  ? null
+                  : Number(formData.projectsDelayed),
+
+          yearsInBusiness:
+              formData.yearsInBusiness === ""
+                  ? null
+                  : Number(formData.yearsInBusiness),
+
+          regulatoryViolations:
+              formData.regulatoryViolations === ""
+                  ? null
+                  : Number(formData.regulatoryViolations),
           })
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to generate report");
+          throw new Error("Failed to generate report.");
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const blob =
+        await response.blob();
+
+      const url =
+        window.URL.createObjectURL(blob);
+
+      const link =
+        document.createElement("a");
+
       link.href = url;
-      link.download = "PropertyIQ_Report.pdf";
+
+      link.download =
+        "PropertyIQ_Report.pdf";
+
       document.body.appendChild(link);
+
       link.click();
+
       link.remove();
+
       window.URL.revokeObjectURL(url);
+
     } catch (error) {
+
       console.error(error);
-      alert("Failed to download report");
-    } finally {
-      setReportLoading(false);
+
+      alert("Failed to generate PropertyIQ report.");
+    }
+    finally {
+        setReportLoading(false);
     }
   };
 
@@ -1031,7 +1098,7 @@ function AssessmentResult({
         <button
           className="download-report-btn"
           onClick={downloadReport}
-          disabled={reportLoading}
+          disabled={true}
         >
           {reportLoading && (
             <span className="spinner"></span>
@@ -1046,7 +1113,6 @@ function AssessmentResult({
 
 
       <FraudIntelligenceStatic />
-
 
     </div>
   );
