@@ -1,0 +1,76 @@
+from backend.vastu_engine import check_vastu_full, _zone_for_room
+
+PLOT_L, PLOT_W = 40, 30  # thirds: x=13.33, y=10
+
+
+def test_zone_detection_corners_and_center():
+    assert _zone_for_room({"x": 30, "y": 2, "length": 8, "width": 6}, PLOT_L, PLOT_W) == "SE"
+    assert _zone_for_room({"x": 30, "y": 22, "length": 8, "width": 6}, PLOT_L, PLOT_W) == "NE"
+    assert _zone_for_room({"x": 2, "y": 2, "length": 8, "width": 6}, PLOT_L, PLOT_W) == "SW"
+    assert _zone_for_room({"x": 2, "y": 22, "length": 8, "width": 6}, PLOT_L, PLOT_W) == "NW"
+    assert _zone_for_room({"x": 16, "y": 12, "length": 6, "width": 6}, PLOT_L, PLOT_W) == "CENTER"
+
+
+def test_kitchen_in_se_is_compliant():
+    result = check_vastu_full(
+        plot_length_ft=PLOT_L, plot_width_ft=PLOT_W,
+        rooms=[{"name": "Kitchen", "x": 30, "y": 2, "length": 8, "width": 6}],
+        entrance_direction="north-east", road_facing_side="north-east",
+    )
+    assert result["compliant"] is True
+    assert result["scope"] == "full_multi_rule_check"
+
+
+def test_kitchen_in_ne_is_flagged():
+    result = check_vastu_full(
+        plot_length_ft=PLOT_L, plot_width_ft=PLOT_W,
+        rooms=[{"name": "Kitchen", "x": 30, "y": 22, "length": 8, "width": 6}],
+        entrance_direction="north-east", road_facing_side="north-east",
+    )
+    assert result["compliant"] is False
+    assert any(f["category"] == "room_placement" for f in result["findings"])
+
+
+def test_room_in_center_flags_brahmasthan():
+    result = check_vastu_full(
+        plot_length_ft=PLOT_L, plot_width_ft=PLOT_W,
+        rooms=[{"name": "Hallway", "x": 16, "y": 12, "length": 6, "width": 6}],
+        entrance_direction="north", road_facing_side="north",
+    )
+    assert result["compliant"] is False
+    assert any(f["category"] == "brahmasthan" for f in result["findings"])
+
+
+def test_unmatched_room_type_produces_no_placement_finding():
+    result = check_vastu_full(
+        plot_length_ft=PLOT_L, plot_width_ft=PLOT_W,
+        rooms=[{"name": "Garage", "x": 30, "y": 22, "length": 8, "width": 6}],  # NE, but "garage" has no rule
+        entrance_direction="north", road_facing_side="north",
+    )
+    # No rule matches "garage" — should produce zero room_placement findings for it
+    assert not any(f["category"] == "room_placement" for f in result["findings"])
+
+
+def test_master_bedroom_in_sw_is_compliant():
+    result = check_vastu_full(
+        plot_length_ft=PLOT_L, plot_width_ft=PLOT_W,
+        rooms=[{"name": "Master Bedroom", "x": 2, "y": 2, "length": 10, "width": 8}],
+        entrance_direction="north", road_facing_side="north",
+    )
+    findings = [f for f in result["findings"] if f["category"] == "room_placement"]
+    assert len(findings) == 1
+    assert "aligns with classical guidance" in findings[0]["note"]
+
+
+def test_multiple_rooms_multiple_findings():
+    result = check_vastu_full(
+        plot_length_ft=PLOT_L, plot_width_ft=PLOT_W,
+        rooms=[
+            {"name": "Kitchen", "x": 30, "y": 2, "length": 8, "width": 6},       # SE - good
+            {"name": "Toilet", "x": 30, "y": 22, "length": 4, "width": 4},       # NE - bad
+            {"name": "Pooja Room", "x": 30, "y": 22, "length": 4, "width": 4},   # NE - N/A, overlaps toilet spot but tests independently
+        ],
+        entrance_direction="north", road_facing_side="north",
+    )
+    room_findings = [f for f in result["findings"] if f["category"] == "room_placement"]
+    assert len(room_findings) == 3

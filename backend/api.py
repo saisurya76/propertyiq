@@ -29,6 +29,10 @@ from backend.construction_studio import (
     identify_construction_risks,
 )
 
+from backend.vastu_engine import (
+    check_vastu_full,
+)
+
 from backend.construction_dxf import (
     generate_plot_dxf,
 )
@@ -1136,11 +1140,22 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         currency=request.currency,
     )
 
-    vastu_result = check_vastu_basics(
-        entrance_direction=request.entrance_direction,
-        road_facing_side=request.road_facing_side,
-        slope_direction=request.slope_direction,
-    )
+    if request.rooms:
+        vastu_result = check_vastu_full(
+            plot_length_ft=request.plot_length_ft,
+            plot_width_ft=request.plot_width_ft,
+            rooms=[r.model_dump() for r in request.rooms],
+            entrance_direction=request.entrance_direction,
+            road_facing_side=request.road_facing_side,
+            slope_direction=request.slope_direction,
+        )
+    else:
+        # No room layout yet — fall back to the entrance/road/slope-only check.
+        vastu_result = check_vastu_basics(
+            entrance_direction=request.entrance_direction,
+            road_facing_side=request.road_facing_side,
+            slope_direction=request.slope_direction,
+        )
 
     risks = identify_construction_risks(
         region=request.region,
