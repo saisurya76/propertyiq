@@ -9,7 +9,7 @@ import StudioAuth from "./studio/StudioAuth";
 import StudioPricing from "./studio/StudioPricing";
 import ConstructionStudio from "./studio/ConstructionStudio";
 import AdminPanel from "./studio/AdminPanel";
-import { getSession } from "./studio/studioApi";
+import { getSession, clearSession, studioApi } from "./studio/studioApi";
 
 
 const LANGUAGE_OPTIONS = [
@@ -297,9 +297,32 @@ function App() {
   };
 
   const [quotaMessage, setQuotaMessage] = useState("");
+  const [checkingSession, setCheckingSession] = useState(false);
 
-  const launchStudio = () => {
-    setStudioView(getSession() ? "pricing" : "auth");
+  const launchStudio = async () => {
+    const session = getSession();
+    if (!session) {
+      setStudioView("auth");
+      return;
+    }
+
+    // The cached session might be stale (e.g. from before a backend data
+    // reset) — validate it before trusting it, instead of showing a false
+    // "signed in" state that only fails later on some other action.
+    setCheckingSession(true);
+    try {
+      await studioApi.getStatus();
+      setStudioView("pricing");
+    } catch (err) {
+      if (err.status === 401) {
+        clearSession();
+        setStudioView("auth");
+      } else {
+        setStudioView("pricing"); // some other error — let the pricing page surface it
+      }
+    } finally {
+      setCheckingSession(false);
+    }
   };
 
   const handleStudioAuthenticated = () => {
@@ -320,6 +343,21 @@ function App() {
     setStudioView("pricing");
   };
 
+  const handleSignOut = () => {
+    clearSession();
+    setStudioView("auth");
+  };
+
+  if (checkingSession) {
+    return (
+      <div className="app">
+        <div className="studio-panel">
+          <p className="studio-subtext">Checking your session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (studioView === "auth") {
     return (
       <div className="app">
@@ -339,7 +377,7 @@ function App() {
             {quotaMessage}
           </div>
         )}
-        <StudioPricing reportId={reportId} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} />
+        <StudioPricing reportId={reportId} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} />
       </div>
     );
   }

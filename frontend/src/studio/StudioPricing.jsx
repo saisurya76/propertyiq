@@ -9,7 +9,7 @@ function formatQuota(quota) {
   return `${quota} design${quota === 1 ? "" : "s"}/month`;
 }
 
-function StudioPricing({ reportId, onBack, onLaunchConstructionStudio }) {
+function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut }) {
   const [tiers, setTiers] = useState(null);
   const [status, setStatus] = useState(null);
   const [loadingTierId, setLoadingTierId] = useState(null);
@@ -20,8 +20,10 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio }) {
 
   useEffect(() => {
     studioApi.getTiers().then(setTiers).catch((e) => setError(e.message));
-    studioApi.getStatus().then(setStatus).catch(() => {});
-  }, []);
+    studioApi.getStatus().then(setStatus).catch((e) => {
+      if (e.status === 401 && onSignOut) onSignOut();
+    });
+  }, [onSignOut]);
 
   const handleSubscribe = async (tierId) => {
     setError("");
@@ -41,6 +43,10 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio }) {
       const refreshed = await studioApi.getStatus();
       setStatus(refreshed);
     } catch (err) {
+      if (err.status === 401 && onSignOut) {
+        onSignOut();
+        return;
+      }
       setError(err.message || "Couldn't start checkout. Please try again.");
     } finally {
       setLoadingTierId(null);
@@ -60,6 +66,10 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio }) {
       }
       setMessage("Similar property insights unlocked for this report.");
     } catch (err) {
+      if (err.status === 401 && onSignOut) {
+        onSignOut();
+        return;
+      }
       setError(err.message || "Couldn't start checkout. Please try again.");
     } finally {
       setLoadingTierId(null);
@@ -75,8 +85,15 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio }) {
       <div className="studio-pricing-header">
         <h2>PropertyIQ Studio Plans</h2>
         <p>
-          Signed in as <strong>{session?.email}</strong>. Pick what fits — unlock insights
-          for this one report, or subscribe for ongoing access to Construction Studio.
+          Signed in as <strong>{session?.email}</strong>
+          {onSignOut && (
+            <>
+              {" "}
+              (<span className="studio-back-link" onClick={onSignOut}>sign out</span>)
+            </>
+          )}
+          . Pick what fits — unlock insights for this one report, or subscribe for ongoing
+          access to Construction Studio.
         </p>
       </div>
 
