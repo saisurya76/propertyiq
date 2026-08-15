@@ -36,7 +36,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
   if (state === "idle") {
     return (
       <div className="sp-widget">
-        <h3>Similar Property Insights</h3>
         <p className="studio-subtext">
           See how this property compares to others like it on price per sqft.
         </p>
@@ -50,7 +49,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
   if (state === "loading") {
     return (
       <div className="sp-widget">
-        <h3>Similar Property Insights</h3>
         <p className="studio-subtext">Loading...</p>
       </div>
     );
@@ -59,7 +57,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
   if (state === "locked") {
     return (
       <div className="sp-widget">
-        <h3>Similar Property Insights</h3>
         <div className="sp-locked">
           <p>
             Unlock similar property suggestions for this report with the Insight Add-on,
@@ -76,7 +73,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
   if (state === "error") {
     return (
       <div className="sp-widget">
-        <h3>Similar Property Insights</h3>
         <p className="studio-subtext">{errorMessage}</p>
       </div>
     );
@@ -86,7 +82,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
   if (data.coverage === "unsupported") {
     return (
       <div className="sp-widget">
-        <h3>Similar Property Insights</h3>
         <div className="sp-unsupported">
           We don't have comparable property data for {city} yet, so we can't show similar
           properties for this report. This coverage is expanding — check back for this city soon.
@@ -97,7 +92,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
 
   return (
     <div className="sp-widget">
-      <h3>Similar Property Insights</h3>
       <p className="sp-market-avg">
         Market average in {city}: <strong>₹{data.market_average_price_per_sqft?.toLocaleString("en-IN")}/sqft</strong>
       </p>

@@ -17,20 +17,9 @@ function FraudIntelligenceStatic() {
         <div
             style={{
                 maxWidth: "1100px",
-                margin: "40px auto"
+                margin: "0 auto"
             }}
         >
-
-            <div
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "700",
-                    color: "#0f172a",
-                    marginBottom: "12px"
-                }}
-            >
-                Fraud Intelligence
-            </div>
 
             <div
                 style={{

@@ -1,8 +1,6 @@
 function StudioPromoCard({ onLaunch }) {
   return (
     <div className="studio-promo-card">
-      <div className="studio-promo-eyebrow">PropertyIQ Studio</div>
-
       <h3>You know the deal. Now let's plan what comes after it.</h3>
 
       <p>

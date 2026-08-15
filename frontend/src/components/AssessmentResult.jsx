@@ -1,5 +1,6 @@
 import { useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
+import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
 
@@ -1116,17 +1117,23 @@ function AssessmentResult({
       </div>
 
 
-      <SimilarPropertiesWidget
-        reportId={reportId}
-        city={formData.city}
-        propertyType={formData.propertyType}
-        subjectPricePerSqft={result.quotedPricePerSqft}
-        onNeedAccess={onLaunchStudio}
-      />
+      <CollapsiblePanel title="Similar Property Insights" defaultOpen={false}>
+        <SimilarPropertiesWidget
+          reportId={reportId}
+          city={formData.city}
+          propertyType={formData.propertyType}
+          subjectPricePerSqft={result.quotedPricePerSqft}
+          onNeedAccess={onLaunchStudio}
+        />
+      </CollapsiblePanel>
 
-      <StudioPromoCard onLaunch={onLaunchStudio} />
+      <CollapsiblePanel title="PropertyIQ Studio" defaultOpen={false}>
+        <StudioPromoCard onLaunch={onLaunchStudio} />
+      </CollapsiblePanel>
 
-      <FraudIntelligenceStatic />
+      <CollapsiblePanel title="Fraud Intelligence" defaultOpen={false}>
+        <FraudIntelligenceStatic />
+      </CollapsiblePanel>
 
     </div>
   );

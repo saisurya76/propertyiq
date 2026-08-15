@@ -8,14 +8,6 @@
   box-shadow: 0 8px 24px rgba(84, 30, 156, 0.25);
 }
 
-.studio-promo-eyebrow {
-  color: #c084fc;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-}
-
 .studio-promo-card h3 {
   font-size: 26px;
   margin: 10px 0 10px;
@@ -687,4 +679,14 @@
 .sp-row .sp-diff-pricier {
   color: #dc2626;
   font-size: 13px;
+}
+
+/* --- Shared session bar (shown on any page when a Studio session exists) --- */
+
+.session-bar {
+  max-width: 1100px;
+  margin: 0 auto 16px;
+  text-align: right;
+  font-size: 13px;
+  color: #6b7280;
 }

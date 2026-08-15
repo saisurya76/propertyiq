@@ -9,6 +9,7 @@ import StudioAuth from "./studio/StudioAuth";
 import StudioPricing from "./studio/StudioPricing";
 import ConstructionStudio from "./studio/ConstructionStudio";
 import AdminPanel from "./studio/AdminPanel";
+import SessionBar from "./studio/SessionBar";
 import { getSession, clearSession, studioApi } from "./studio/studioApi";
 
 
@@ -343,9 +344,9 @@ function App() {
     setStudioView("pricing");
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = (targetView = "auth") => {
     clearSession();
-    setStudioView("auth");
+    setStudioView(targetView);
   };
 
   if (checkingSession) {
@@ -385,6 +386,7 @@ function App() {
   if (studioView === "construction") {
     return (
       <div className="app">
+        <SessionBar onSignOut={handleSignOut} />
         <ConstructionStudio onBack={() => setStudioView("pricing")} onQuotaExceeded={handleQuotaExceeded} />
       </div>
     );
@@ -393,6 +395,7 @@ function App() {
   if (studioView === "admin") {
     return (
       <div className="app">
+        <SessionBar onSignOut={() => handleSignOut("main")} />
         <AdminPanel onBack={backToReport} />
       </div>
     );
@@ -400,6 +403,8 @@ function App() {
 
   return (
     <div className="app">
+
+      <SessionBar onSignOut={() => handleSignOut("main")} />
 
       <div className="language-bar" aria-label="Language selection">
         <label htmlFor="propertyiq-language">Language</label>

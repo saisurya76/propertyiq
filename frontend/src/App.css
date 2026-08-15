@@ -733,3 +733,42 @@ body {
     margin-bottom: 10px;
   }
 }
+
+/* --- Collapsible panels (report page: Similar Property Insights, PropertyIQ Studio, Fraud Intelligence) --- */
+
+.collapsible-panel {
+  max-width: 1100px;
+  margin: 20px auto;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.collapsible-panel-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.collapsible-panel-chevron {
+  font-size: 16px;
+  color: #9ca3af;
+  transition: transform 0.2s ease;
+}
+
+.collapsible-panel-chevron-open {
+  transform: rotate(180deg);
+}
+
+.collapsible-panel-body {
+  padding-top: 16px;
+}
