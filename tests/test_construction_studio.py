@@ -89,3 +89,14 @@ def test_fx_rates_endpoint():
     data = r.json()
     assert data["USD"] == 1.0
     assert "INR" in data and data["INR"] > 1
+
+
+def test_dxf_hex_to_true_color_conversion():
+    from backend.construction_dxf import _hex_to_true_color
+    import ezdxf
+
+    assert _hex_to_true_color("#7c3aed") == ezdxf.colors.rgb2int((124, 58, 237))
+    assert _hex_to_true_color(None) is None
+    assert _hex_to_true_color("") is None
+    assert _hex_to_true_color("not-a-color") is None
+    assert _hex_to_true_color("#zzzzzz") is None

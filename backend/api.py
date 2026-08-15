@@ -1101,6 +1101,7 @@ class RoomSpec(BaseModel):
     y: float
     length: float
     width: float
+    color: Optional[str] = None  # "#rrggbb" — carried through to the real DXF export
 
 
 class ConstructionDesignRequest(BaseModel):

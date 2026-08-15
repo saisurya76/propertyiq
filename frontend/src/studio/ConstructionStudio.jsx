@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
+
+const RoomCanvas = lazy(() => import("./RoomCanvas"));
+
+const ROOM_COLOR_PALETTE = ["#c4b5fd", "#93c5fd", "#86efac", "#fde68a", "#fca5a5", "#f9a8d4"];
 
 const REGIONS = [
   ["india", "India"],
@@ -16,7 +20,7 @@ const DIRECTIONS = ["north", "north-east", "east", "south-east", "south", "south
 const STEPS = ["Plot Details", "Materials", "Room Layout", "Review & Generate"];
 
 function emptyRoom() {
-  return { name: "", x: 0, y: 0, length: 10, width: 10, _key: Math.random().toString(36).slice(2) };
+  return { name: "", x: 0, y: 0, length: 10, width: 10, color: null, _key: Math.random().toString(36).slice(2) };
 }
 
 function formatUnitPrice(usdAmount, unit, currency, fxRates) {
@@ -67,9 +71,11 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const [catalog, setCatalog] = useState(null);
   const [fxRates, setFxRates] = useState(null);
   const [selections, setSelections] = useState({});
+  const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
   const [rooms, setRooms] = useState([emptyRoom()]);
+  const [selectedRoomKey, setSelectedRoomKey] = useState(null);
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -104,6 +110,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
 
   const toggleMaterial = (category, optionId) => {
     setSelections((s) => ({ ...s, [category]: optionId }));
+  };
+
+  const getFilteredOptions = (catId, options) => {
+    const query = (supplierSearch[catId] || "").trim().toLowerCase();
+    if (!query) return options;
+    return options.filter(
+      (opt) =>
+        opt.suppliers.some((s) => s.toLowerCase().includes(query)) ||
+        opt.name.toLowerCase().includes(query)
+    );
   };
 
   const toggleSupplierPreference = (optionId, supplier) => {
@@ -160,7 +176,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
         rooms: rooms
           .filter((r) => r.name.trim())
-          .map(({ name, x, y, length, width }) => ({ name, x, y, length, width })),
+          .map(({ name, x, y, length, width, color }) => ({ name, x, y, length, width, color })),
       };
       const designResult = await studioApi.createConstructionDesign(payload);
       setResult(designResult);
@@ -259,21 +275,39 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
             and see exactly what each option adds to your {plotSizeSqft} sqft plot's total.
           </p>
           {!catalog && <p className="studio-subtext">Loading catalog...</p>}
-          {catalog && Object.entries(catalog).map(([catId, cat]) => (
-            <div className="cs-material-category" key={catId}>
-              <h4>{cat.label}</h4>
-              <div className="cs-material-table-wrap">
-                <table className="cs-material-table">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      <th>Material</th>
-                      <th>Suppliers</th>
-                      <th>Price for your plot</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cat.options.map((opt) => {
+          {catalog && Object.entries(catalog).map(([catId, cat]) => {
+            const filteredOptions = getFilteredOptions(catId, cat.options);
+            return (
+              <div className="cs-material-category" key={catId}>
+                <div className="cs-material-category-header">
+                  <h4>{cat.label}</h4>
+                  <input
+                    type="text"
+                    className="cs-supplier-search"
+                    placeholder="Search suppliers..."
+                    value={supplierSearch[catId] || ""}
+                    onChange={(e) => setSupplierSearch((s) => ({ ...s, [catId]: e.target.value }))}
+                  />
+                </div>
+                <div className="cs-material-table-wrap">
+                  <table className="cs-material-table">
+                    <thead>
+                      <tr>
+                        <th></th>
+                        <th>Material</th>
+                        <th>Suppliers</th>
+                        <th>Price for your plot</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOptions.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="cs-material-no-results">
+                            No materials with a matching supplier in {cat.label}.
+                          </td>
+                        </tr>
+                      )}
+                      {filteredOptions.map((opt) => {
                       const isSelected = selections[catId] === opt.id;
                       return (
                         <tr
@@ -317,20 +351,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                         </tr>
                       );
                     })}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))}
-
-          {estimate && Object.keys(selections).length > 0 && (
-            <div className="cs-running-total">
-              <span className="cs-total-label">Running estimate ({plot.currency})</span>
-              <span className="cs-total-value">
-                {plot.currency} {estimate.grand_total_converted.toLocaleString()}
-              </span>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
@@ -338,19 +364,49 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         <div className="cs-card">
           <h3>Room Layout</h3>
           <p className="studio-subtext">
-            Position each room within your plot (feet from the bottom-left corner). Naming rooms clearly
+            Drag rooms into position on the plot below. Naming rooms clearly
             (e.g. "Kitchen", "Master Bedroom", "Pooja Room") enables Vastu compliance checks for that room.
           </p>
+
+          <Suspense fallback={<p className="studio-subtext">Loading room editor...</p>}>
+            <RoomCanvas
+              plotLengthFt={plot.plot_length_ft}
+              plotWidthFt={plot.plot_width_ft}
+              roadFacingSide={plot.road_facing_side}
+              rooms={rooms}
+              selectedKey={selectedRoomKey}
+              onSelectRoom={setSelectedRoomKey}
+              onRoomDrag={(key, x, y) => {
+                updateRoom(key, "x", x);
+                updateRoom(key, "y", y);
+              }}
+            />
+          </Suspense>
+
           <div className="cs-room-row cs-room-row-header">
-            <span>Room name</span><span>X (ft)</span><span>Y (ft)</span><span>Length (ft)</span><span>Width (ft)</span><span></span>
+            <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>
           </div>
           {rooms.map((room) => (
-            <div className="cs-room-row" key={room._key}>
+            <div
+              className={`cs-room-row ${room._key === selectedRoomKey ? "cs-room-row-selected" : ""}`}
+              key={room._key}
+              onClick={() => setSelectedRoomKey(room._key)}
+            >
               <input placeholder="Kitchen" value={room.name} onChange={(e) => updateRoom(room._key, "name", e.target.value)} />
-              <input type="number" placeholder="X (ft)" value={room.x} onChange={(e) => updateRoom(room._key, "x", Number(e.target.value))} />
-              <input type="number" placeholder="Y (ft)" value={room.y} onChange={(e) => updateRoom(room._key, "y", Number(e.target.value))} />
               <input type="number" placeholder="Length (ft)" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
               <input type="number" placeholder="Width (ft)" value={room.width} onChange={(e) => updateRoom(room._key, "width", Number(e.target.value))} />
+              <div className="cs-room-color-swatches" onClick={(e) => e.stopPropagation()}>
+                {ROOM_COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`cs-room-color-swatch ${room.color === color ? "cs-room-color-swatch-active" : ""}`}
+                    style={{ background: color }}
+                    onClick={() => updateRoom(room._key, "color", color)}
+                    aria-label={`Set room color ${color}`}
+                  />
+                ))}
+              </div>
               <button className="cs-remove-room" onClick={() => removeRoom(room._key)}>Remove</button>
             </div>
           ))}
@@ -449,6 +505,15 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         roadFacingSide={plot.road_facing_side}
         rooms={rooms}
       />
+
+      {estimate && Object.keys(selections).length > 0 && !result && (
+        <div className="cs-floating-total">
+          <span className="cs-total-label">Running estimate ({plot.currency})</span>
+          <span className="cs-total-value">
+            {plot.currency} {estimate.grand_total_converted.toLocaleString()}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,10 +18,18 @@ body {
   background: #f7f8fa;
   color: #111827;
   font-family:
-    Inter,
+    "Inter",
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
+}
+
+h1, h2, h3, h4,
+.hero-brand,
+.studio-tier-name,
+.admin-stat-value {
+  font-family: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .app{

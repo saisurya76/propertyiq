@@ -259,6 +259,7 @@
 .cs-wizard {
   max-width: 900px;
   margin: 0 auto;
+  padding-bottom: 90px; /* clearance for the fixed floating total bar */
 }
 
 .cs-steps {
@@ -330,10 +331,35 @@
   margin-bottom: 24px;
 }
 
-.cs-material-category h4 {
+.cs-material-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.cs-material-category-header h4 {
   font-size: 15px;
   color: #111827;
-  margin-bottom: 8px;
+  margin: 0;
+}
+
+.cs-supplier-search {
+  width: auto;
+  min-width: 180px;
+  padding: 7px 12px;
+  font-size: 13px;
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.cs-material-no-results {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 16px;
 }
 
 .cs-material-table-wrap {
@@ -352,7 +378,7 @@
 
 .cs-material-table thead th {
   text-align: left;
-  background: #111827;
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
   color: white;
   font-size: 12px;
   font-weight: 700;
@@ -472,12 +498,54 @@
   font-weight: 800;
 }
 
+/* Always-visible running total — fixed to the viewport so it stays in
+   view across every wizard step, not just while scrolled into the
+   Materials card. Solves "have to scroll up/down to see the total". */
+.cs-floating-total {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(92vw, 420px);
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
+  color: white;
+  border-radius: 16px;
+  padding: 14px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 12px 32px rgba(76, 29, 149, 0.35);
+}
+
+.cs-floating-total .cs-total-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.cs-floating-total .cs-total-value {
+  font-size: 20px;
+  font-weight: 800;
+}
+
 .cs-room-row {
   display: grid;
-  grid-template-columns: 2fr repeat(4, 1fr) auto;
+  grid-template-columns: 2fr 1fr 1fr 1.6fr auto;
   gap: 10px;
   align-items: center;
   margin-bottom: 10px;
+  padding: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cs-room-row:not(.cs-room-row-header):hover {
+  background: #f8fafc;
+}
+
+.cs-room-row-selected {
+  background: rgba(124, 58, 237, 0.08);
 }
 
 .cs-room-row input {
@@ -487,6 +555,37 @@
   font-size: 14px;
   width: 100%;
   box-sizing: border-box;
+}
+
+.cs-room-color-swatches {
+  display: flex;
+  gap: 6px;
+  cursor: default;
+}
+
+.cs-room-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cs-room-color-swatch-active {
+  border-color: #4c1d95;
+  box-shadow: 0 0 0 2px white, 0 0 0 3px #4c1d95;
+}
+
+.room-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
 }
 
 .cs-remove-room {
@@ -737,7 +836,7 @@
 .admin-table th {
   text-align: left;
   color: white;
-  background: #0f172a;
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -977,6 +1076,15 @@
     grid-template-columns: 1fr;
   }
 
+  .cs-material-category-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cs-supplier-search {
+    width: 100%;
+  }
+
   .cs-material-table {
     min-width: 480px;
     font-size: 13px;
@@ -1003,6 +1111,13 @@
     padding: 14px 18px;
   }
 
+  .cs-floating-total {
+    width: 94vw;
+    bottom: 12px;
+    padding: 12px 18px;
+    flex-direction: row;
+  }
+
   .cs-total-value {
     font-size: 20px;
   }
@@ -1027,6 +1142,10 @@
 
   .cs-remove-room {
     width: 100%;
+  }
+
+  .room-canvas-wrap {
+    padding: 10px;
   }
 
   /* Admin tier config grid: same problem, same fix. */
@@ -1078,16 +1197,53 @@
   }
 }
 
-/* --- Unified top bar (back-to-report + sign-out), shown on every Studio screen --- */
+/* --- Studio header (logo + back-to-report + sign-out), shown on every Studio screen --- */
 
-.studio-top-bar {
+.studio-header {
   max-width: 1100px;
-  margin: 0 auto 20px;
+  margin: 0 auto 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.studio-header-brand {
+  display: flex;
+  align-items: center;
   gap: 10px;
+}
+
+.studio-header-logo {
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #111827;
+}
+
+.studio-header-divider {
+  width: 1px;
+  height: 18px;
+  background: #d1d5db;
+}
+
+.studio-header-product {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .studio-top-bar-session {
@@ -1128,9 +1284,14 @@
 }
 
 @media (max-width: 640px) {
-  .studio-top-bar {
+  .studio-header {
     justify-content: center;
     text-align: center;
+  }
+
+  .studio-header-actions {
+    justify-content: center;
+    width: 100%;
   }
 
   .plot-preview {

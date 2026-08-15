@@ -1,9 +1,27 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import ezdxf
 
 DEFAULT_OUTPUT_DIR = Path("outputs/dxf")
+
+
+def _hex_to_true_color(hex_color: Optional[str]) -> Optional[int]:
+    """Converts a '#rrggbb' hex string to ezdxf's true_color int. Returns
+    None on anything invalid so callers can fall back to the layer's
+    default color rather than erroring on a bad value."""
+    if not hex_color:
+        return None
+    hex_color = hex_color.strip().lstrip("#")
+    if len(hex_color) != 6:
+        return None
+    try:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+    except ValueError:
+        return None
+    return ezdxf.colors.rgb2int((r, g, b))
 
 
 def generate_plot_dxf(
@@ -19,8 +37,11 @@ def generate_plot_dxf(
     boundary and a simple room layout, so the design can be opened in
     AutoCAD, Revit, SketchUp, FreeCAD, or any DXF-compatible tool.
 
-    `rooms` = [{"name": str, "x": float, "y": float, "length": float, "width": float}, ...]
-    Coordinates are in feet, plot origin at (0, 0).
+    `rooms` = [{"name": str, "x": float, "y": float, "length": float, "width": float, "color": Optional[str "#rrggbb"]}, ...]
+    Coordinates are in feet, plot origin at (0, 0). Room `color`, if
+    provided, is applied as a real DXF true-color value on that room's
+    polyline and label — not just a cosmetic UI choice, it genuinely
+    carries into the exported file and round-trips through any DXF reader.
 
     This is a genuine, working DXF export — not a mock. It does not attempt
     full 3D BIM (that is out of scope); it is a real, portable 2D layout
@@ -62,14 +83,22 @@ def generate_plot_dxf(
     for room in rooms:
         x, y = room["x"], room["y"]
         length, width = room["length"], room["width"]
+        true_color = _hex_to_true_color(room.get("color"))
+
+        poly_attribs = {"layer": "ROOMS"}
+        label_attribs = {"layer": "LABELS", "height": 1.0}
+        if true_color is not None:
+            poly_attribs["true_color"] = true_color
+            label_attribs["true_color"] = true_color
+
         msp.add_lwpolyline(
             [(x, y), (x + length, y), (x + length, y + width), (x, y + width), (x, y)],
-            dxfattribs={"layer": "ROOMS"},
+            dxfattribs=poly_attribs,
         )
         label_point = (x + length / 2, y + width / 2)
         msp.add_text(
             room.get("name", "Room"),
-            dxfattribs={"layer": "LABELS", "height": 1.0},
+            dxfattribs=label_attribs,
         ).set_placement(label_point, align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER)
 
     output_path = output_dir / f"{design_id}.dxf"
