@@ -1,13 +1,9 @@
 import os
 
 
-def test_payment_order_records_terms_and_property_payload(tmp_path, monkeypatch):
-    database_path = tmp_path / "propertyiq_payments.db"
-    monkeypatch.setenv("PROPERTYIQ_PAYMENT_DB_PATH", str(database_path))
-
+def test_payment_order_records_terms_and_property_payload():
     import backend.payment_store as payment_store
 
-    payment_store.DEFAULT_DB_PATH = database_path
     payment_store.initialize_payment_store()
     payment_store.create_order(
         order_id="PIQ-test-order",

@@ -1,17 +1,11 @@
 import os
-import uuid
 
 os.environ.setdefault("DODO_PAYMENTS_API_KEY", "test")
 os.environ.setdefault("DODO_REPORT_PRODUCT_ID", "test")
 os.environ.setdefault("PROPERTYIQ_ADMIN_PASSWORD", "test-admin-pw")
-
-_run_id = uuid.uuid4().hex[:8]
-os.environ["PROPERTYIQ_AUTH_DB_PATH"] = f"data/test_sp_auth_{_run_id}.db"
-os.environ["PROPERTYIQ_CONFIG_DB_PATH"] = f"data/test_sp_config_{_run_id}.db"
-os.environ["PROPERTYIQ_SUBSCRIPTION_DB_PATH"] = f"data/test_sp_subscription_{_run_id}.db"
-os.environ["PROPERTYIQ_CONSTRUCTION_DB_PATH"] = f"data/test_sp_construction_{_run_id}.db"
-os.environ["PROPERTYIQ_PAYMENT_DB_PATH"] = f"data/test_sp_payment_{_run_id}.db"
-os.environ["PROPERTYIQ_INSIGHT_DB_PATH"] = f"data/test_sp_insight_{_run_id}.db"
+# Test isolation now comes from tests/conftest.py truncating the shared
+# Postgres database at session start (DATABASE_URL) — no more per-run
+# SQLite file paths.
 
 from fastapi.testclient import TestClient  # noqa: E402
 from backend.api import app  # noqa: E402

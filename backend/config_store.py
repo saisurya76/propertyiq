@@ -1,10 +1,7 @@
 import json
-import os
-import sqlite3
-from pathlib import Path
 from typing import Any
 
-DEFAULT_DB_PATH = Path(os.getenv("PROPERTYIQ_CONFIG_DB_PATH", "data/propertyiq_config.db"))
+from backend.db import get_connection
 
 # Base prices in USD, converted at checkout time the same way construction
 # estimates are (see backend/construction_studio.py fx_rates_usd_base).
@@ -59,23 +56,17 @@ DEFAULT_TIER_CONFIG = {
 _CONFIG_KEY = "tier_config"
 
 
-def _connect() -> sqlite3.Connection:
-    DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DEFAULT_DB_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
 def initialize_config_store() -> None:
-    with _connect() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS app_config (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
             )
-            """
-        )
         connection.commit()
 
     # Seed defaults on first run only — never overwrite an admin's existing config
@@ -85,10 +76,10 @@ def initialize_config_store() -> None:
 
 
 def get_tier_config() -> dict[str, Any] | None:
-    with _connect() as connection:
-        row = connection.execute(
-            "SELECT value FROM app_config WHERE key = ?", (_CONFIG_KEY,)
-        ).fetchone()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT value FROM app_config WHERE key = %s", (_CONFIG_KEY,))
+            row = cursor.fetchone()
 
     if row is None:
         return None
@@ -97,12 +88,13 @@ def get_tier_config() -> dict[str, Any] | None:
 
 
 def set_tier_config(config: dict[str, Any]) -> None:
-    with _connect() as connection:
-        connection.execute(
-            "INSERT INTO app_config (key, value) VALUES (?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (_CONFIG_KEY, json.dumps(config, separators=(",", ":"))),
-        )
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO app_config (key, value) VALUES (%s, %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                (_CONFIG_KEY, json.dumps(config, separators=(",", ":"))),
+            )
         connection.commit()
 
 
