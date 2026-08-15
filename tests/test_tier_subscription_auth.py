@@ -182,3 +182,22 @@ def test_beta_bypass_insight_addon(monkeypatch):
     r = client.post("/api/insight/checkout", headers=headers, json={"report_id": "rep_test"})
     assert r.status_code == 200
     assert r.json()["beta_bypass"] is True
+
+
+def test_admin_overview_requires_correct_password():
+    r = client.post("/api/admin/overview", json={"password": "wrong"})
+    assert r.status_code == 403
+
+
+def test_admin_overview_returns_subscriptions_and_grants(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "PROPERTYIQ_BETA_BYPASS_PAYMENTS", True)
+
+    headers = _authed_headers("adminoverviewsub@example.com")
+    client.post("/api/subscribe/checkout", headers=headers, json={"tier_id": "studio_starter"})
+
+    r = client.post("/api/admin/overview", json={"password": "test-admin-pw"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "tier_config" in data
+    assert any(s["email"] == "adminoverviewsub@example.com" for s in data["subscriptions"])

@@ -97,3 +97,13 @@ def get_active_tier(email: str) -> Optional[str]:
     if sub and sub["status"] == "active":
         return sub["tier_id"]
     return None
+
+
+def list_all_subscriptions() -> list[dict[str, Any]]:
+    """For the admin overview panel — all subscriptions regardless of status,
+    most recently updated first."""
+    with _connect() as connection:
+        rows = connection.execute(
+            "SELECT * FROM subscriptions ORDER BY updated_at DESC"
+        ).fetchall()
+    return [dict(row) for row in rows]

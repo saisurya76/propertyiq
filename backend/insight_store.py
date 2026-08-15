@@ -46,3 +46,13 @@ def has_insight_access(report_id: str, user_email: str) -> bool:
             (report_id, user_email.strip().lower()),
         ).fetchone()
     return row is not None
+
+
+def list_all_grants() -> list[dict]:
+    """For the admin overview panel — all Insight Add-on grants, most
+    recent first."""
+    with _connect() as connection:
+        rows = connection.execute(
+            "SELECT * FROM insight_grants ORDER BY granted_at DESC"
+        ).fetchall()
+    return [dict(row) for row in rows]

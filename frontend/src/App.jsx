@@ -8,6 +8,7 @@ import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
 import StudioPricing from "./studio/StudioPricing";
 import ConstructionStudio from "./studio/ConstructionStudio";
+import AdminPanel from "./studio/AdminPanel";
 import { getSession } from "./studio/studioApi";
 
 
@@ -89,7 +90,7 @@ function App() {
 
   const [result, setResult] = useState(null);
   const [reportId, setReportId] = useState(null);
-  const [studioView, setStudioView] = useState("main"); // "main" | "auth" | "pricing" | "construction"
+  const [studioView, setStudioView] = useState("main"); // "main" | "auth" | "pricing" | "construction" | "admin"
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
@@ -351,6 +352,14 @@ function App() {
     );
   }
 
+  if (studioView === "admin") {
+    return (
+      <div className="app">
+        <AdminPanel onBack={backToReport} />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
 
@@ -419,6 +428,12 @@ function App() {
       <p>Independent Property Intelligence</p>
 
       <p>© 2026 PropertyIQ</p>
+
+      <p style={{ fontSize: 12, opacity: 0.5 }}>
+        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setStudioView("admin")}>
+          Admin
+        </span>
+      </p>
 
     </footer>
 

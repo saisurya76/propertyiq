@@ -488,3 +488,97 @@
   font-size: 13px;
   margin-bottom: 16px;
 }
+
+/* --- Admin panel --- */
+
+.admin-panel {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.admin-panel h2 {
+  font-size: 24px;
+}
+
+.admin-section {
+  background: white;
+  border-radius: 18px;
+  padding: 26px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  margin-bottom: 24px;
+}
+
+.admin-section h3 {
+  margin-top: 0;
+  font-size: 17px;
+}
+
+.admin-tier-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 2fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.admin-tier-row:first-child {
+  border-top: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+}
+
+.admin-tier-row input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-table th {
+  text-align: left;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.admin-table td {
+  padding: 10px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.admin-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-status-active {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.admin-status-other {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.admin-empty-note {
+  color: #9ca3af;
+  font-size: 14px;
+  padding: 10px 0;
+}

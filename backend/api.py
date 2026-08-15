@@ -62,12 +62,14 @@ from backend.subscription_store import (
     get_subscription,
     set_status_by_dodo_id,
     get_active_tier,
+    list_all_subscriptions,
 )
 
 from backend.insight_store import (
     initialize_insight_store,
     grant_insight_access,
     has_insight_access,
+    list_all_grants,
 )
 
 from backend.similar_properties import (
@@ -796,6 +798,15 @@ class AdminTierConfigRequest(BaseModel):
     tier_config: dict
 
 
+class AdminAuthRequest(BaseModel):
+    password: str
+
+
+def _require_admin_password(password: str) -> None:
+    if not PROPERTYIQ_ADMIN_PASSWORD or password != PROPERTYIQ_ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Invalid admin password")
+
+
 class SubscribeCheckoutRequest(BaseModel):
     tier_id: str
 
@@ -838,11 +849,24 @@ def list_tiers():
 def update_tiers(request: AdminTierConfigRequest):
     """Admin-only: overwrite the tier config (features/prices/quotas).
     Password-gated via PROPERTYIQ_ADMIN_PASSWORD."""
-    if not PROPERTYIQ_ADMIN_PASSWORD or request.password != PROPERTYIQ_ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="Invalid admin password")
+    _require_admin_password(request.password)
 
     set_tier_config(request.tier_config)
     return {"status": "updated", "tier_config": request.tier_config}
+
+
+@app.post("/api/admin/overview")
+def admin_overview(request: AdminAuthRequest):
+    """Admin-only: current tier config plus all subscriptions and Insight
+    Add-on grants, for the admin panel's overview view. Password-gated via
+    PROPERTYIQ_ADMIN_PASSWORD — same check as /api/admin/tiers."""
+    _require_admin_password(request.password)
+
+    return {
+        "tier_config": get_tier_config(),
+        "subscriptions": list_all_subscriptions(),
+        "insight_grants": list_all_grants(),
+    }
 
 
 @app.post("/api/subscribe/checkout")

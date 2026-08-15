@@ -81,4 +81,10 @@ export const studioApi = {
 
   estimateCost: (payload) =>
     apiFetch("/api/construction-studio/estimate", { method: "POST", body: JSON.stringify(payload) }),
+
+  adminOverview: (password) =>
+    apiFetch("/api/admin/overview", { method: "POST", body: JSON.stringify({ password }) }),
+
+  adminUpdateTiers: (password, tierConfig) =>
+    apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
 };
