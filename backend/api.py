@@ -24,6 +24,7 @@ from backend.construction_store import (
 
 from backend.construction_studio import (
     get_catalog,
+    get_fx_rates,
     estimate_cost,
     check_vastu_basics,
     identify_construction_risks,
@@ -848,6 +849,13 @@ def list_tiers():
     convert client-side for display using the same fx table Construction
     Studio uses."""
     return get_tier_config()
+
+
+@app.get("/api/fx-rates")
+def fx_rates():
+    """USD-based FX table for converting displayed prices (tier pricing,
+    Construction Studio estimates) to the visitor's local currency."""
+    return get_fx_rates()
 
 
 @app.post("/api/admin/tiers")

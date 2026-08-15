@@ -68,6 +68,34 @@ function AdminPanel({ onBack }) {
     [subscriptions]
   );
 
+  // Estimated revenue analytics — computed from configured list prices ×
+  // real counts, same as AccidentIQ's admin analytics. This is NOT pulled
+  // from live Dodo transaction data (no such integration exists), so it's
+  // an estimate: it won't reflect discounts, refunds, or mid-cycle changes.
+  const revenueAnalytics = useMemo(() => {
+    if (!tierConfig) return null;
+
+    const subscriptionTiers = TIER_ORDER.filter(
+      (id) => tierConfig[id] && tierConfig[id].billing === "subscription"
+    ).map((tierId) => {
+      const activeCount = subscriptions.filter((s) => s.status === "active" && s.tier_id === tierId).length;
+      const priceUsd = tierConfig[tierId].price_usd;
+      return {
+        tierId,
+        label: tierConfig[tierId].label,
+        activeCount,
+        priceUsd,
+        subtotalUsd: activeCount * priceUsd,
+      };
+    });
+
+    const estimatedMrrUsd = subscriptionTiers.reduce((sum, t) => sum + t.subtotalUsd, 0);
+    const insightPriceUsd = tierConfig.insight_addon?.price_usd || 0;
+    const insightRevenueUsd = grants.length * insightPriceUsd;
+
+    return { subscriptionTiers, estimatedMrrUsd, insightRevenueUsd, insightPriceUsd };
+  }, [tierConfig, subscriptions, grants]);
+
   if (!authed) {
     return (
       <div className="studio-panel">
@@ -127,6 +155,51 @@ function AdminPanel({ onBack }) {
           <div className="admin-stat-label">Configured Tiers</div>
         </div>
       </div>
+
+      {revenueAnalytics && (
+        <div className="admin-section admin-section-amber">
+          <h3>Revenue Analytics</h3>
+          <p className="admin-empty-note" style={{ marginTop: -6, marginBottom: 16 }}>
+            Estimated from configured list prices × real counts — not live Dodo transaction
+            data, so this won't reflect discounts, refunds, or mid-cycle plan changes.
+          </p>
+
+          <div className="admin-stats-row" style={{ marginBottom: 20 }}>
+            <div className="admin-stat-card admin-stat-purple">
+              <div className="admin-stat-value">${revenueAnalytics.estimatedMrrUsd.toLocaleString()}</div>
+              <div className="admin-stat-label">Estimated MRR (subscriptions)</div>
+            </div>
+            <div className="admin-stat-card admin-stat-green">
+              <div className="admin-stat-value">${revenueAnalytics.insightRevenueUsd.toLocaleString()}</div>
+              <div className="admin-stat-label">Insight Add-on Revenue (one-time, all-time)</div>
+            </div>
+          </div>
+
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr><th>Tier</th><th>Active Subscribers</th><th>Price (USD/mo)</th><th>Subtotal (USD/mo)</th></tr>
+              </thead>
+              <tbody>
+                {revenueAnalytics.subscriptionTiers.map((t) => (
+                  <tr key={t.tierId}>
+                    <td>{t.label}</td>
+                    <td>{t.activeCount}</td>
+                    <td>${t.priceUsd}</td>
+                    <td>${t.subtotalUsd.toLocaleString()}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td><strong>Insight Add-on</strong></td>
+                  <td>{grants.length} purchase{grants.length === 1 ? "" : "s"}</td>
+                  <td>${revenueAnalytics.insightPriceUsd}</td>
+                  <td>${revenueAnalytics.insightRevenueUsd.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="admin-section admin-section-purple">
         <h3>Tier Configuration</h3>

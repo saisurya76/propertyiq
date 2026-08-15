@@ -19,6 +19,37 @@ function emptyRoom() {
   return { name: "", x: 0, y: 0, length: 10, width: 10, _key: Math.random().toString(36).slice(2) };
 }
 
+function formatUnitPrice(usdAmount, unit, currency, fxRates) {
+  const rate = fxRates?.[currency];
+  const amount = rate ? usdAmount * rate : usdAmount;
+  const displayCurrency = rate ? currency : "USD";
+  try {
+    return `${new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: displayCurrency,
+      maximumFractionDigits: amount >= 100 ? 0 : 2,
+    }).format(amount)}/${unit}`;
+  } catch {
+    return `$${usdAmount}/${unit}`;
+  }
+}
+
+function formatLinePrice(usdPerUnit, plotSizeSqft, currency, fxRates) {
+  const usdTotal = usdPerUnit * plotSizeSqft;
+  const rate = fxRates?.[currency];
+  const amount = rate ? usdTotal * rate : usdTotal;
+  const displayCurrency = rate ? currency : "USD";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: displayCurrency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `$${Math.round(usdTotal).toLocaleString()}`;
+  }
+}
+
 function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const [step, setStep] = useState(0);
 
@@ -34,7 +65,9 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   });
 
   const [catalog, setCatalog] = useState(null);
+  const [fxRates, setFxRates] = useState(null);
   const [selections, setSelections] = useState({});
+  const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
   const [rooms, setRooms] = useState([emptyRoom()]);
 
@@ -48,6 +81,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   useEffect(() => {
     studioApi.getMaterials(plot.region).then((res) => setCatalog(res.categories)).catch(() => setCatalog(null));
   }, [plot.region]);
+
+  useEffect(() => {
+    studioApi.getFxRates().then(setFxRates).catch(() => {}); // silent — falls back to USD display
+  }, []);
 
   // Live running total whenever selections/plot size/currency change
   useEffect(() => {
@@ -69,11 +106,42 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     setSelections((s) => ({ ...s, [category]: optionId }));
   };
 
+  const toggleSupplierPreference = (optionId, supplier) => {
+    setSupplierPreferences((prev) => {
+      const current = prev[optionId] || [];
+      const next = current.includes(supplier)
+        ? current.filter((s) => s !== supplier)
+        : [...current, supplier];
+      return { ...prev, [optionId]: next };
+    });
+  };
+
   const updateRoom = (key, field, value) => {
     setRooms((rs) => rs.map((r) => (r._key === key ? { ...r, [field]: value } : r)));
   };
 
-  const addRoom = () => setRooms((rs) => [...rs, emptyRoom()]);
+  const addRoom = () =>
+    setRooms((rs) => {
+      const defaultLength = 10;
+      const defaultWidth = 10;
+      const gap = 3;
+      // Stagger each new room into its own grid cell instead of always
+      // defaulting to (0,0) — which made every new room render fully
+      // overlapping the previous ones in the live preview until manually
+      // repositioned.
+      const cols = Math.max(1, Math.floor((plot.plot_length_ft || 40) / (defaultLength + gap)));
+      const index = rs.length;
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      return [
+        ...rs,
+        {
+          ...emptyRoom(),
+          x: col * (defaultLength + gap),
+          y: row * (defaultWidth + gap),
+        },
+      ];
+    });
   const removeRoom = (key) => setRooms((rs) => rs.filter((r) => r._key !== key));
 
   const generateDesign = async () => {
@@ -186,24 +254,65 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
       {step === 1 && (
         <div className="cs-card">
           <h3>Materials & Suppliers</h3>
-          <p className="studio-subtext">Pick one option per category — your estimate updates live below.</p>
+          <p className="studio-subtext">
+            Pick one material per category — check off your preferred supplier(s) for reference,
+            and see exactly what each option adds to your {plotSizeSqft} sqft plot's total.
+          </p>
           {!catalog && <p className="studio-subtext">Loading catalog...</p>}
           {catalog && Object.entries(catalog).map(([catId, cat]) => (
             <div className="cs-material-category" key={catId}>
               <h4>{cat.label}</h4>
-              <div className="cs-material-options">
-                {cat.options.map((opt) => (
-                  <div
-                    key={opt.id}
-                    className={`cs-material-option ${selections[catId] === opt.id ? "cs-material-selected" : ""}`}
-                    onClick={() => toggleMaterial(catId, opt.id)}
-                  >
-                    <div className="cs-material-name">{opt.name}</div>
-                    <div className="cs-material-price">
-                      ${opt.base_cost_usd}/{opt.unit} · {opt.suppliers.slice(0, 2).join(", ")}
-                    </div>
-                  </div>
-                ))}
+              <div className="cs-material-table-wrap">
+                <table className="cs-material-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Material</th>
+                      <th>Suppliers</th>
+                      <th>Price for your plot</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cat.options.map((opt) => {
+                      const isSelected = selections[catId] === opt.id;
+                      return (
+                        <tr
+                          key={opt.id}
+                          className={isSelected ? "cs-material-row-selected" : ""}
+                          onClick={() => toggleMaterial(catId, opt.id)}
+                        >
+                          <td>
+                            <input
+                              type="radio"
+                              name={`material-${catId}`}
+                              checked={isSelected}
+                              onChange={() => toggleMaterial(catId, opt.id)}
+                            />
+                          </td>
+                          <td className="cs-material-table-name">
+                            {opt.name}
+                            <div className="cs-material-table-unit">{formatUnitPrice(opt.base_cost_usd, opt.unit, plot.currency, fxRates)}</div>
+                          </td>
+                          <td className="cs-supplier-cell" onClick={(e) => e.stopPropagation()}>
+                            {opt.suppliers.map((supplier) => (
+                              <label key={supplier} className="cs-supplier-check">
+                                <input
+                                  type="checkbox"
+                                  checked={(supplierPreferences[opt.id] || []).includes(supplier)}
+                                  onChange={() => toggleSupplierPreference(opt.id, supplier)}
+                                />
+                                {supplier}
+                              </label>
+                            ))}
+                          </td>
+                          <td className="cs-material-table-price">
+                            {formatLinePrice(opt.base_cost_usd, plotSizeSqft, plot.currency, fxRates)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           ))}

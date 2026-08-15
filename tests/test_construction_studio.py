@@ -77,3 +77,15 @@ def test_construction_risks_includes_import_note():
         region="india", grand_total_usd=50000, currency="USD", has_imported_materials=True
     )
     assert any("import" in r.lower() for r in risks)
+
+
+def test_fx_rates_endpoint():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r = client.get("/api/fx-rates")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["USD"] == 1.0
+    assert "INR" in data and data["INR"] > 1

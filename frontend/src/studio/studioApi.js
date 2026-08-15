@@ -60,6 +60,8 @@ export const studioApi = {
 
   getTiers: () => apiFetch("/api/tiers"),
 
+  getFxRates: () => apiFetch("/api/fx-rates"),
+
   getStatus: () => apiFetch("/api/subscribe/status"),
 
   subscribeCheckout: (tierId) =>

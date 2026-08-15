@@ -8,6 +8,12 @@ with open(_DATA_PATH, "r", encoding="utf-8") as _f:
     _CATALOG = json.load(_f)
 
 
+def get_fx_rates() -> dict[str, float]:
+    """USD-based FX table used for both Construction Studio cost estimates
+    and Studio tier pricing display — one shared source of truth."""
+    return dict(_CATALOG["fx_rates_usd_base"])
+
+
 def get_catalog(region: str = "global") -> dict[str, Any]:
     """Return material categories/options available for a region, with base
     costs still in USD (currency conversion happens in estimate_cost)."""

@@ -327,7 +327,7 @@
 }
 
 .cs-material-category {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .cs-material-category h4 {
@@ -336,34 +336,94 @@
   margin-bottom: 8px;
 }
 
-.cs-material-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+.cs-material-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
 }
 
-.cs-material-option {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 12px 14px;
-  cursor: pointer;
+.cs-material-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
   font-size: 14px;
 }
 
-.cs-material-option.cs-material-selected {
-  border-color: #c084fc;
-  background: rgba(192, 132, 252, 0.08);
+.cs-material-table thead th {
+  text-align: left;
+  background: #111827;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 10px 14px;
 }
 
-.cs-material-option .cs-material-name {
+.cs-material-table tbody tr {
+  cursor: pointer;
+  border-top: 1px solid #f3f4f6;
+  transition: background 0.15s ease;
+}
+
+.cs-material-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.cs-material-table tbody tr.cs-material-row-selected {
+  background: rgba(192, 132, 252, 0.1);
+}
+
+.cs-material-table td {
+  padding: 10px 14px;
+  vertical-align: top;
+}
+
+.cs-material-table td:first-child {
+  width: 36px;
+}
+
+.cs-material-table-name {
   font-weight: 600;
   color: #111827;
+  white-space: nowrap;
 }
 
-.cs-material-option .cs-material-price {
-  color: #6b7280;
-  font-size: 13px;
+.cs-material-table-unit {
+  font-weight: 400;
+  color: #9ca3af;
+  font-size: 12px;
   margin-top: 2px;
+}
+
+.cs-supplier-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: default;
+}
+
+.cs-supplier-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cs-supplier-check input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.cs-material-table-price {
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .cs-running-total {
@@ -601,6 +661,7 @@
 .admin-section-purple { border-top-color: #7c3aed; }
 .admin-section-blue { border-top-color: #3b82f6; }
 .admin-section-green { border-top-color: #059669; }
+.admin-section-amber { border-top-color: #d97706; }
 
 .admin-section h3 {
   margin-top: 0;
@@ -894,8 +955,14 @@
     grid-template-columns: 1fr;
   }
 
-  .cs-material-options {
-    grid-template-columns: 1fr;
+  .cs-material-table {
+    min-width: 480px;
+    font-size: 13px;
+  }
+
+  .cs-material-table thead th,
+  .cs-material-table td {
+    padding: 8px 10px;
   }
 
   .cs-running-total {
@@ -1019,8 +1086,7 @@
 
 .plot-preview-svg {
   width: 100%;
-  height: auto;
-  max-height: 340px;
+  height: 320px;
   display: block;
 }
 
@@ -1041,6 +1107,6 @@
   }
 
   .plot-preview-svg {
-    max-height: 260px;
+    height: 240px;
   }
 }

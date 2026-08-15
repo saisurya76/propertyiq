@@ -9,8 +9,29 @@ function formatQuota(quota) {
   return `${quota} design${quota === 1 ? "" : "s"}/month`;
 }
 
-function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut }) {
+function formatPrice(usdAmount, currency, fxRates) {
+  const rate = fxRates?.[currency];
+  // Fall back to plain USD if the visitor's currency isn't in our FX
+  // table (rare) or rates haven't loaded yet — never show a broken price.
+  if (!rate) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(usdAmount);
+  }
+  const converted = usdAmount * rate;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: converted >= 100 ? 0 : 2,
+    }).format(converted);
+  } catch {
+    // Intl throws on a currency code it doesn't recognize — fall back to USD.
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(usdAmount);
+  }
+}
+
+function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructionStudio, onSignOut }) {
   const [tiers, setTiers] = useState(null);
+  const [fxRates, setFxRates] = useState(null);
   const [status, setStatus] = useState(null);
   const [loadingTierId, setLoadingTierId] = useState(null);
   const [message, setMessage] = useState("");
@@ -21,6 +42,7 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
 
   useEffect(() => {
     studioApi.getTiers().then(setTiers).catch((e) => setError(e.message));
+    studioApi.getFxRates().then(setFxRates).catch(() => {}); // silent — formatPrice falls back to USD
     studioApi.getStatus().then(setStatus).catch((e) => {
       if (e.status === 401 && onSignOut) onSignOut();
     });
@@ -132,7 +154,7 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
             <div key={tierId} className={`studio-tier-card ${isFeatured ? "studio-tier-featured" : ""}`}>
               <div className="studio-tier-name">{tier.label}</div>
               <div className="studio-tier-price">
-                ${tier.price_usd}
+                {formatPrice(tier.price_usd, currency, fxRates)}
                 <span>{isInsight ? " one-time" : "/mo"}</span>
               </div>
               <div className="studio-tier-quota">{formatQuota(tier.design_quota_per_month)}</div>

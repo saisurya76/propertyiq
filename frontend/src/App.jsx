@@ -38,7 +38,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const COUNTRY_LANGUAGE_MAP = {
-  IN: "hi", US: "en", GB: "en", CA: "en", AU: "en", NZ: "en", IE: "en",
+  IN: "en", US: "en", GB: "en", CA: "en", AU: "en", NZ: "en", IE: "en",
   SG: "en", MY: "ms", ID: "id", TH: "th", VN: "vi", PH: "fil", JP: "ja",
   KR: "ko", CN: "zh-CN", TW: "zh-TW", HK: "zh-TW", AE: "ar", SA: "ar",
   QA: "ar", KW: "ar", BH: "ar", OM: "ar", EG: "ar", IL: "he", IR: "fa",
@@ -103,6 +103,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
+  const [currency, setCurrency] = useState("USD");
 
   // Keep the URL bar in sync with the admin view, and support the browser
   // back/forward buttons.
@@ -160,6 +161,7 @@ function App() {
         const response = await fetch("https://ipapi.co/json/", { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
+          if (data.currency && !cancelled) setCurrency(data.currency);
           const mapped = COUNTRY_LANGUAGE_MAP[data.country_code];
           const geoLanguage = (data.languages || "").split(",")[0]?.trim();
           if (mapped) {
@@ -413,7 +415,7 @@ function App() {
             {quotaMessage}
           </div>
         )}
-        <StudioPricing reportId={reportId} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} />
+        <StudioPricing reportId={reportId} currency={currency} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} />
       </div>
     );
   }
