@@ -377,7 +377,7 @@
 
 .cs-material-table td {
   padding: 10px 14px;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .cs-material-table td:first-child {
@@ -399,24 +399,46 @@
 
 .cs-supplier-cell {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   cursor: default;
+  min-width: 180px;
 }
 
 .cs-supplier-check {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 12.5px;
+  line-height: 1;
   color: #4b5563;
   cursor: pointer;
   white-space: nowrap;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 5px 10px 5px 8px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.cs-supplier-check:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.cs-supplier-check-active {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: #a78bfa;
+  color: #4c1d95;
 }
 
 .cs-supplier-check input {
   margin: 0;
   cursor: pointer;
+  accent-color: #7c3aed;
+  width: 13px;
+  height: 13px;
 }
 
 .cs-material-table-price {
@@ -963,6 +985,15 @@
   .cs-material-table thead th,
   .cs-material-table td {
     padding: 8px 10px;
+  }
+
+  .cs-supplier-check {
+    font-size: 11.5px;
+    padding: 4px 8px 4px 6px;
+  }
+
+  .cs-supplier-cell {
+    min-width: 140px;
   }
 
   .cs-running-total {

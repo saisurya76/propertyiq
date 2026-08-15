@@ -294,16 +294,22 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                             <div className="cs-material-table-unit">{formatUnitPrice(opt.base_cost_usd, opt.unit, plot.currency, fxRates)}</div>
                           </td>
                           <td className="cs-supplier-cell" onClick={(e) => e.stopPropagation()}>
-                            {opt.suppliers.map((supplier) => (
-                              <label key={supplier} className="cs-supplier-check">
-                                <input
-                                  type="checkbox"
-                                  checked={(supplierPreferences[opt.id] || []).includes(supplier)}
-                                  onChange={() => toggleSupplierPreference(opt.id, supplier)}
-                                />
-                                {supplier}
-                              </label>
-                            ))}
+                            {opt.suppliers.map((supplier) => {
+                              const isChecked = (supplierPreferences[opt.id] || []).includes(supplier);
+                              return (
+                                <label
+                                  key={supplier}
+                                  className={`cs-supplier-check ${isChecked ? "cs-supplier-check-active" : ""}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleSupplierPreference(opt.id, supplier)}
+                                  />
+                                  {supplier}
+                                </label>
+                              );
+                            })}
                           </td>
                           <td className="cs-material-table-price">
                             {formatLinePrice(opt.base_cost_usd, plotSizeSqft, plot.currency, fxRates)}
