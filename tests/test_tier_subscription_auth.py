@@ -99,6 +99,8 @@ def test_admin_tier_update_wrong_password_rejected():
 
 
 def test_admin_tier_update_correct_password_persists():
+    from backend.config_store import DEFAULT_TIER_CONFIG
+
     new_config = {"studio_starter": {
         "label": "Studio Starter", "billing": "subscription", "price_usd": 99,
         "features": [], "design_quota_per_month": 1,
@@ -108,6 +110,12 @@ def test_admin_tier_update_correct_password_persists():
 
     r = client.get("/api/tiers")
     assert r.json()["studio_starter"]["price_usd"] == 99
+
+    # Restore full defaults so later tests in this module (and any that
+    # reference other tiers, e.g. studio_pro) aren't left with a config
+    # this test intentionally truncated to a single tier.
+    r = client.post("/api/admin/tiers", json={"password": "test-admin-pw", "tier_config": DEFAULT_TIER_CONFIG})
+    assert r.status_code == 200
 
 
 def test_webhook_rejects_unsigned_payload():
@@ -131,3 +139,46 @@ def test_subscribe_status_reflects_active_tier():
     r = client.get("/api/subscribe/status", headers=headers)
     assert r.status_code == 200
     assert r.json()["tier_id"] == "studio_pro"
+
+
+def test_beta_bypass_off_by_default():
+    """Regression guard: without PROPERTYIQ_BETA_BYPASS_PAYMENTS=true, real
+    Dodo checkout path must still run (fails cleanly with 503 here since no
+    product ID is configured in tests — the point is it does NOT silently
+    grant access)."""
+    headers = _authed_headers("nobypass@example.com")
+    r = client.post("/api/subscribe/checkout", headers=headers, json={"tier_id": "studio_starter"})
+    assert r.status_code == 503
+    r = client.get("/api/subscribe/status", headers=headers)
+    assert r.json()["tier_id"] is None
+
+
+def test_beta_bypass_when_enabled(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "PROPERTYIQ_BETA_BYPASS_PAYMENTS", True)
+
+    headers = _authed_headers("bypassuser@example.com")
+    r = client.post("/api/subscribe/checkout", headers=headers, json={"tier_id": "studio_pro"})
+    assert r.status_code == 200
+    assert r.json()["beta_bypass"] is True
+    assert r.json()["status"] == "active"
+
+    r = client.get("/api/subscribe/status", headers=headers)
+    assert r.json()["tier_id"] == "studio_pro"
+
+    # feature actually usable end-to-end
+    r = client.post("/api/construction-studio/design", headers=headers, json={
+        "plot_size_sqft": 1000, "plot_length_ft": 40, "plot_width_ft": 25,
+        "selections": {}, "entrance_direction": "north", "road_facing_side": "north",
+    })
+    assert r.status_code == 200
+
+
+def test_beta_bypass_insight_addon(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "PROPERTYIQ_BETA_BYPASS_PAYMENTS", True)
+
+    headers = _authed_headers("bypassinsight@example.com")
+    r = client.post("/api/insight/checkout", headers=headers, json={"report_id": "rep_test"})
+    assert r.status_code == 200
+    assert r.json()["beta_bypass"] is True

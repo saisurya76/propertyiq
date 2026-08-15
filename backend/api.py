@@ -99,6 +99,13 @@ FRONTEND_URL = os.getenv("PROPERTYIQ_FRONTEND_URL", "https://app.propertyiqweb.c
 DODO_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY", "")
 PROPERTYIQ_ADMIN_PASSWORD = os.getenv("PROPERTYIQ_ADMIN_PASSWORD", "")
 
+# BETA ONLY — skips the real Dodo checkout call and immediately activates
+# whatever tier the user selected, so the full auth -> tier -> Construction
+# Studio flow can be tested end-to-end before Dodo envs are wired up.
+# Defaults OFF. Must be explicitly set to the exact string "true" to engage —
+# unset/anything else behaves exactly as before (real Dodo checkout).
+PROPERTYIQ_BETA_BYPASS_PAYMENTS = os.getenv("PROPERTYIQ_BETA_BYPASS_PAYMENTS", "false").lower() == "true"
+
 # Per-tier Dodo product IDs — each must be created as a recurring/subscription
 # product in the Dodo dashboard first.
 TIER_DODO_PRODUCT_IDS = {
@@ -827,13 +834,33 @@ def update_tiers(request: AdminTierConfigRequest):
 def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depends(get_current_user_email)):
     """Creates a Dodo checkout session for a subscription tier. The Dodo
     product behind DODO_TIER_PRODUCT_IDS[tier_id] must be configured as a
-    recurring/subscription product in the Dodo dashboard."""
+    recurring/subscription product in the Dodo dashboard.
+
+    BETA: if PROPERTYIQ_BETA_BYPASS_PAYMENTS=true, skips Dodo entirely and
+    activates the tier immediately — no real payment, no checkout_url."""
 
     tier = get_tier(request.tier_id)
     if tier is None:
         raise HTTPException(status_code=404, detail=f"Unknown tier: {request.tier_id}")
     if tier["billing"] != "subscription":
         raise HTTPException(status_code=400, detail=f"Tier '{request.tier_id}' is not a subscription tier")
+
+    if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
+        dummy_subscription_id = f"beta_dummy_{uuid.uuid4()}"
+        upsert_subscription(
+            email=user_email,
+            tier_id=request.tier_id,
+            status="active",
+            dodo_subscription_id=dummy_subscription_id,
+        )
+        return {
+            "checkout_url": None,
+            "beta_bypass": True,
+            "status": "active",
+            "tier_id": request.tier_id,
+            "note": "Payment bypassed in beta — tier activated immediately. Replace with real Dodo "
+                    "checkout once DODO_PRODUCT_ID_* envs are set and PROPERTYIQ_BETA_BYPASS_PAYMENTS is unset.",
+        }
 
     product_id = TIER_DODO_PRODUCT_IDS.get(request.tier_id)
     if not product_id:
@@ -864,7 +891,20 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
 @app.post("/api/insight/checkout")
 def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(get_current_user_email)):
     """One-time checkout for the Insight Add-on (similar property
-    suggestions), tied to a specific report_id."""
+    suggestions), tied to a specific report_id.
+
+    BETA: if PROPERTYIQ_BETA_BYPASS_PAYMENTS=true, skips Dodo entirely and
+    returns immediate access — no real payment, no checkout_url."""
+
+    if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
+        return {
+            "checkout_url": None,
+            "beta_bypass": True,
+            "status": "granted",
+            "report_id": request.report_id,
+            "note": "Payment bypassed in beta. Replace with real Dodo checkout once "
+                    "DODO_PRODUCT_ID_INSIGHT_ADDON is set and PROPERTYIQ_BETA_BYPASS_PAYMENTS is unset.",
+        }
 
     product_id = os.getenv("DODO_PRODUCT_ID_INSIGHT_ADDON", "")
     if not product_id:
