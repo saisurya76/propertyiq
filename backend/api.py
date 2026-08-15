@@ -60,6 +60,16 @@ from backend.subscription_store import (
     get_active_tier,
 )
 
+from backend.insight_store import (
+    initialize_insight_store,
+    grant_insight_access,
+    has_insight_access,
+)
+
+from backend.similar_properties import (
+    get_similar_properties,
+)
+
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
@@ -92,6 +102,7 @@ initialize_construction_store()
 initialize_auth_store()
 initialize_config_store()
 initialize_subscription_store()
+initialize_insight_store()
 
 DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
@@ -897,6 +908,7 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
     returns immediate access — no real payment, no checkout_url."""
 
     if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
+        grant_insight_access(request.report_id, user_email)
         return {
             "checkout_url": None,
             "beta_bypass": True,
@@ -966,8 +978,8 @@ async def dodo_webhook(request: Request):
         set_status_by_dodo_id(dodo_subscription_id, "cancelled")
     elif event_type == "subscription.failed" and dodo_subscription_id:
         set_status_by_dodo_id(dodo_subscription_id, "payment_failed")
-    # payment.succeeded for the one-time Insight add-on needs no state change
-    # here — access is granted by report_id via metadata, checked at report view time.
+    elif event_type == "payment.succeeded" and tier_id == "insight_addon" and metadata.get("report_id") and user_email:
+        grant_insight_access(metadata["report_id"], user_email)
 
     return {"received": True}
 
@@ -992,6 +1004,47 @@ def subscribe_status(user_email: str = Depends(get_current_user_email)):
         "designs_used_this_month": used,
         "designs_remaining": None if quota is None else max(0, quota - used),
     }
+
+
+def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
+    """Access via either the one-time Insight Add-on grant for this specific
+    report, or an active subscription tier whose features include it."""
+    if has_insight_access(report_id, user_email):
+        return True
+
+    tier_id = get_active_tier(user_email)
+    if tier_id:
+        tier = get_tier(tier_id)
+        if tier and "similar_property_suggestions" in tier.get("features", []):
+            return True
+
+    return False
+
+
+@app.get("/api/similar-properties/{report_id}")
+def similar_properties(
+    report_id: str,
+    city: str,
+    property_type: str,
+    subject_price_per_sqft: float = 0,
+    user_email: str = Depends(get_current_user_email),
+):
+    """Similar property suggestions with vital params (price/sqft, price
+    delta vs subject, developer). Requires either a purchased Insight
+    Add-on grant for this report_id, or an active Studio subscription."""
+
+    if not _has_similar_properties_access(user_email, report_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Similar property suggestions require the Insight Add-on for this report "
+                   "(POST /api/insight/checkout) or an active Studio subscription."
+        )
+
+    return get_similar_properties(
+        city=city,
+        property_type=property_type,
+        subject_price_per_sqft=subject_price_per_sqft,
+    )
 
 
 class ConstructionEstimateRequest(BaseModel):
