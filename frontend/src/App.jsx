@@ -122,6 +122,15 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Admin dashboard stays English-only — no auto-detection, no Google
+    // Translate widget triggering, regardless of visitor IP/browser locale.
+    // (languageReady/language React state is irrelevant here since the
+    // admin view never renders the language selector.)
+    if (window.location.pathname === "/admin") {
+      document.documentElement.lang = "en";
+      return;
+    }
+
     let cancelled = false;
 
     const applyLanguage = (code) => {
