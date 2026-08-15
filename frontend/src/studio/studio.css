@@ -111,13 +111,39 @@
   margin-bottom: 12px;
 }
 
-.studio-panel .studio-back-link {
+.studio-back-link {
   display: inline-block;
   margin-top: 16px;
   font-size: 14px;
   color: #6b7280;
   cursor: pointer;
   text-decoration: underline;
+}
+
+.studio-prominent-link {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  background: #7c3aed;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.studio-prominent-link:hover {
+  background: #6d28d9;
+}
+
+.studio-sign-out-link {
+  font-size: 13px;
+  font-weight: 700;
+  color: #dc2626;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-left: 8px;
 }
 
 .studio-pricing-header {

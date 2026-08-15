@@ -89,24 +89,21 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
         <p>
           Signed in as <strong>{session?.email}</strong>
           {onSignOut && (
-            <>
-              {" "}
-              (<span className="studio-back-link" onClick={onSignOut}>sign out</span>)
-            </>
+            <span className="studio-sign-out-link" onClick={onSignOut}>Sign out</span>
           )}
-          . Pick what fits — unlock insights for this one report, or subscribe for ongoing
+          <br />
+          Pick what fits — unlock insights for this one report, or subscribe for ongoing
           access to Construction Studio.
         </p>
       </div>
 
       {message && (
         <div className="studio-status-banner">
-          {message}
+          <div>{message}</div>
           {insightUnlocked && onBack && (
-            <>
-              {" "}
-              <span className="studio-back-link" onClick={onBack}>← Go to your report to view it</span>
-            </>
+            <div className="studio-prominent-link" onClick={onBack}>
+              ← Go to your report to view it
+            </div>
           )}
         </div>
       )}
