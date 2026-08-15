@@ -15,6 +15,7 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
   const [loadingTierId, setLoadingTierId] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [insightUnlocked, setInsightUnlocked] = useState(false);
 
   const session = getSession();
 
@@ -65,6 +66,7 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
         return;
       }
       setMessage("Similar property insights unlocked for this report.");
+      setInsightUnlocked(true);
     } catch (err) {
       if (err.status === 401 && onSignOut) {
         onSignOut();
@@ -97,7 +99,17 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
         </p>
       </div>
 
-      {message && <div className="studio-status-banner">{message}</div>}
+      {message && (
+        <div className="studio-status-banner">
+          {message}
+          {insightUnlocked && onBack && (
+            <>
+              {" "}
+              <span className="studio-back-link" onClick={onBack}>← Go to your report to view it</span>
+            </>
+          )}
+        </div>
+      )}
       {error && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{error}</div>}
 
       {status?.tier_id && (
@@ -142,11 +154,17 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
               {isInsight ? (
                 <button
                   className="studio-tier-btn"
-                  disabled={!reportId || loadingTierId === tierId}
+                  disabled={!reportId || loadingTierId === tierId || insightUnlocked}
                   onClick={handleInsightBuy}
                   title={!reportId ? "View a report first to unlock this for that report" : undefined}
                 >
-                  {loadingTierId === tierId ? "Processing..." : reportId ? "Unlock for this report" : "View a report first"}
+                  {insightUnlocked
+                    ? "Unlocked ✓"
+                    : loadingTierId === tierId
+                    ? "Processing..."
+                    : reportId
+                    ? "Unlock for this report"
+                    : "View a report first"}
                 </button>
               ) : (
                 <button
