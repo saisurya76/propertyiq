@@ -862,3 +862,68 @@
     padding: 0 8px;
   }
 }
+
+/* --- Unified top bar (back-to-report + sign-out), shown on every Studio screen --- */
+
+.studio-top-bar {
+  max-width: 1100px;
+  margin: 0 auto 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.studio-top-bar-session {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* --- Live plot preview (Construction Studio wizard) --- */
+
+.plot-preview {
+  max-width: 900px;
+  margin: 20px auto 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.plot-preview-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.plot-preview-svg {
+  width: 100%;
+  height: auto;
+  max-height: 340px;
+  display: block;
+}
+
+.plot-preview-meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+@media (max-width: 640px) {
+  .studio-top-bar {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .plot-preview {
+    padding: 16px;
+  }
+
+  .plot-preview-svg {
+    max-height: 260px;
+  }
+}

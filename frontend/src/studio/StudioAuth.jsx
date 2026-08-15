@@ -87,6 +87,8 @@ function StudioAuth({ onAuthenticated, onBack }) {
         </button>
       </form>
       <span className="studio-back-link" onClick={() => setStep("email")}>← Use a different email</span>
+      {" · "}
+      <span className="studio-back-link" onClick={onBack}>← Back to report</span>
     </div>
   );
 }

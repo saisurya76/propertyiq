@@ -87,13 +87,8 @@ function StudioPricing({ reportId, onBack, onLaunchConstructionStudio, onSignOut
       <div className="studio-pricing-header">
         <h2>PropertyIQ Studio Plans</h2>
         <p>
-          Signed in as <strong>{session?.email}</strong>
-          {onSignOut && (
-            <span className="studio-sign-out-link" onClick={onSignOut}>Sign out</span>
-          )}
-          <br />
-          Pick what fits — unlock insights for this one report, or subscribe for ongoing
-          access to Construction Studio.
+          Signed in as <strong>{session?.email}</strong>. Pick what fits — unlock insights
+          for this one report, or subscribe for ongoing access to Construction Studio.
         </p>
       </div>
 

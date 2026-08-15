@@ -10,6 +10,7 @@ import StudioPricing from "./studio/StudioPricing";
 import ConstructionStudio from "./studio/ConstructionStudio";
 import AdminPanel from "./studio/AdminPanel";
 import SessionBar from "./studio/SessionBar";
+import StudioTopBar from "./studio/StudioTopBar";
 import { getSession, clearSession, studioApi } from "./studio/studioApi";
 
 
@@ -370,6 +371,7 @@ function App() {
   if (studioView === "pricing") {
     return (
       <div className="app">
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         {quotaMessage && (
           <div
             className="studio-status-banner"
@@ -386,7 +388,7 @@ function App() {
   if (studioView === "construction") {
     return (
       <div className="app">
-        <SessionBar onSignOut={handleSignOut} />
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <ConstructionStudio onBack={() => setStudioView("pricing")} onQuotaExceeded={handleQuotaExceeded} />
       </div>
     );
@@ -395,7 +397,7 @@ function App() {
   if (studioView === "admin") {
     return (
       <div className="app">
-        <SessionBar onSignOut={() => handleSignOut("main")} />
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <AdminPanel onBack={backToReport} />
       </div>
     );

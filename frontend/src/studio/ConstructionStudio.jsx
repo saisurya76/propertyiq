@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { studioApi } from "./studioApi";
+import PlotPreview from "./PlotPreview";
 
 const REGIONS = [
   ["india", "India"],
@@ -88,7 +89,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         currency: plot.currency,
         entrance_direction: plot.entrance_direction,
         road_facing_side: plot.road_facing_side,
-        slope_direction: plot.slope_direction,
+        slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
         rooms: rooms
           .filter((r) => r.name.trim())
           .map(({ name, x, y, length, width }) => ({ name, x, y, length, width })),
@@ -174,6 +175,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
               <label>Plot Slope Direction</label>
               <select value={plot.slope_direction} onChange={(e) => updatePlotField("slope_direction", e.target.value)}>
                 {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                <option value="not_available">Not available / unknown</option>
               </select>
             </div>
           </div>
@@ -325,6 +327,13 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
           </button>
         )}
       </div>
+
+      <PlotPreview
+        plotLengthFt={plot.plot_length_ft}
+        plotWidthFt={plot.plot_width_ft}
+        roadFacingSide={plot.road_facing_side}
+        rooms={rooms}
+      />
     </div>
   );
 }
