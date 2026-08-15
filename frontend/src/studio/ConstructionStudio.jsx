@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
 
@@ -74,8 +74,9 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
-  const [rooms, setRooms] = useState([emptyRoom()]);
-  const [selectedRoomKey, setSelectedRoomKey] = useState(null);
+  const [roomsHistory, setRoomsHistory] = useState({ past: [], present: [emptyRoom()], future: [] });
+  const rooms = roomsHistory.present;
+  const [selectedKeys, setSelectedKeys] = useState([]);
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -132,33 +133,109 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     });
   };
 
-  const updateRoom = (key, field, value) => {
-    setRooms((rs) => rs.map((r) => (r._key === key ? { ...r, [field]: value } : r)));
+  const editBaselineRef = useRef(null);
+  const historyDebounceRef = useRef(null);
+
+  // Discrete actions (drag end, resize end, add/remove room, color pick)
+  // push to history immediately.
+  const commitRooms = (newRooms) => {
+    setRoomsHistory((s) => {
+      if (JSON.stringify(newRooms) === JSON.stringify(s.present)) return s;
+      return { past: [...s.past, s.present], present: newRooms, future: [] };
+    });
   };
 
-  const addRoom = () =>
-    setRooms((rs) => {
-      const defaultLength = 10;
-      const defaultWidth = 10;
-      const gap = 3;
-      // Stagger each new room into its own grid cell instead of always
-      // defaulting to (0,0) — which made every new room render fully
-      // overlapping the previous ones in the live preview until manually
-      // repositioned.
-      const cols = Math.max(1, Math.floor((plot.plot_length_ft || 40) / (defaultLength + gap)));
-      const index = rs.length;
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      return [
-        ...rs,
-        {
-          ...emptyRoom(),
-          x: col * (defaultLength + gap),
-          y: row * (defaultWidth + gap),
-        },
-      ];
+  // Continuous edits (typing in a name/length/width field) update live on
+  // every keystroke, but only push ONE history entry 500ms after the user
+  // stops — otherwise every keystroke would be its own undo step.
+  const commitRoomsDebounced = (newRooms) => {
+    setRoomsHistory((s) => {
+      if (editBaselineRef.current === null) editBaselineRef.current = s.present;
+      return { ...s, present: newRooms };
     });
-  const removeRoom = (key) => setRooms((rs) => rs.filter((r) => r._key !== key));
+    if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+    historyDebounceRef.current = setTimeout(() => {
+      setRoomsHistory((s) => {
+        const baseline = editBaselineRef.current;
+        editBaselineRef.current = null;
+        if (baseline === null || JSON.stringify(baseline) === JSON.stringify(s.present)) return s;
+        return { past: [...s.past, baseline], present: s.present, future: [] };
+      });
+    }, 500);
+  };
+
+  const undo = () => {
+    setRoomsHistory((s) => {
+      if (s.past.length === 0) return s;
+      const previous = s.past[s.past.length - 1];
+      return { past: s.past.slice(0, -1), present: previous, future: [s.present, ...s.future] };
+    });
+  };
+
+  const redo = () => {
+    setRoomsHistory((s) => {
+      if (s.future.length === 0) return s;
+      const next = s.future[0];
+      return { past: [...s.past, s.present], present: next, future: s.future.slice(1) };
+    });
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = document.activeElement?.tagName;
+      const isTyping = tag === "INPUT" || tag === "TEXTAREA";
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && !isTyping && selectedKeys.length > 0) {
+        e.preventDefault();
+        commitRooms(rooms.filter((r) => !selectedKeys.includes(r._key)));
+        setSelectedKeys([]);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [rooms, selectedKeys]);
+
+  const updateRoom = (key, field, value) => {
+    const newRooms = rooms.map((r) => (r._key === key ? { ...r, [field]: value } : r));
+    if (field === "color") {
+      commitRooms(newRooms); // discrete click, not a text field — commit immediately
+    } else {
+      commitRoomsDebounced(newRooms);
+    }
+  };
+
+  const addRoom = () => {
+    const defaultLength = 10;
+    const defaultWidth = 10;
+    const gap = 3;
+    // Stagger each new room into its own grid cell instead of always
+    // defaulting to (0,0) — which made every new room render fully
+    // overlapping the previous ones in the live preview until manually
+    // repositioned.
+    const cols = Math.max(1, Math.floor((plot.plot_length_ft || 40) / (defaultLength + gap)));
+    const index = rooms.length;
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    commitRooms([
+      ...rooms,
+      {
+        ...emptyRoom(),
+        x: col * (defaultLength + gap),
+        y: row * (defaultWidth + gap),
+      },
+    ]);
+  };
+
+  const removeRoom = (key) => {
+    commitRooms(rooms.filter((r) => r._key !== key));
+    setSelectedKeys((sk) => sk.filter((k) => k !== key));
+  };
 
   const generateDesign = async () => {
     setError("");
@@ -364,9 +441,31 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         <div className="cs-card">
           <h3>Room Layout</h3>
           <p className="studio-subtext">
-            Drag rooms into position on the plot below. Naming rooms clearly
-            (e.g. "Kitchen", "Master Bedroom", "Pooja Room") enables Vastu compliance checks for that room.
+            Drag rooms into position, resize via the corner handles, and use Ctrl+Z / Ctrl+Y to
+            undo/redo. Naming rooms clearly (e.g. "Kitchen", "Master Bedroom", "Pooja Room")
+            enables Vastu compliance checks for that room.
           </p>
+
+          <div className="rc-history-toolbar">
+            <button type="button" className="rc-tool-btn" onClick={undo} disabled={roomsHistory.past.length === 0}>
+              ↶ Undo
+            </button>
+            <button type="button" className="rc-tool-btn" onClick={redo} disabled={roomsHistory.future.length === 0}>
+              ↷ Redo
+            </button>
+            {selectedKeys.length > 0 && (
+              <button
+                type="button"
+                className="rc-tool-btn rc-tool-btn-danger"
+                onClick={() => {
+                  commitRooms(rooms.filter((r) => !selectedKeys.includes(r._key)));
+                  setSelectedKeys([]);
+                }}
+              >
+                Delete selected ({selectedKeys.length})
+              </button>
+            )}
+          </div>
 
           <Suspense fallback={<p className="studio-subtext">Loading room editor...</p>}>
             <RoomCanvas
@@ -374,12 +473,9 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
               plotWidthFt={plot.plot_width_ft}
               roadFacingSide={plot.road_facing_side}
               rooms={rooms}
-              selectedKey={selectedRoomKey}
-              onSelectRoom={setSelectedRoomKey}
-              onRoomDrag={(key, x, y) => {
-                updateRoom(key, "x", x);
-                updateRoom(key, "y", y);
-              }}
+              onRoomsChange={commitRooms}
+              selectedKeys={selectedKeys}
+              onSelectionChange={setSelectedKeys}
             />
           </Suspense>
 
@@ -388,9 +484,9 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
           </div>
           {rooms.map((room) => (
             <div
-              className={`cs-room-row ${room._key === selectedRoomKey ? "cs-room-row-selected" : ""}`}
+              className={`cs-room-row ${selectedKeys.includes(room._key) ? "cs-room-row-selected" : ""}`}
               key={room._key}
-              onClick={() => setSelectedRoomKey(room._key)}
+              onClick={() => setSelectedKeys([room._key])}
             >
               <input placeholder="Kitchen" value={room.name} onChange={(e) => updateRoom(room._key, "name", e.target.value)} />
               <input type="number" placeholder="Length (ft)" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
