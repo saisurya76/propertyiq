@@ -7,6 +7,7 @@ import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
 import StudioPricing from "./studio/StudioPricing";
+import ConstructionStudio from "./studio/ConstructionStudio";
 import { getSession } from "./studio/studioApi";
 
 
@@ -88,7 +89,7 @@ function App() {
 
   const [result, setResult] = useState(null);
   const [reportId, setReportId] = useState(null);
-  const [studioView, setStudioView] = useState("main"); // "main" | "auth" | "pricing"
+  const [studioView, setStudioView] = useState("main"); // "main" | "auth" | "pricing" | "construction"
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
@@ -294,6 +295,8 @@ function App() {
     }
   };
 
+  const [quotaMessage, setQuotaMessage] = useState("");
+
   const launchStudio = () => {
     setStudioView(getSession() ? "pricing" : "auth");
   };
@@ -304,6 +307,16 @@ function App() {
 
   const backToReport = () => {
     setStudioView("main");
+  };
+
+  const launchConstructionStudio = () => {
+    setQuotaMessage("");
+    setStudioView("construction");
+  };
+
+  const handleQuotaExceeded = (message) => {
+    setQuotaMessage(message);
+    setStudioView("pricing");
   };
 
   if (studioView === "auth") {
@@ -317,7 +330,23 @@ function App() {
   if (studioView === "pricing") {
     return (
       <div className="app">
-        <StudioPricing reportId={reportId} onBack={backToReport} />
+        {quotaMessage && (
+          <div
+            className="studio-status-banner"
+            style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b", maxWidth: 1100, margin: "0 auto 20px" }}
+          >
+            {quotaMessage}
+          </div>
+        )}
+        <StudioPricing reportId={reportId} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} />
+      </div>
+    );
+  }
+
+  if (studioView === "construction") {
+    return (
+      <div className="app">
+        <ConstructionStudio onBack={() => setStudioView("pricing")} onQuotaExceeded={handleQuotaExceeded} />
       </div>
     );
   }

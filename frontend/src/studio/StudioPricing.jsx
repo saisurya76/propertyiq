@@ -9,7 +9,7 @@ function formatQuota(quota) {
   return `${quota} design${quota === 1 ? "" : "s"}/month`;
 }
 
-function StudioPricing({ reportId, onBack }) {
+function StudioPricing({ reportId, onBack, onLaunchConstructionStudio }) {
   const [tiers, setTiers] = useState(null);
   const [status, setStatus] = useState(null);
   const [loadingTierId, setLoadingTierId] = useState(null);
@@ -88,6 +88,14 @@ function StudioPricing({ reportId, onBack }) {
           Current plan: <strong>{tiers[status.tier_id]?.label || status.tier_id}</strong>
           {status.design_quota_per_month !== null && status.design_quota_per_month !== undefined && (
             <> — {status.designs_remaining ?? status.design_quota_per_month} design(s) remaining this month</>
+          )}
+          {onLaunchConstructionStudio && (
+            <>
+              {" · "}
+              <span className="studio-back-link" onClick={onLaunchConstructionStudio}>
+                Open Construction Studio →
+              </span>
+            </>
           )}
         </div>
       )}

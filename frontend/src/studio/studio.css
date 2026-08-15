@@ -235,3 +235,256 @@
   font-size: 14px;
   text-align: center;
 }
+
+/* --- Construction Studio wizard --- */
+
+.cs-wizard {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.cs-steps {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.cs-step-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.cs-step-pill.cs-step-active {
+  background: #111827;
+  color: white;
+}
+
+.cs-step-pill.cs-step-done {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.cs-card {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  margin-bottom: 24px;
+}
+
+.cs-card h3 {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+.cs-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.cs-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.cs-field input,
+.cs-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  font-size: 15px;
+}
+
+.cs-material-category {
+  margin-bottom: 20px;
+}
+
+.cs-material-category h4 {
+  font-size: 15px;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.cs-material-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.cs-material-option {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.cs-material-option.cs-material-selected {
+  border-color: #c084fc;
+  background: rgba(192, 132, 252, 0.08);
+}
+
+.cs-material-option .cs-material-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.cs-material-option .cs-material-price {
+  color: #6b7280;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.cs-running-total {
+  position: sticky;
+  bottom: 16px;
+  background: #111827;
+  color: white;
+  border-radius: 16px;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  margin-top: 10px;
+}
+
+.cs-running-total .cs-total-label {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.cs-running-total .cs-total-value {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.cs-room-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cs-room-row input {
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cs-remove-room {
+  background: #fef2f2;
+  color: #dc2626;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cs-add-room-btn {
+  background: #f3f4f6;
+  color: #111827;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.cs-wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.cs-nav-btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cs-nav-btn.cs-nav-primary {
+  background: #111827;
+  color: white;
+}
+
+.cs-nav-btn.cs-nav-secondary {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.cs-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cs-vastu-finding {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.cs-vastu-good {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.cs-vastu-bad {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.cs-vastu-neutral {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.cs-risk-list {
+  padding-left: 20px;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cs-download-btn {
+  background: #c084fc;
+  color: #1e1b3a;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.cs-quota-note {
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
