@@ -1,0 +1,237 @@
+.studio-promo-card {
+  margin-top: 30px;
+  background: linear-gradient(135deg, #1e1b3a 0%, #2d1b4e 100%);
+  border-radius: 20px;
+  padding: 36px;
+  text-align: left;
+  color: #f3f0ff;
+  box-shadow: 0 8px 24px rgba(84, 30, 156, 0.25);
+}
+
+.studio-promo-eyebrow {
+  color: #c084fc;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+.studio-promo-card h3 {
+  font-size: 26px;
+  margin: 10px 0 10px;
+  line-height: 1.25;
+}
+
+.studio-promo-card p {
+  color: #d8d3f0;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+  max-width: 640px;
+}
+
+.studio-promo-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.studio-promo-feature {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(192, 132, 252, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  color: #ece7fb;
+}
+
+.studio-promo-feature strong {
+  display: block;
+  color: #fff;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.studio-cta-btn {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #c084fc;
+  color: #1e1b3a;
+  transition: 0.2s ease;
+}
+
+.studio-cta-btn:hover {
+  opacity: 0.9;
+}
+
+.studio-cta-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.studio-panel {
+  max-width: 480px;
+  margin: 30px auto;
+  background: white;
+  border-radius: 20px;
+  padding: 34px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  text-align: left;
+}
+
+.studio-panel h2 {
+  margin-top: 0;
+  font-size: 22px;
+}
+
+.studio-panel p.studio-subtext {
+  color: #6b7280;
+  font-size: 15px;
+  margin-bottom: 22px;
+}
+
+.studio-panel input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+
+.studio-panel .studio-error {
+  color: #dc2626;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.studio-panel .studio-back-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.studio-pricing-header {
+  text-align: center;
+  max-width: 640px;
+  margin: 10px auto 40px;
+}
+
+.studio-pricing-header h2 {
+  font-size: 30px;
+  margin-bottom: 10px;
+}
+
+.studio-pricing-header p {
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.studio-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.studio-tier-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.studio-tier-card.studio-tier-featured {
+  border: 2px solid #c084fc;
+  box-shadow: 0 8px 24px rgba(192, 132, 252, 0.2);
+}
+
+.studio-tier-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.studio-tier-price {
+  font-size: 34px;
+  font-weight: 800;
+  margin: 10px 0 4px;
+  color: #111827;
+}
+
+.studio-tier-price span {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.studio-tier-quota {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 18px;
+}
+
+.studio-tier-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  flex-grow: 1;
+}
+
+.studio-tier-features li {
+  font-size: 14px;
+  color: #374151;
+  padding: 6px 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.studio-tier-features li:first-child {
+  border-top: none;
+}
+
+.studio-tier-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #111827;
+  color: white;
+  transition: 0.2s ease;
+}
+
+.studio-tier-btn:hover {
+  opacity: 0.9;
+}
+
+.studio-tier-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.studio-status-banner {
+  max-width: 1100px;
+  margin: 0 auto 20px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 14px;
+  text-align: center;
+}

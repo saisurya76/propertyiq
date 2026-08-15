@@ -1,9 +1,11 @@
 import { useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
+import StudioPromoCard from "../studio/StudioPromoCard";
 
 function AssessmentResult({
   result,
-  formData
+  formData,
+  onLaunchStudio
 }) {
   if (!result) return null;
 
@@ -1111,6 +1113,8 @@ function AssessmentResult({
 
       </div>
 
+
+      <StudioPromoCard onLaunch={onLaunchStudio} />
 
       <FraudIntelligenceStatic />
 

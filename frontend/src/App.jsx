@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import "./studio/studio.css";
 
 import PropertyForm from "./components/PropertyForm";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
+import StudioAuth from "./studio/StudioAuth";
+import StudioPricing from "./studio/StudioPricing";
+import { getSession } from "./studio/studioApi";
 
 
 const LANGUAGE_OPTIONS = [
@@ -83,6 +87,8 @@ function App() {
   });
 
   const [result, setResult] = useState(null);
+  const [reportId, setReportId] = useState(null);
+  const [studioView, setStudioView] = useState("main"); // "main" | "auth" | "pricing"
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
@@ -269,6 +275,11 @@ function App() {
       const data = await response.json();
 
       setResult(data);
+      setReportId(
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `report_${Date.now()}_${Math.random().toString(36).slice(2)}`
+      );
 
     } catch (error) {
 
@@ -282,6 +293,34 @@ function App() {
         setLoading(false);
     }
   };
+
+  const launchStudio = () => {
+    setStudioView(getSession() ? "pricing" : "auth");
+  };
+
+  const handleStudioAuthenticated = () => {
+    setStudioView("pricing");
+  };
+
+  const backToReport = () => {
+    setStudioView("main");
+  };
+
+  if (studioView === "auth") {
+    return (
+      <div className="app">
+        <StudioAuth onAuthenticated={handleStudioAuthenticated} onBack={backToReport} />
+      </div>
+    );
+  }
+
+  if (studioView === "pricing") {
+    return (
+      <div className="app">
+        <StudioPricing reportId={reportId} onBack={backToReport} />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -339,6 +378,7 @@ function App() {
       <AssessmentResult
         result={result}
         formData={formData}
+        onLaunchStudio={launchStudio}
       />
 
       <Disclaimer />
