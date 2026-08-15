@@ -416,6 +416,7 @@ function App() {
       <AssessmentResult
         result={result}
         formData={formData}
+        reportId={reportId}
         onLaunchStudio={launchStudio}
       />
 

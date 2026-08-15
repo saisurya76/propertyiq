@@ -1,10 +1,12 @@
 import { useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 import StudioPromoCard from "../studio/StudioPromoCard";
+import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
 
 function AssessmentResult({
   result,
   formData,
+  reportId,
   onLaunchStudio
 }) {
   if (!result) return null;
@@ -1113,6 +1115,14 @@ function AssessmentResult({
 
       </div>
 
+
+      <SimilarPropertiesWidget
+        reportId={reportId}
+        city={formData.city}
+        propertyType={formData.propertyType}
+        subjectPricePerSqft={result.quotedPricePerSqft}
+        onNeedAccess={onLaunchStudio}
+      />
 
       <StudioPromoCard onLaunch={onLaunchStudio} />
 
