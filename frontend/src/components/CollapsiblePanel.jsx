@@ -1,10 +1,10 @@
 import { useState } from "react";
 
-function CollapsiblePanel({ title, defaultOpen = false, children }) {
+function CollapsiblePanel({ title, defaultOpen = false, color = "neutral", children }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="collapsible-panel">
+    <div className={`collapsible-panel collapsible-panel-${color}`}>
       <button
         type="button"
         className="collapsible-panel-header"

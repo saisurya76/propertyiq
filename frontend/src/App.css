@@ -243,21 +243,46 @@ input,
 select,
 textarea {
   width: 100%;
-  padding:12px 14px;
+  padding: 13px 15px;
 
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1.5px solid #e2e5eb;
 
   box-sizing: border-box;
 
-  color: #111827;
-  background: #ffffff;
+  color: #0f172a;
+  background: #f8fafc;
 
   font-family: inherit;
+  font-size: 15px;
 
   transition:
     border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+input:disabled,
+select:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 40px;
 }
 
 textarea {
@@ -605,11 +630,13 @@ textarea {
 .form-field label {
   margin-bottom: 8px;
 
-  font-size: 14px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 
-  font-weight: 600;
+  font-weight: 700;
 
-  color: #4b5563;
+  color: #64748b;
 }
 
 input::placeholder,
@@ -622,10 +649,11 @@ select:focus,
 textarea:focus {
   outline: none;
 
-  border-color: #2563eb;
+  border-color: #7c3aed;
+  background: #ffffff;
 
   box-shadow:
-    0 0 0 3px rgba(37, 99, 235, 0.15);
+    0 0 0 4px rgba(124, 58, 237, 0.12);
 }
 
 .primary-btn:disabled {
@@ -751,18 +779,52 @@ body {
   padding: 18px 24px;
   background: white;
   border: 1px solid #e5e7eb;
+  border-left: 6px solid #cbd5e1;
   border-radius: 16px;
   font-size: 19px;
   font-weight: 700;
   color: #0f172a;
   cursor: pointer;
   text-align: left;
+  transition: background 0.15s ease;
+}
+
+.collapsible-panel-header:hover {
+  background: #f8fafc;
+}
+
+/* Distinct accent per section, same tinted-background + left-border idiom
+   already used by .recommendation-card elsewhere in this app. */
+.collapsible-panel-blue .collapsible-panel-header {
+  background: #eff6ff;
+  border-left-color: #3b82f6;
+}
+.collapsible-panel-blue .collapsible-panel-header:hover {
+  background: #e0edff;
+}
+
+.collapsible-panel-purple .collapsible-panel-header {
+  background: #f5f3ff;
+  border-left-color: #7c3aed;
+}
+.collapsible-panel-purple .collapsible-panel-header:hover {
+  background: #ede9fe;
+}
+
+.collapsible-panel-red .collapsible-panel-header {
+  background: #fef2f2;
+  border-left-color: #dc2626;
+}
+.collapsible-panel-red .collapsible-panel-header:hover {
+  background: #fee2e2;
 }
 
 .collapsible-panel-chevron {
   font-size: 16px;
   color: #9ca3af;
   transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
 .collapsible-panel-chevron-open {
@@ -771,4 +833,17 @@ body {
 
 .collapsible-panel-body {
   padding-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .collapsible-panel {
+    margin: 14px auto;
+    border-radius: 12px;
+  }
+
+  .collapsible-panel-header {
+    padding: 14px 16px;
+    font-size: 16px;
+    border-radius: 12px;
+  }
 }

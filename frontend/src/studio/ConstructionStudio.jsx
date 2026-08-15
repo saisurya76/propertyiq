@@ -224,16 +224,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
             Position each room within your plot (feet from the bottom-left corner). Naming rooms clearly
             (e.g. "Kitchen", "Master Bedroom", "Pooja Room") enables Vastu compliance checks for that room.
           </p>
-          <div className="cs-room-row" style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600 }}>
+          <div className="cs-room-row cs-room-row-header">
             <span>Room name</span><span>X (ft)</span><span>Y (ft)</span><span>Length (ft)</span><span>Width (ft)</span><span></span>
           </div>
           {rooms.map((room) => (
             <div className="cs-room-row" key={room._key}>
               <input placeholder="Kitchen" value={room.name} onChange={(e) => updateRoom(room._key, "name", e.target.value)} />
-              <input type="number" value={room.x} onChange={(e) => updateRoom(room._key, "x", Number(e.target.value))} />
-              <input type="number" value={room.y} onChange={(e) => updateRoom(room._key, "y", Number(e.target.value))} />
-              <input type="number" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
-              <input type="number" value={room.width} onChange={(e) => updateRoom(room._key, "width", Number(e.target.value))} />
+              <input type="number" placeholder="X (ft)" value={room.x} onChange={(e) => updateRoom(room._key, "x", Number(e.target.value))} />
+              <input type="number" placeholder="Y (ft)" value={room.y} onChange={(e) => updateRoom(room._key, "y", Number(e.target.value))} />
+              <input type="number" placeholder="Length (ft)" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
+              <input type="number" placeholder="Width (ft)" value={room.width} onChange={(e) => updateRoom(room._key, "width", Number(e.target.value))} />
               <button className="cs-remove-room" onClick={() => removeRoom(room._key)}>Remove</button>
             </div>
           ))}

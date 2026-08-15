@@ -1117,7 +1117,7 @@ function AssessmentResult({
       </div>
 
 
-      <CollapsiblePanel title="Similar Property Insights" defaultOpen={false}>
+      <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
         <SimilarPropertiesWidget
           reportId={reportId}
           city={formData.city}
@@ -1127,11 +1127,11 @@ function AssessmentResult({
         />
       </CollapsiblePanel>
 
-      <CollapsiblePanel title="PropertyIQ Studio" defaultOpen={false}>
+      <CollapsiblePanel title="PropertyIQ Studio" defaultOpen={false} color="purple">
         <StudioPromoCard onLaunch={onLaunchStudio} />
       </CollapsiblePanel>
 
-      <CollapsiblePanel title="Fraud Intelligence" defaultOpen={false}>
+      <CollapsiblePanel title="Fraud Intelligence" defaultOpen={false} color="red">
         <FraudIntelligenceStatic />
       </CollapsiblePanel>
 

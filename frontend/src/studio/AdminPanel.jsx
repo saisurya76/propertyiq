@@ -100,16 +100,17 @@ function AdminPanel({ onBack }) {
 
       <div className="admin-section">
         <h3>Tier Configuration</h3>
-        <div className="admin-tier-row">
+        <div className="admin-tier-row admin-tier-row-header">
           <span>Tier</span><span>Price (USD)</span><span>Quota/mo (blank = unlimited, 0 = one-time)</span><span>Label</span><span></span>
         </div>
         {TIER_ORDER.filter((id) => tierConfig?.[id]).map((tierId) => {
           const tier = tierConfig[tierId];
           return (
             <div className="admin-tier-row" key={tierId}>
-              <span>{tierId}</span>
+              <span className="admin-tier-row-name">{tierId}</span>
               <input
                 type="number"
+                placeholder="Price (USD)"
                 value={tier.price_usd}
                 onChange={(e) => updateTierField(tierId, "price_usd", Number(e.target.value))}
               />
@@ -123,6 +124,7 @@ function AdminPanel({ onBack }) {
               />
               <input
                 type="text"
+                placeholder="Label"
                 value={tier.label}
                 onChange={(e) => updateTierField(tierId, "label", e.target.value)}
               />
@@ -143,25 +145,27 @@ function AdminPanel({ onBack }) {
         {subscriptions.length === 0 ? (
           <p className="admin-empty-note">No subscriptions yet.</p>
         ) : (
-          <table className="admin-table">
-            <thead>
-              <tr><th>Email</th><th>Tier</th><th>Status</th><th>Updated</th></tr>
-            </thead>
-            <tbody>
-              {subscriptions.map((s) => (
-                <tr key={s.email}>
-                  <td>{s.email}</td>
-                  <td>{s.tier_id}</td>
-                  <td>
-                    <span className={`admin-status-badge ${s.status === "active" ? "admin-status-active" : "admin-status-other"}`}>
-                      {s.status}
-                    </span>
-                  </td>
-                  <td>{new Date(s.updated_at).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr><th>Email</th><th>Tier</th><th>Status</th><th>Updated</th></tr>
+              </thead>
+              <tbody>
+                {subscriptions.map((s) => (
+                  <tr key={s.email}>
+                    <td>{s.email}</td>
+                    <td>{s.tier_id}</td>
+                    <td>
+                      <span className={`admin-status-badge ${s.status === "active" ? "admin-status-active" : "admin-status-other"}`}>
+                        {s.status}
+                      </span>
+                    </td>
+                    <td>{new Date(s.updated_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -170,20 +174,22 @@ function AdminPanel({ onBack }) {
         {grants.length === 0 ? (
           <p className="admin-empty-note">No Insight purchases yet.</p>
         ) : (
-          <table className="admin-table">
-            <thead>
-              <tr><th>Report ID</th><th>Email</th><th>Granted</th></tr>
-            </thead>
-            <tbody>
-              {grants.map((g, i) => (
-                <tr key={i}>
-                  <td>{g.report_id}</td>
-                  <td>{g.user_email}</td>
-                  <td>{new Date(g.granted_at).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr><th>Report ID</th><th>Email</th><th>Granted</th></tr>
+              </thead>
+              <tbody>
+                {grants.map((g, i) => (
+                  <tr key={i}>
+                    <td>{g.report_id}</td>
+                    <td>{g.user_email}</td>
+                    <td>{new Date(g.granted_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

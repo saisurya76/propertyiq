@@ -690,3 +690,175 @@
   font-size: 13px;
   color: #6b7280;
 }
+
+/* --- Header row helpers for the room/tier config grids --- */
+
+.cs-room-row-header,
+.admin-tier-row-header {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.admin-tier-row-name {
+  font-weight: 700;
+  color: #111827;
+  font-size: 13px;
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+  min-width: 480px;
+}
+
+/* ============================================================
+   RESPONSIVE — mandatory across every Studio page.
+   Two breakpoints: tablet/narrow desktop (900px) and phone (640px).
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .studio-tier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cs-steps {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cs-step-pill {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .studio-panel {
+    max-width: 100%;
+    margin: 16px 8px;
+    padding: 22px 18px;
+  }
+
+  .studio-pricing-header h2,
+  .admin-panel h2 {
+    font-size: 22px;
+  }
+
+  .studio-pricing-header {
+    margin: 4px auto 24px;
+  }
+
+  .studio-tier-card {
+    padding: 22px 18px;
+  }
+
+  .studio-tier-price {
+    font-size: 28px;
+  }
+
+  .cs-wizard {
+    padding: 0 4px;
+  }
+
+  .cs-card {
+    padding: 20px 16px;
+    border-radius: 16px;
+  }
+
+  .cs-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cs-material-options {
+    grid-template-columns: 1fr;
+  }
+
+  .cs-running-total {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 14px 18px;
+  }
+
+  .cs-total-value {
+    font-size: 20px;
+  }
+
+  /* Room layout grid: the fixed 6-column grid genuinely cannot fit on a
+     phone screen, so it collapses to one input per line. The header
+     labels row is hidden here (it doesn't map to a stacked layout) —
+     each input has its own placeholder instead, so fields stay
+     self-explanatory without it. */
+  .cs-room-row-header {
+    display: none;
+  }
+
+  .cs-room-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+
+  .cs-remove-room {
+    width: 100%;
+  }
+
+  /* Admin tier config grid: same problem, same fix. */
+  .admin-tier-row-header {
+    display: none;
+  }
+
+  .admin-tier-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+
+  .admin-tier-row-name {
+    font-size: 15px;
+  }
+
+  .cs-nav-btn {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .studio-promo-card,
+  .studio-promo-features {
+    padding: 24px 20px;
+  }
+
+  .studio-promo-card h3 {
+    font-size: 21px;
+  }
+
+  .sp-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .sp-row .sp-price {
+    text-align: left;
+  }
+
+  .session-bar {
+    text-align: center;
+    font-size: 12px;
+    padding: 0 8px;
+  }
+}
