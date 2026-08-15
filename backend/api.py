@@ -114,7 +114,12 @@ DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
 FRONTEND_URL = os.getenv("PROPERTYIQ_FRONTEND_URL", "https://app.propertyiqweb.com")
 DODO_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY", "")
-PROPERTYIQ_ADMIN_PASSWORD = os.getenv("PROPERTYIQ_ADMIN_PASSWORD", "")
+# Matches AccidentIQ's env var naming convention. Falls back to the old
+# PROPERTYIQ_ADMIN_PASSWORD name if ADMIN_DASHBOARD_PASSWORD isn't set yet,
+# so this doesn't break the moment it deploys — rename the Render env var
+# to ADMIN_DASHBOARD_PASSWORD when convenient, then the fallback can be
+# removed later.
+PROPERTYIQ_ADMIN_PASSWORD = os.getenv("ADMIN_DASHBOARD_PASSWORD", "") or os.getenv("PROPERTYIQ_ADMIN_PASSWORD", "")
 
 # BETA ONLY — skips the real Dodo checkout call and immediately activates
 # whatever tier the user selected, so the full auth -> tier -> Construction
@@ -848,7 +853,7 @@ def list_tiers():
 @app.post("/api/admin/tiers")
 def update_tiers(request: AdminTierConfigRequest):
     """Admin-only: overwrite the tier config (features/prices/quotas).
-    Password-gated via PROPERTYIQ_ADMIN_PASSWORD."""
+    Password-gated via ADMIN_DASHBOARD_PASSWORD."""
     _require_admin_password(request.password)
 
     set_tier_config(request.tier_config)
@@ -859,7 +864,7 @@ def update_tiers(request: AdminTierConfigRequest):
 def admin_overview(request: AdminAuthRequest):
     """Admin-only: current tier config plus all subscriptions and Insight
     Add-on grants, for the admin panel's overview view. Password-gated via
-    PROPERTYIQ_ADMIN_PASSWORD — same check as /api/admin/tiers."""
+    ADMIN_DASHBOARD_PASSWORD — same check as /api/admin/tiers."""
     _require_admin_password(request.password)
 
     return {

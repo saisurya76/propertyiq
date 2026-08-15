@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { studioApi } from "./studioApi";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
@@ -63,6 +63,11 @@ function AdminPanel({ onBack }) {
     }
   };
 
+  const activeSubCount = useMemo(
+    () => subscriptions.filter((s) => s.status === "active").length,
+    [subscriptions]
+  );
+
   if (!authed) {
     return (
       <div className="studio-panel">
@@ -88,8 +93,14 @@ function AdminPanel({ onBack }) {
   }
 
   return (
-    <div className="admin-panel">
-      <h2>PropertyIQ Studio — Admin</h2>
+    <div className="admin-dashboard">
+      <div className="admin-dashboard-header">
+        <div>
+          <div className="admin-dashboard-eyebrow">PropertyIQ Studio</div>
+          <h2>Admin Dashboard</h2>
+        </div>
+        <span className="admin-refresh-btn" onClick={refresh}>⟳ Refresh</span>
+      </div>
 
       {error && (
         <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>
@@ -98,7 +109,26 @@ function AdminPanel({ onBack }) {
       )}
       {saveMessage && <div className="studio-status-banner">{saveMessage}</div>}
 
-      <div className="admin-section">
+      <div className="admin-stats-row">
+        <div className="admin-stat-card admin-stat-purple">
+          <div className="admin-stat-value">{activeSubCount}</div>
+          <div className="admin-stat-label">Active Subscriptions</div>
+        </div>
+        <div className="admin-stat-card admin-stat-blue">
+          <div className="admin-stat-value">{subscriptions.length}</div>
+          <div className="admin-stat-label">Total Subscription Records</div>
+        </div>
+        <div className="admin-stat-card admin-stat-green">
+          <div className="admin-stat-value">{grants.length}</div>
+          <div className="admin-stat-label">Insight Add-on Purchases</div>
+        </div>
+        <div className="admin-stat-card admin-stat-slate">
+          <div className="admin-stat-value">{TIER_ORDER.filter((id) => tierConfig?.[id]).length}</div>
+          <div className="admin-stat-label">Configured Tiers</div>
+        </div>
+      </div>
+
+      <div className="admin-section admin-section-purple">
         <h3>Tier Configuration</h3>
         <div className="admin-tier-row admin-tier-row-header">
           <span>Tier</span><span>Price (USD)</span><span>Quota/mo (blank = unlimited, 0 = one-time)</span><span>Label</span><span></span>
@@ -137,11 +167,8 @@ function AdminPanel({ onBack }) {
         </button>
       </div>
 
-      <div className="admin-section">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3>Active Subscriptions ({subscriptions.length})</h3>
-          <span className="studio-back-link" onClick={refresh}>Refresh</span>
-        </div>
+      <div className="admin-section admin-section-blue">
+        <h3>Active Subscriptions ({subscriptions.length})</h3>
         {subscriptions.length === 0 ? (
           <p className="admin-empty-note">No subscriptions yet.</p>
         ) : (
@@ -169,7 +196,7 @@ function AdminPanel({ onBack }) {
         )}
       </div>
 
-      <div className="admin-section">
+      <div className="admin-section admin-section-green">
         <h3>Insight Add-on Grants ({grants.length})</h3>
         {grants.length === 0 ? (
           <p className="admin-empty-note">No Insight purchases yet.</p>

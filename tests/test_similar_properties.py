@@ -2,7 +2,7 @@ import os
 
 os.environ.setdefault("DODO_PAYMENTS_API_KEY", "test")
 os.environ.setdefault("DODO_REPORT_PRODUCT_ID", "test")
-os.environ.setdefault("PROPERTYIQ_ADMIN_PASSWORD", "test-admin-pw")
+os.environ.setdefault("ADMIN_DASHBOARD_PASSWORD", "test-admin-pw")
 # Test isolation now comes from tests/conftest.py truncating the shared
 # Postgres database at session start (DATABASE_URL) — no more per-run
 # SQLite file paths.

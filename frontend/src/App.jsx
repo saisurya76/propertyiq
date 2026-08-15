@@ -92,10 +92,34 @@ function App() {
 
   const [result, setResult] = useState(null);
   const [reportId, setReportId] = useState(null);
-  const [studioView, setStudioView] = useState("main"); // "main" | "auth" | "pricing" | "construction" | "admin"
+  const [studioView, setStudioView] = useState(() => {
+    // Real URL access: hitting /admin directly loads straight into the
+    // admin view (paired with vercel.json's SPA rewrite so this doesn't 404).
+    if (typeof window !== "undefined" && window.location.pathname === "/admin") {
+      return "admin";
+    }
+    return "main";
+  }); // "main" | "auth" | "pricing" | "construction" | "admin"
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
+
+  // Keep the URL bar in sync with the admin view, and support the browser
+  // back/forward buttons.
+  useEffect(() => {
+    const targetPath = studioView === "admin" ? "/admin" : "/";
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, "", targetPath);
+    }
+  }, [studioView]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setStudioView(window.location.pathname === "/admin" ? "admin" : "main");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -474,12 +498,6 @@ function App() {
       <p>Independent Property Intelligence</p>
 
       <p>© 2026 PropertyIQ</p>
-
-      <p style={{ fontSize: 12, opacity: 0.5 }}>
-        <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setStudioView("admin")}>
-          Admin
-        </span>
-      </p>
 
     </footer>
 
