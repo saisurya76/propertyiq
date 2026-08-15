@@ -1,0 +1,75 @@
+{
+  "categories": {
+    "structure": {
+      "label": "Structure & Framing",
+      "options": [
+        {"id": "rcc_frame", "name": "RCC Frame (Reinforced Concrete)", "unit": "sqft", "base_cost_usd_per_sqft": 18.5, "regions": ["india", "thailand", "usa", "global"], "suppliers": [
+          {"name": "UltraTech Cement", "region": "india"},
+          {"name": "SCG Cement", "region": "thailand"},
+          {"name": "CEMEX", "region": "usa"},
+          {"name": "Generic Regional Supplier", "region": "global"}
+        ]},
+        {"id": "steel_frame", "name": "Structural Steel Frame", "unit": "sqft", "base_cost_usd_per_sqft": 26.0, "regions": ["usa", "global"], "suppliers": [
+          {"name": "Nucor Steel", "region": "usa"},
+          {"name": "Generic Regional Supplier", "region": "global"}
+        ]},
+        {"id": "load_bearing", "name": "Load-Bearing Brick/Block Masonry", "unit": "sqft", "base_cost_usd_per_sqft": 12.0, "regions": ["india", "global"], "suppliers": [
+          {"name": "Local Brick Kilns", "region": "india"},
+          {"name": "Generic Regional Supplier", "region": "global"}
+        ]}
+      ]
+    },
+    "roofing": {
+      "label": "Roofing",
+      "options": [
+        {"id": "rcc_slab", "name": "RCC Flat Slab Roof", "unit": "sqft", "base_cost_usd_per_sqft": 7.0, "regions": ["india", "thailand", "global"], "suppliers": [{"name": "UltraTech Cement", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "clay_tile", "name": "Clay/Terracotta Tile Sloped Roof", "unit": "sqft", "base_cost_usd_per_sqft": 9.5, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Wienerberger", "region": "global"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "metal_roof", "name": "Standing Seam Metal Roof", "unit": "sqft", "base_cost_usd_per_sqft": 11.0, "regions": ["usa", "global"], "suppliers": [{"name": "Metal Sales Manufacturing", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+      ]
+    },
+    "flooring": {
+      "label": "Flooring",
+      "options": [
+        {"id": "vitrified_tile", "name": "Vitrified Tile", "unit": "sqft", "base_cost_usd_per_sqft": 3.2, "regions": ["india", "global"], "suppliers": [{"name": "Kajaria Ceramics", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "engineered_wood", "name": "Engineered Hardwood", "unit": "sqft", "base_cost_usd_per_sqft": 8.5, "regions": ["usa", "global"], "suppliers": [{"name": "Shaw Floors", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "natural_stone", "name": "Natural Stone (Marble/Granite)", "unit": "sqft", "base_cost_usd_per_sqft": 12.0, "regions": ["india", "usa", "global"], "suppliers": [{"name": "RK Marbles", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+      ]
+    },
+    "doors_windows": {
+      "label": "Doors & Windows",
+      "options": [
+        {"id": "upvc", "name": "UPVC Frames", "unit": "sqft_opening", "base_cost_usd_per_sqft": 14.0, "regions": ["india", "thailand", "global"], "suppliers": [{"name": "Fenesta", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "aluminum", "name": "Aluminum Frames", "unit": "sqft_opening", "base_cost_usd_per_sqft": 17.0, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Jindal Aluminium", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "wood_frame", "name": "Solid Wood Frames", "unit": "sqft_opening", "base_cost_usd_per_sqft": 22.0, "regions": ["usa", "global"], "suppliers": [{"name": "Andersen Windows", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+      ]
+    },
+    "electrical": {
+      "label": "Electrical",
+      "options": [
+        {"id": "standard_electrical", "name": "Standard Copper Wiring + Modular Switches", "unit": "sqft", "base_cost_usd_per_sqft": 2.8, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Havells", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "smart_home", "name": "Smart Home Wiring (IoT-ready)", "unit": "sqft", "base_cost_usd_per_sqft": 5.5, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Schneider Electric", "region": "global"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+      ]
+    },
+    "plumbing": {
+      "label": "Plumbing",
+      "options": [
+        {"id": "cpvc_standard", "name": "CPVC Standard Plumbing", "unit": "sqft", "base_cost_usd_per_sqft": 2.2, "regions": ["india", "thailand", "global"], "suppliers": [{"name": "Astral Pipes", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
+        {"id": "copper_plumbing", "name": "Copper Plumbing", "unit": "sqft", "base_cost_usd_per_sqft": 4.0, "regions": ["usa", "global"], "suppliers": [{"name": "Mueller Industries", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+      ]
+    }
+  },
+  "labor_cost_index": {
+    "india": 0.35,
+    "thailand": 0.45,
+    "usa": 1.0,
+    "global": 0.6
+  },
+  "fx_rates_usd_base": {
+    "USD": 1.0,
+    "INR": 83.5,
+    "THB": 34.8,
+    "AED": 3.67,
+    "GBP": 0.79,
+    "EUR": 0.92
+  }
+}

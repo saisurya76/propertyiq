@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from typing import Optional
@@ -13,6 +13,51 @@ from backend.payment_store import (
     initialize_payment_store,
     create_order,
     attach_checkout_session,
+)
+
+from backend.construction_store import (
+    initialize_construction_store,
+    save_design,
+    get_design,
+    count_designs_this_month,
+)
+
+from backend.construction_studio import (
+    get_catalog,
+    estimate_cost,
+    check_vastu_basics,
+    identify_construction_risks,
+)
+
+from backend.construction_dxf import (
+    generate_plot_dxf,
+)
+
+from backend.auth_store import (
+    initialize_auth_store,
+    create_otp,
+    verify_otp,
+    create_session,
+)
+
+from backend.auth import (
+    send_otp_email,
+    get_current_user_email,
+)
+
+from backend.config_store import (
+    initialize_config_store,
+    get_tier_config,
+    set_tier_config,
+    get_tier,
+)
+
+from backend.subscription_store import (
+    initialize_subscription_store,
+    upsert_subscription,
+    get_subscription,
+    set_status_by_dodo_id,
+    get_active_tier,
 )
 
 from backend.assessment_pipeline import (
@@ -43,11 +88,34 @@ from backend.renderers.pdf_renderer import (
 app = FastAPI()
 
 initialize_payment_store()
+initialize_construction_store()
+initialize_auth_store()
+initialize_config_store()
+initialize_subscription_store()
 
 DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
 FRONTEND_URL = os.getenv("PROPERTYIQ_FRONTEND_URL", "https://app.propertyiqweb.com")
 DODO_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY", "")
+PROPERTYIQ_ADMIN_PASSWORD = os.getenv("PROPERTYIQ_ADMIN_PASSWORD", "")
+
+# Per-tier Dodo product IDs — each must be created as a recurring/subscription
+# product in the Dodo dashboard first.
+TIER_DODO_PRODUCT_IDS = {
+    "studio_starter": os.getenv("DODO_PRODUCT_ID_STUDIO_STARTER", ""),
+    "studio_pro": os.getenv("DODO_PRODUCT_ID_STUDIO_PRO", ""),
+    "studio_unlimited": os.getenv("DODO_PRODUCT_ID_STUDIO_UNLIMITED", ""),
+}
+
+
+def get_dodo_webhook_client():
+    """Separate from get_dodo_client() since webhook verification needs
+    webhook_key, which checkout-flow calls don't use."""
+    return DodoPayments(
+        bearer_token=DODO_API_KEY,
+        environment=DODO_ENVIRONMENT,
+        webhook_key=os.getenv("DODO_PAYMENTS_WEBHOOK_KEY", ""),
+    )
 
 
 def get_dodo_client():
@@ -691,6 +759,370 @@ def generate_report(data: PropertyRequest):
         media_type="application/pdf",
         filename="PropertyIQ_Report.pdf"
     )
+
+class RequestOtpRequest(BaseModel):
+    email: str
+
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    code: str
+
+
+class AdminTierConfigRequest(BaseModel):
+    password: str
+    tier_config: dict
+
+
+class SubscribeCheckoutRequest(BaseModel):
+    tier_id: str
+
+
+class InsightCheckoutRequest(BaseModel):
+    report_id: str
+
+
+@app.post("/api/auth/request-otp")
+def request_otp(request: RequestOtpRequest):
+    """Step 1 of email registration/login: sends a 6-digit code valid for
+    10 minutes. Calling this again before the code is used invalidates the
+    previous one."""
+    code = create_otp(request.email)
+    send_otp_email(request.email, code)
+    return {"status": "sent"}
+
+
+@app.post("/api/auth/verify-otp")
+def verify_otp_endpoint(request: VerifyOtpRequest):
+    """Step 2: verifying the code registers/logs in the user and returns a
+    bearer session token (30-day expiry) to use as
+    'Authorization: Bearer <token>' on subsequent calls."""
+    if not verify_otp(request.email, request.code):
+        raise HTTPException(status_code=401, detail="Invalid or expired code")
+
+    token = create_session(request.email)
+    return {"session_token": token}
+
+
+@app.get("/api/tiers")
+def list_tiers():
+    """Public tier/pricing config for the pricing page. Base prices are USD;
+    convert client-side for display using the same fx table Construction
+    Studio uses."""
+    return get_tier_config()
+
+
+@app.post("/api/admin/tiers")
+def update_tiers(request: AdminTierConfigRequest):
+    """Admin-only: overwrite the tier config (features/prices/quotas).
+    Password-gated via PROPERTYIQ_ADMIN_PASSWORD."""
+    if not PROPERTYIQ_ADMIN_PASSWORD or request.password != PROPERTYIQ_ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Invalid admin password")
+
+    set_tier_config(request.tier_config)
+    return {"status": "updated", "tier_config": request.tier_config}
+
+
+@app.post("/api/subscribe/checkout")
+def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depends(get_current_user_email)):
+    """Creates a Dodo checkout session for a subscription tier. The Dodo
+    product behind DODO_TIER_PRODUCT_IDS[tier_id] must be configured as a
+    recurring/subscription product in the Dodo dashboard."""
+
+    tier = get_tier(request.tier_id)
+    if tier is None:
+        raise HTTPException(status_code=404, detail=f"Unknown tier: {request.tier_id}")
+    if tier["billing"] != "subscription":
+        raise HTTPException(status_code=400, detail=f"Tier '{request.tier_id}' is not a subscription tier")
+
+    product_id = TIER_DODO_PRODUCT_IDS.get(request.tier_id)
+    if not product_id:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No Dodo product configured for tier '{request.tier_id}'. "
+                   f"Set env var DODO_PRODUCT_ID_{request.tier_id.upper()}."
+        )
+
+    client = get_dodo_client()
+    session = client.checkout_sessions.create(
+        product_cart=[{"product_id": product_id, "quantity": 1}],
+        customer={"email": user_email},
+        metadata={"tier_id": request.tier_id, "user_email": user_email},
+        return_url=f"{FRONTEND_URL}/studio?subscribed=1",
+    )
+
+    upsert_subscription(
+        email=user_email,
+        tier_id=request.tier_id,
+        status="pending_payment",
+        dodo_checkout_session_id=session.id if hasattr(session, "id") else None,
+    )
+
+    return {"checkout_url": session.checkout_url if hasattr(session, "checkout_url") else session}
+
+
+@app.post("/api/insight/checkout")
+def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(get_current_user_email)):
+    """One-time checkout for the Insight Add-on (similar property
+    suggestions), tied to a specific report_id."""
+
+    product_id = os.getenv("DODO_PRODUCT_ID_INSIGHT_ADDON", "")
+    if not product_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Insight add-on is not configured. Set DODO_PRODUCT_ID_INSIGHT_ADDON."
+        )
+
+    client = get_dodo_client()
+    session = client.checkout_sessions.create(
+        product_cart=[{"product_id": product_id, "quantity": 1}],
+        customer={"email": user_email},
+        metadata={"tier_id": "insight_addon", "report_id": request.report_id, "user_email": user_email},
+        return_url=f"{FRONTEND_URL}/report/{request.report_id}?insight=1",
+    )
+
+    return {"checkout_url": session.checkout_url if hasattr(session, "checkout_url") else session}
+
+
+@app.post("/api/webhooks/dodo")
+async def dodo_webhook(request: Request):
+    """Handles subscription lifecycle + one-time Insight add-on payments.
+    Verifies the Standard Webhooks signature via Dodo's SDK before trusting
+    any payload, per https://docs.dodopayments.com/developer-resources/webhooks"""
+
+    webhook_client = get_dodo_webhook_client()
+    raw_body = await request.body()
+
+    try:
+        event = webhook_client.webhooks.unwrap(
+            raw_body,
+            headers={
+                "webhook-id": request.headers.get("webhook-id", ""),
+                "webhook-signature": request.headers.get("webhook-signature", ""),
+                "webhook-timestamp": request.headers.get("webhook-timestamp", ""),
+            },
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    event_type = getattr(event, "type", None) or event.get("type")
+    data = getattr(event, "data", None) or event.get("data", {})
+    metadata = getattr(data, "metadata", None) or (data.get("metadata") if isinstance(data, dict) else {}) or {}
+
+    tier_id = metadata.get("tier_id")
+    user_email = metadata.get("user_email")
+    dodo_subscription_id = getattr(data, "subscription_id", None) or (
+        data.get("subscription_id") if isinstance(data, dict) else None
+    )
+
+    if event_type in ("subscription.active", "subscription.renewed") and tier_id and user_email:
+        upsert_subscription(
+            email=user_email,
+            tier_id=tier_id,
+            status="active",
+            dodo_subscription_id=dodo_subscription_id,
+        )
+    elif event_type == "subscription.cancelled" and dodo_subscription_id:
+        set_status_by_dodo_id(dodo_subscription_id, "cancelled")
+    elif event_type == "subscription.failed" and dodo_subscription_id:
+        set_status_by_dodo_id(dodo_subscription_id, "payment_failed")
+    # payment.succeeded for the one-time Insight add-on needs no state change
+    # here — access is granted by report_id via metadata, checked at report view time.
+
+    return {"received": True}
+
+
+@app.get("/api/subscribe/status")
+def subscribe_status(user_email: str = Depends(get_current_user_email)):
+    """Current subscription tier + design quota remaining this month."""
+    sub = get_subscription(user_email)
+    tier_id = get_active_tier(user_email)
+
+    if not tier_id:
+        return {"tier_id": None, "status": sub["status"] if sub else "none", "design_quota_per_month": 0, "designs_used_this_month": 0}
+
+    tier = get_tier(tier_id)
+    quota = tier["design_quota_per_month"] if tier else 0
+    used = count_designs_this_month(user_email)
+
+    return {
+        "tier_id": tier_id,
+        "status": "active",
+        "design_quota_per_month": quota,
+        "designs_used_this_month": used,
+        "designs_remaining": None if quota is None else max(0, quota - used),
+    }
+
+
+class ConstructionEstimateRequest(BaseModel):
+    plot_size_sqft: float
+    selections: dict[str, str]
+    region: str = "global"
+    currency: str = "USD"
+
+
+class RoomSpec(BaseModel):
+    name: str
+    x: float
+    y: float
+    length: float
+    width: float
+
+
+class ConstructionDesignRequest(BaseModel):
+    plot_size_sqft: float
+    plot_length_ft: float
+    plot_width_ft: float
+    selections: dict[str, str]
+    region: str = "global"
+    currency: str = "USD"
+    entrance_direction: str
+    road_facing_side: str
+    slope_direction: Optional[str] = None
+    rooms: list[RoomSpec] = []
+    has_imported_materials: bool = False
+
+
+@app.get("/api/construction-studio/materials")
+def construction_materials(region: str = "global"):
+    """Available material/supplier options for a region. Base costs are in
+    USD; convert client-side or via /estimate for a specific currency."""
+    return {"region": region, "categories": get_catalog(region)}
+
+
+@app.post("/api/construction-studio/estimate")
+def construction_estimate(request: ConstructionEstimateRequest):
+    """Live running cost total as the user picks materials — call this on
+    every selection change to update the on-screen total."""
+    if request.plot_size_sqft <= 0:
+        raise HTTPException(status_code=400, detail="plot_size_sqft must be greater than 0")
+
+    return estimate_cost(
+        plot_size_sqft=request.plot_size_sqft,
+        selections=request.selections,
+        region=request.region,
+        currency=request.currency,
+    )
+
+
+@app.post("/api/construction-studio/design")
+def construction_design(request: ConstructionDesignRequest, user_email: str = Depends(get_current_user_email)):
+    """Finalize a Construction Studio design: computes final cost estimate,
+    runs the basic Vastu directional check, generates the risk section, and
+    exports a real, portable DXF file of the plot layout.
+
+    Requires an active Studio subscription and enforces that tier's monthly
+    design quota (None quota = unlimited)."""
+
+    tier_id = get_active_tier(user_email)
+    if not tier_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Construction Studio requires an active Studio subscription. "
+                   "Subscribe via POST /api/subscribe/checkout first."
+        )
+
+    tier = get_tier(tier_id)
+    quota = tier["design_quota_per_month"] if tier else 0
+    if quota is not None:
+        used = count_designs_this_month(user_email)
+        if used >= quota:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Monthly design quota reached ({used}/{quota}) for the {tier['label']} tier. "
+                       f"Upgrade your plan or wait until next month."
+            )
+
+    if request.plot_size_sqft <= 0:
+        raise HTTPException(status_code=400, detail="plot_size_sqft must be greater than 0")
+
+    cost_estimate = estimate_cost(
+        plot_size_sqft=request.plot_size_sqft,
+        selections=request.selections,
+        region=request.region,
+        currency=request.currency,
+    )
+
+    vastu_result = check_vastu_basics(
+        entrance_direction=request.entrance_direction,
+        road_facing_side=request.road_facing_side,
+        slope_direction=request.slope_direction,
+    )
+
+    risks = identify_construction_risks(
+        region=request.region,
+        grand_total_usd=cost_estimate["grand_total_usd"],
+        currency=request.currency,
+        has_imported_materials=request.has_imported_materials,
+    )
+
+    design_id = str(uuid.uuid4())
+
+    dxf_path = None
+    if request.rooms:
+        generated_path = generate_plot_dxf(
+            design_id=design_id,
+            plot_length_ft=request.plot_length_ft,
+            plot_width_ft=request.plot_width_ft,
+            rooms=[r.model_dump() for r in request.rooms],
+            road_facing_side=request.road_facing_side,
+        )
+        dxf_path = str(generated_path)
+
+    plot_spec = {
+        "plot_size_sqft": request.plot_size_sqft,
+        "plot_length_ft": request.plot_length_ft,
+        "plot_width_ft": request.plot_width_ft,
+        "entrance_direction": request.entrance_direction,
+        "road_facing_side": request.road_facing_side,
+        "slope_direction": request.slope_direction,
+        "rooms": [r.model_dump() for r in request.rooms],
+    }
+
+    save_design(
+        design_id=design_id,
+        user_email=user_email,
+        region=request.region,
+        currency=request.currency,
+        plot_spec=plot_spec,
+        selections=request.selections,
+        cost_estimate=cost_estimate,
+        vastu_result=vastu_result,
+        risks=risks,
+        dxf_path=dxf_path,
+    )
+
+    return {
+        "design_id": design_id,
+        "cost_estimate": cost_estimate,
+        "vastu_result": vastu_result,
+        "risks": risks,
+        "dxf_available": dxf_path is not None,
+    }
+
+
+@app.get("/api/construction-studio/design/{design_id}")
+def get_construction_design(design_id: str):
+    design = get_design(design_id)
+    if design is None:
+        raise HTTPException(status_code=404, detail="Design not found")
+    return design
+
+
+@app.get("/api/construction-studio/design/{design_id}/dxf")
+def download_construction_dxf(design_id: str):
+    design = get_design(design_id)
+    if design is None:
+        raise HTTPException(status_code=404, detail="Design not found")
+    if not design.get("dxf_path"):
+        raise HTTPException(status_code=404, detail="No DXF file was generated for this design (no rooms provided)")
+
+    return FileResponse(
+        path=design["dxf_path"],
+        media_type="application/dxf",
+        filename=f"PropertyIQ_ConstructionStudio_{design_id}.dxf",
+    )
+
 
 @app.get("/")
 def health():
