@@ -23,6 +23,51 @@ function emptyRoom() {
   return { name: "", x: 0, y: 0, length: 10, width: 10, color: null, _key: Math.random().toString(36).slice(2) };
 }
 
+// Site elements: landscaping/hardscape/site furnishings — distinct from
+// rooms (never Vastu-checked, never in the Materials/cost step). "symbol"
+// tells RoomCanvas what decorative overlay to draw inside the bounding
+// box (all still use the same interactive Rect+Transformer for drag/resize,
+// same proven code path as rooms — only the fill color and overlay differ).
+const ELEMENT_DEFS = {
+  tree: { label: "Tree", color: "#86efac", symbol: "circle", defaultLength: 6, defaultWidth: 6 },
+  plant: { label: "Plant", color: "#bbf7d0", symbol: "circle", defaultLength: 3, defaultWidth: 3 },
+  gazebo: { label: "Gazebo", color: "#e7d4b5", symbol: "hexagon", defaultLength: 10, defaultWidth: 10 },
+  pool: { label: "Swimming Pool", color: "#7dd3fc", symbol: null, defaultLength: 16, defaultWidth: 8 },
+  car: { label: "Car", color: "#cbd5e1", symbol: null, defaultLength: 15, defaultWidth: 7 },
+  pathway: { label: "Pathway", color: "#e7e5e4", symbol: null, defaultLength: 4, defaultWidth: 20 },
+  bench: { label: "Bench", color: "#c4a484", symbol: null, defaultLength: 5, defaultWidth: 2 },
+};
+
+const LINE_ELEMENT_DEFS = {
+  line: { label: "Line", dashed: false },
+  dotted_line: { label: "Dotted Line", dashed: true },
+};
+
+function emptyAreaElement(type) {
+  const def = ELEMENT_DEFS[type];
+  return {
+    _key: `el_${Math.random().toString(36).slice(2)}`,
+    type,
+    x: 0,
+    y: 0,
+    length: def.defaultLength,
+    width: def.defaultWidth,
+    color: def.color,
+  };
+}
+
+function emptyLineElement(type, plotLengthFt, plotWidthFt) {
+  return {
+    _key: `el_${Math.random().toString(36).slice(2)}`,
+    type,
+    x: plotLengthFt * 0.25,
+    y: plotWidthFt * 0.5,
+    x2: plotLengthFt * 0.75,
+    y2: plotWidthFt * 0.5,
+    color: "#111827",
+  };
+}
+
 function formatUnitPrice(usdAmount, unit, currency, fxRates) {
   const rate = fxRates?.[currency];
   const amount = rate ? usdAmount * rate : usdAmount;
@@ -74,8 +119,13 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
-  const [roomsHistory, setRoomsHistory] = useState({ past: [], present: [emptyRoom()], future: [] });
-  const rooms = roomsHistory.present;
+  const [layoutHistory, setLayoutHistory] = useState({
+    past: [],
+    present: { rooms: [emptyRoom()], elements: [] },
+    future: [],
+  });
+  const rooms = layoutHistory.present.rooms;
+  const siteElements = layoutHistory.present.elements;
   const [selectedKeys, setSelectedKeys] = useState([]);
 
   const [result, setResult] = useState(null);
@@ -136,26 +186,31 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const editBaselineRef = useRef(null);
   const historyDebounceRef = useRef(null);
 
-  // Discrete actions (drag end, resize end, add/remove room, color pick)
-  // push to history immediately.
-  const commitRooms = (newRooms) => {
-    setRoomsHistory((s) => {
-      if (JSON.stringify(newRooms) === JSON.stringify(s.present)) return s;
-      return { past: [...s.past, s.present], present: newRooms, future: [] };
+  // Discrete actions (drag end, resize end, add/remove, color pick) push
+  // to history immediately. `present` is always the full { rooms, elements }
+  // pair — pass partial updates and this merges them.
+  const commitLayout = (partial) => {
+    setLayoutHistory((s) => {
+      const newPresent = { ...s.present, ...partial };
+      if (JSON.stringify(newPresent) === JSON.stringify(s.present)) return s;
+      return { past: [...s.past, s.present], present: newPresent, future: [] };
     });
   };
+
+  const commitRooms = (newRooms) => commitLayout({ rooms: newRooms });
+  const commitElements = (newElements) => commitLayout({ elements: newElements });
 
   // Continuous edits (typing in a name/length/width field) update live on
   // every keystroke, but only push ONE history entry 500ms after the user
   // stops — otherwise every keystroke would be its own undo step.
   const commitRoomsDebounced = (newRooms) => {
-    setRoomsHistory((s) => {
+    setLayoutHistory((s) => {
       if (editBaselineRef.current === null) editBaselineRef.current = s.present;
-      return { ...s, present: newRooms };
+      return { ...s, present: { ...s.present, rooms: newRooms } };
     });
     if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
     historyDebounceRef.current = setTimeout(() => {
-      setRoomsHistory((s) => {
+      setLayoutHistory((s) => {
         const baseline = editBaselineRef.current;
         editBaselineRef.current = null;
         if (baseline === null || JSON.stringify(baseline) === JSON.stringify(s.present)) return s;
@@ -165,7 +220,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   };
 
   const undo = () => {
-    setRoomsHistory((s) => {
+    setLayoutHistory((s) => {
       if (s.past.length === 0) return s;
       const previous = s.past[s.past.length - 1];
       return { past: s.past.slice(0, -1), present: previous, future: [s.present, ...s.future] };
@@ -173,7 +228,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   };
 
   const redo = () => {
-    setRoomsHistory((s) => {
+    setLayoutHistory((s) => {
       if (s.future.length === 0) return s;
       const next = s.future[0];
       return { past: [...s.past, s.present], present: next, future: s.future.slice(1) };
@@ -193,13 +248,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         redo();
       } else if ((e.key === "Delete" || e.key === "Backspace") && !isTyping && selectedKeys.length > 0) {
         e.preventDefault();
-        commitRooms(rooms.filter((r) => !selectedKeys.includes(r._key)));
+        commitLayout({
+          rooms: rooms.filter((r) => !selectedKeys.includes(r._key)),
+          elements: siteElements.filter((el) => !selectedKeys.includes(el._key)),
+        });
         setSelectedKeys([]);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [rooms, selectedKeys]);
+  }, [rooms, siteElements, selectedKeys]);
 
   const updateRoom = (key, field, value) => {
     const newRooms = rooms.map((r) => (r._key === key ? { ...r, [field]: value } : r));
@@ -237,6 +295,31 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     setSelectedKeys((sk) => sk.filter((k) => k !== key));
   };
 
+  const addElement = (type) => {
+    const isLine = type in LINE_ELEMENT_DEFS;
+    const newElement = isLine
+      ? emptyLineElement(type, plot.plot_length_ft || 40, plot.plot_width_ft || 30)
+      : emptyAreaElement(type);
+    // Stagger area elements the same way rooms are, so they don't all land
+    // stacked at the same spot.
+    if (!isLine) {
+      const index = siteElements.filter((el) => el.type === type).length;
+      const step = 4;
+      newElement.x += (index % 5) * step;
+      newElement.y += Math.floor(index / 5) * step;
+    }
+    commitElements([...siteElements, newElement]);
+  };
+
+  const updateElement = (key, field, value) => {
+    commitElements(siteElements.map((el) => (el._key === key ? { ...el, [field]: value } : el)));
+  };
+
+  const removeElement = (key) => {
+    commitElements(siteElements.filter((el) => el._key !== key));
+    setSelectedKeys((sk) => sk.filter((k) => k !== key));
+  };
+
   const generateDesign = async () => {
     setError("");
     setLoading(true);
@@ -254,6 +337,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         rooms: rooms
           .filter((r) => r.name.trim())
           .map(({ name, x, y, length, width, color }) => ({ name, x, y, length, width, color })),
+        site_elements: siteElements.map((el) => {
+          const isLine = el.type in LINE_ELEMENT_DEFS;
+          return isLine
+            ? { type: el.type, x: el.x, y: el.y, x2: el.x2, y2: el.y2, color: el.color }
+            : { type: el.type, x: el.x, y: el.y, length: el.length, width: el.width, color: el.color };
+        }),
       };
       const designResult = await studioApi.createConstructionDesign(payload);
       setResult(designResult);
@@ -447,10 +536,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
           </p>
 
           <div className="rc-history-toolbar">
-            <button type="button" className="rc-tool-btn" onClick={undo} disabled={roomsHistory.past.length === 0}>
+            <button type="button" className="rc-tool-btn" onClick={undo} disabled={layoutHistory.past.length === 0}>
               ↶ Undo
             </button>
-            <button type="button" className="rc-tool-btn" onClick={redo} disabled={roomsHistory.future.length === 0}>
+            <button type="button" className="rc-tool-btn" onClick={redo} disabled={layoutHistory.future.length === 0}>
               ↷ Redo
             </button>
             {selectedKeys.length > 0 && (
@@ -458,13 +547,36 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                 type="button"
                 className="rc-tool-btn rc-tool-btn-danger"
                 onClick={() => {
-                  commitRooms(rooms.filter((r) => !selectedKeys.includes(r._key)));
+                  commitLayout({
+                    rooms: rooms.filter((r) => !selectedKeys.includes(r._key)),
+                    elements: siteElements.filter((el) => !selectedKeys.includes(el._key)),
+                  });
                   setSelectedKeys([]);
                 }}
               >
                 Delete selected ({selectedKeys.length})
               </button>
             )}
+          </div>
+
+          <div className="rc-element-toolbar">
+            <span className="rc-element-toolbar-label">Add to site plan:</span>
+            {Object.entries(ELEMENT_DEFS).map(([type, def]) => (
+              <button
+                key={type}
+                type="button"
+                className="rc-tool-btn"
+                onClick={() => addElement(type)}
+                style={{ borderLeft: `4px solid ${def.color}` }}
+              >
+                {def.label}
+              </button>
+            ))}
+            {Object.entries(LINE_ELEMENT_DEFS).map(([type, def]) => (
+              <button key={type} type="button" className="rc-tool-btn" onClick={() => addElement(type)}>
+                {def.label}
+              </button>
+            ))}
           </div>
 
           <Suspense fallback={<p className="studio-subtext">Loading room editor...</p>}>
@@ -474,10 +586,51 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
               roadFacingSide={plot.road_facing_side}
               rooms={rooms}
               onRoomsChange={commitRooms}
+              siteElements={siteElements}
+              onElementsChange={commitElements}
               selectedKeys={selectedKeys}
               onSelectionChange={setSelectedKeys}
             />
           </Suspense>
+
+          {siteElements.length > 0 && (
+            <>
+              <div className="cs-room-row cs-room-row-header">
+                <span>Element</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>
+              </div>
+              {siteElements.map((el) => {
+                const isLine = el.type in LINE_ELEMENT_DEFS;
+                const label = isLine ? LINE_ELEMENT_DEFS[el.type].label : ELEMENT_DEFS[el.type].label;
+                return (
+                  <div
+                    className={`cs-room-row ${selectedKeys.includes(el._key) ? "cs-room-row-selected" : ""}`}
+                    key={el._key}
+                    onClick={() => setSelectedKeys([el._key])}
+                  >
+                    <span className="cs-element-label">{label}</span>
+                    {isLine ? (
+                      <span className="cs-element-note">drag endpoints on canvas</span>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          value={el.length}
+                          onChange={(e) => updateElement(el._key, "length", Number(e.target.value))}
+                        />
+                        <input
+                          type="number"
+                          value={el.width}
+                          onChange={(e) => updateElement(el._key, "width", Number(e.target.value))}
+                        />
+                      </>
+                    )}
+                    {!isLine && <span />}
+                    <button className="cs-remove-room" onClick={() => removeElement(el._key)}>Remove</button>
+                  </div>
+                );
+              })}
+            </>
+          )}
 
           <div className="cs-room-row cs-room-row-header">
             <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>

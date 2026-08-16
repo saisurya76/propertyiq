@@ -117,12 +117,76 @@ def _draw_total_dimensions(msp, plot_length_ft, plot_width_ft):
     msp.add_line((line_x - tick_half, plot_width_ft), (line_x + tick_half, plot_width_ft), dxfattribs={"layer": "DIMENSIONS"})
 
 
+def _hexagon_points(cx: float, cy: float, rx: float, ry: float) -> list[tuple[float, float]]:
+    """6 vertices of a flat-topped hexagon fitted inside the given
+    half-width/half-height, for gazebo symbols."""
+    import math
+
+    return [
+        (cx + rx * math.cos(math.radians(a)), cy + ry * math.sin(math.radians(a)))
+        for a in range(0, 360, 60)
+    ]
+
+
+def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
+    """Draws landscaping/hardscape/site-furnishing symbols — trees, gazebo,
+    pool, cars, plants, pathway, bench, and straight/dashed lines. These
+    are visually distinct real DXF entities (CIRCLE for tree/plant canopy,
+    a 6-vertex LWPOLYLINE for gazebo, rectangles for pool/car/pathway/bench,
+    LINE entities for the two line types) — not the same room-box shape
+    reused with a different label."""
+
+    for el in site_elements:
+        el_type = el.get("type", "")
+        true_color = _hex_to_true_color(el.get("color"))
+        attribs = {"layer": "SITE_ELEMENTS"}
+        if true_color is not None:
+            attribs["true_color"] = true_color
+
+        if el_type in ("line", "dotted_line"):
+            line_attribs = dict(attribs)
+            if el_type == "dotted_line":
+                line_attribs["linetype"] = "DASHED"
+            msp.add_line((el["x"], el["y"]), (el.get("x2", el["x"]), el.get("y2", el["y"])), dxfattribs=line_attribs)
+            continue
+
+        x, y = el["x"], el["y"]
+        length = el.get("length") or 1
+        width = el.get("width") or 1
+        cx, cy = x + length / 2, y + width / 2
+
+        if el_type == "tree":
+            radius = min(length, width) / 2
+            msp.add_circle((cx, cy), radius, dxfattribs=attribs)
+            msp.add_circle((cx, cy), radius * 0.12, dxfattribs=attribs)  # trunk mark
+        elif el_type == "plant":
+            radius = min(length, width) / 2
+            msp.add_circle((cx, cy), radius, dxfattribs=attribs)
+        elif el_type == "gazebo":
+            points = _hexagon_points(cx, cy, length / 2, width / 2)
+            msp.add_lwpolyline(points + [points[0]], dxfattribs=attribs)
+            msp.add_text("Gazebo", dxfattribs={**attribs, "height": 0.6}).set_placement(
+                (cx, cy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
+            )
+        else:
+            # pool, car, pathway, bench — rectangular footprint
+            msp.add_lwpolyline(
+                [(x, y), (x + length, y), (x + length, y + width), (x, y + width), (x, y)],
+                dxfattribs=attribs,
+            )
+            label = el_type.replace("_", " ").title()
+            msp.add_text(label, dxfattribs={**attribs, "height": 0.5}).set_placement(
+                (cx, cy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
+            )
+
+
 def generate_plot_dxf(
     *,
     design_id: str,
     plot_length_ft: float,
     plot_width_ft: float,
     rooms: list[dict[str, Any]],
+    site_elements: Optional[list[dict[str, Any]]] = None,
     road_facing_side: str = "north",
     output_dir: Path = DEFAULT_OUTPUT_DIR,
 ) -> Path:
@@ -159,6 +223,8 @@ def generate_plot_dxf(
     doc.layers.add(name="LABELS", color=7)
     doc.layers.add(name="ROAD_SIDE", color=2)
     doc.layers.add(name="DIMENSIONS", color=7)
+    doc.layers.add(name="SITE_ELEMENTS", color=2)
+    doc.linetypes.add("DASHED", pattern="A,.5,-.25", description="dashed line")
 
     msp = doc.modelspace()
 
@@ -211,6 +277,7 @@ def generate_plot_dxf(
     _draw_dimension_chain(msp, north_segments, "north", plot_length_ft, plot_width_ft)
     _draw_dimension_chain(msp, west_segments, "west", plot_length_ft, plot_width_ft)
     _draw_total_dimensions(msp, plot_length_ft, plot_width_ft)
+    _draw_site_elements(msp, site_elements or [])
 
     output_path = output_dir / f"{design_id}.dxf"
     doc.saveas(output_path)

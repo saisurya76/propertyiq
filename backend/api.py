@@ -1104,6 +1104,22 @@ class RoomSpec(BaseModel):
     color: Optional[str] = None  # "#rrggbb" — carried through to the real DXF export
 
 
+# Site elements are landscaping/hardscape/site furnishings — distinct from
+# rooms (never subject to Vastu checks, never counted in cost estimates or
+# quota, never shown in the Materials/Room-list steps). "line"/"dotted_line"
+# use (x, y) as one endpoint and (x2, y2) as the other; every other type
+# uses (x, y, length, width) as a bounding box, same convention as rooms.
+class SiteElementSpec(BaseModel):
+    type: str  # tree | gazebo | pool | car | plant | pathway | bench | line | dotted_line
+    x: float
+    y: float
+    length: Optional[float] = None
+    width: Optional[float] = None
+    x2: Optional[float] = None
+    y2: Optional[float] = None
+    color: Optional[str] = None
+
+
 class ConstructionDesignRequest(BaseModel):
     plot_size_sqft: float
     plot_length_ft: float
@@ -1115,6 +1131,7 @@ class ConstructionDesignRequest(BaseModel):
     road_facing_side: str
     slope_direction: Optional[str] = None
     rooms: list[RoomSpec] = []
+    site_elements: list[SiteElementSpec] = []
     has_imported_materials: bool = False
 
 
@@ -1211,6 +1228,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
             plot_length_ft=request.plot_length_ft,
             plot_width_ft=request.plot_width_ft,
             rooms=[r.model_dump() for r in request.rooms],
+            site_elements=[e.model_dump() for e in request.site_elements],
             road_facing_side=request.road_facing_side,
         )
         dxf_path = str(generated_path)
@@ -1223,6 +1241,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "road_facing_side": request.road_facing_side,
         "slope_direction": request.slope_direction,
         "rooms": [r.model_dump() for r in request.rooms],
+        "site_elements": [e.model_dump() for e in request.site_elements],
     }
 
     save_design(

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Stage, Layer, Rect, Text, Line, Transformer, Group } from "react-konva";
+import { Stage, Layer, Rect, Text, Line, Circle, RegularPolygon, Transformer, Group } from "react-konva";
 
 const BASE_CANVAS_WIDTH = 640;
 const ROAD_SIDE_OFFSET = 14;
@@ -146,12 +146,29 @@ function roadLinePoints(side, canvasWidth, canvasHeight) {
  * convention as the backend/DXF export. Canvas y grows downward, so this
  * component handles that flip internally; callers only ever see feet.
  */
+const LINE_TYPES = new Set(["line", "dotted_line"]);
+
+// Rendering-relevant subset of ConstructionStudio.jsx's ELEMENT_DEFS —
+// duplicated deliberately (not imported) so this lazy-loaded chunk stays
+// self-contained. Keep in sync if element types change there.
+const ELEMENT_DEFS_FOR_RENDER = {
+  tree: { label: "Tree", color: "#86efac", symbol: "circle" },
+  plant: { label: "Plant", color: "#bbf7d0", symbol: "circle" },
+  gazebo: { label: "Gazebo", color: "#e7d4b5", symbol: "hexagon" },
+  pool: { label: "Swimming Pool", color: "#7dd3fc", symbol: null, rounded: true },
+  car: { label: "Car", color: "#cbd5e1", symbol: null, rounded: true },
+  pathway: { label: "Pathway", color: "#e7e5e4", symbol: null },
+  bench: { label: "Bench", color: "#c4a484", symbol: null, rounded: true },
+};
+
 function RoomCanvas({
   plotLengthFt,
   plotWidthFt,
   roadFacingSide,
   rooms,
   onRoomsChange,
+  siteElements = [],
+  onElementsChange,
   selectedKeys,
   onSelectionChange,
 }) {
@@ -181,6 +198,12 @@ function RoomCanvas({
     [rooms]
   );
 
+  const areaElements = useMemo(
+    () => siteElements.filter((el) => !LINE_TYPES.has(el.type) && el.length > 0 && el.width > 0),
+    [siteElements]
+  );
+  const lineElements = useMemo(() => siteElements.filter((el) => LINE_TYPES.has(el.type)), [siteElements]);
+
   // Konva's Transformer must be attached to a live shape node imperatively
   // (via an effect), not by reading a ref's .current value inline during
   // render — React 19 flags that as unsafe.
@@ -189,7 +212,7 @@ function RoomCanvas({
     const node = selectedKeys.length === 1 ? shapeRefs.current[selectedKeys[0]] : null;
     transformerRef.current.nodes(node ? [node] : []);
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedKeys, placedRooms]);
+  }, [selectedKeys, placedRooms, areaElements]);
 
   // ---- feet <-> canvas-pixel conversion (pre-zoom "base" pixels) ----
   const feetToCanvas = (room) => ({
@@ -336,22 +359,21 @@ function RoomCanvas({
     return { snappedX, snappedY, newGuides };
   };
 
-  const handleDragMove = (room, e) => {
-    const { width, height } = feetToCanvas(room);
-    const { snappedX, snappedY, newGuides } = computeEdgeSnap(room._key, e.target.x(), e.target.y(), width, height);
+  const handleDragMove = (item, e) => {
+    const { width, height } = feetToCanvas(item);
+    const { snappedX, snappedY, newGuides } = computeEdgeSnap(item._key, e.target.x(), e.target.y(), width, height);
     e.target.x(snappedX);
     e.target.y(snappedY);
     setGuides(newGuides);
   };
 
-  const handleDragEnd = (room, e) => {
+  const handleDragEnd = (item, items, onChange, e) => {
     setGuides([]);
-    const { x, y } = canvasToFeet(e.target.x(), e.target.y(), 0, feetToCanvas(room).height);
-    const updated = rooms.map((r) => (r._key === room._key ? { ...r, x, y } : r));
-    onRoomsChange(updated);
+    const { x, y } = canvasToFeet(e.target.x(), e.target.y(), 0, feetToCanvas(item).height);
+    onChange(items.map((it) => (it._key === item._key ? { ...it, x, y } : it)));
   };
 
-  const handleTransformEnd = (room, e) => {
+  const handleTransformEnd = (item, items, onChange, e) => {
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
@@ -362,8 +384,28 @@ function RoomCanvas({
     const newHeightPx = Math.max(MIN_ROOM_FT * baseScale, node.height() * scaleY);
 
     const { x, y, length, width } = canvasToFeet(node.x(), node.y(), newWidthPx, newHeightPx);
-    const updated = rooms.map((r) => (r._key === room._key ? { ...r, x, y, length, width } : r));
-    onRoomsChange(updated);
+    onChange(items.map((it) => (it._key === item._key ? { ...it, x, y, length, width } : it)));
+  };
+
+  const handleLineEndpointDrag = (line, endpoint, e) => {
+    const { x, y } = canvasToFeet(e.target.x(), e.target.y(), 0, 0);
+    const field1 = endpoint === "start" ? "x" : "x2";
+    const field2 = endpoint === "start" ? "y" : "y2";
+    onElementsChange(siteElements.map((el) => (el._key === line._key ? { ...el, [field1]: x, [field2]: y } : el)));
+  };
+
+  const handleLineBodyDragEnd = (line, e) => {
+    const dxFt = e.target.x() / baseScale;
+    const dyFt = -e.target.y() / baseScale; // canvas y is flipped relative to feet-north
+    e.target.x(0);
+    e.target.y(0);
+    onElementsChange(
+      siteElements.map((el) =>
+        el._key === line._key
+          ? { ...el, x: el.x + dxFt, y: el.y + dyFt, x2: el.x2 + dxFt, y2: el.y2 + dyFt }
+          : el
+      )
+    );
   };
 
   if (!hasValidPlot) return null;
@@ -464,8 +506,8 @@ function RoomCanvas({
                       y: Math.max(0, Math.min(pos.y, canvasHeight - height)),
                     })}
                     onDragMove={(e) => handleDragMove(room, e)}
-                    onDragEnd={(e) => handleDragEnd(room, e)}
-                    onTransformEnd={(e) => handleTransformEnd(room, e)}
+                    onDragEnd={(e) => handleDragEnd(room, rooms, onRoomsChange, e)}
+                    onTransformEnd={(e) => handleTransformEnd(room, rooms, onRoomsChange, e)}
                     onClick={(e) => toggleSelect(room._key, e.evt.shiftKey)}
                     onTap={() => toggleSelect(room._key, false)}
                   />
@@ -491,6 +533,120 @@ function RoomCanvas({
                     listening={false}
                   />
                 </Group>
+              </Fragment>
+            );
+          })}
+
+          {areaElements.map((el) => {
+            const { x, y, width, height } = feetToCanvas(el);
+            const isSelected = selectedKeys.includes(el._key);
+            const def = ELEMENT_DEFS_FOR_RENDER[el.type] || {};
+            const symbol = def.symbol;
+
+            return (
+              <Fragment key={el._key}>
+                <Group>
+                  <Rect
+                    ref={(node) => {
+                      if (node) shapeRefs.current[el._key] = node;
+                    }}
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill={el.color || def.color || "#e5e7eb"}
+                    stroke={isSelected ? "#4c1d95" : "#6b7280"}
+                    strokeWidth={isSelected ? 2 : 1}
+                    cornerRadius={def.rounded ? Math.min(width, height) * 0.15 : 0}
+                    draggable={!panMode}
+                    dragBoundFunc={(pos) => ({
+                      x: Math.max(0, Math.min(pos.x, canvasWidth - width)),
+                      y: Math.max(0, Math.min(pos.y, canvasHeight - height)),
+                    })}
+                    onDragMove={(e) => handleDragMove(el, e)}
+                    onDragEnd={(e) => handleDragEnd(el, siteElements, onElementsChange, e)}
+                    onTransformEnd={(e) => handleTransformEnd(el, siteElements, onElementsChange, e)}
+                    onClick={(evt) => toggleSelect(el._key, evt.evt.shiftKey)}
+                    onTap={() => toggleSelect(el._key, false)}
+                  />
+                  {symbol === "circle" && (
+                    <Circle
+                      x={x + width / 2}
+                      y={y + height / 2}
+                      radius={Math.min(width, height) / 2.6}
+                      fill={el.color || def.color}
+                      stroke="#166534"
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                  )}
+                  {symbol === "hexagon" && (
+                    <RegularPolygon
+                      x={x + width / 2}
+                      y={y + height / 2}
+                      sides={6}
+                      radius={Math.min(width, height) / 2.2}
+                      fill="none"
+                      stroke="#92400e"
+                      strokeWidth={1.5}
+                      listening={false}
+                    />
+                  )}
+                  <Text
+                    x={x}
+                    y={y + height / 2 - 6}
+                    width={width}
+                    align="center"
+                    text={def.label || el.type}
+                    fontSize={9}
+                    fontStyle="600"
+                    fill="#374151"
+                    listening={false}
+                  />
+                </Group>
+              </Fragment>
+            );
+          })}
+
+          {lineElements.map((line) => {
+            const isSelected = selectedKeys.includes(line._key);
+            const p1x = line.x * baseScale;
+            const p1y = (safeWidthFt - line.y) * baseScale;
+            const p2x = line.x2 * baseScale;
+            const p2y = (safeWidthFt - line.y2) * baseScale;
+            const dashed = line.type === "dotted_line";
+
+            return (
+              <Fragment key={line._key}>
+                <Line
+                  points={[p1x, p1y, p2x, p2y]}
+                  stroke={line.color || "#111827"}
+                  strokeWidth={isSelected ? 3 : 2}
+                  dash={dashed ? [8, 6] : undefined}
+                  draggable={!panMode}
+                  onDragEnd={(e) => handleLineBodyDragEnd(line, e)}
+                  onClick={(evt) => toggleSelect(line._key, evt.evt.shiftKey)}
+                  onTap={() => toggleSelect(line._key, false)}
+                  hitStrokeWidth={12}
+                />
+                <Circle
+                  x={p1x}
+                  y={p1y}
+                  radius={5}
+                  fill={isSelected ? "#4c1d95" : "#6b7280"}
+                  draggable={!panMode}
+                  onDragMove={(e) => handleLineEndpointDrag(line, "start", e)}
+                  onClick={() => toggleSelect(line._key, false)}
+                />
+                <Circle
+                  x={p2x}
+                  y={p2y}
+                  radius={5}
+                  fill={isSelected ? "#4c1d95" : "#6b7280"}
+                  draggable={!panMode}
+                  onDragMove={(e) => handleLineEndpointDrag(line, "end", e)}
+                  onClick={() => toggleSelect(line._key, false)}
+                />
               </Fragment>
             );
           })}

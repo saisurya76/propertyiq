@@ -154,3 +154,44 @@ def test_generated_dxf_contains_real_dimension_entities(tmp_path):
 
     assert "40' total" in dim_texts
     assert any("20" in t for t in dim_texts)
+
+
+def test_site_elements_produce_distinct_dxf_entities(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    site_elements = [
+        {"type": "tree", "x": 2, "y": 2, "length": 6, "width": 6, "color": "#22c55e"},
+        {"type": "gazebo", "x": 15, "y": 2, "length": 10, "width": 10, "color": None},
+        {"type": "pool", "x": 2, "y": 15, "length": 16, "width": 8, "color": None},
+        {"type": "line", "x": 0, "y": 25, "x2": 40, "y2": 25, "color": None},
+        {"type": "dotted_line", "x": 0, "y": 28, "x2": 40, "y2": 28, "color": None},
+    ]
+    path = generate_plot_dxf(
+        design_id="site_elements_pytest",
+        plot_length_ft=40, plot_width_ft=30,
+        rooms=[], site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    entities = [e for e in msp if e.dxf.layer == "SITE_ELEMENTS"]
+
+    assert any(e.dxftype() == "CIRCLE" for e in entities)
+    assert any(e.dxftype() == "LWPOLYLINE" and len(e.get_points()) == 7 for e in entities)  # gazebo hexagon
+    assert any(e.dxftype() == "LINE" and e.dxf.linetype == "DASHED" for e in entities)
+    assert any(e.dxftype() == "LINE" and e.dxf.linetype != "DASHED" for e in entities)
+
+
+def test_generate_plot_dxf_backward_compatible_without_site_elements(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+
+    # Existing callers that don't pass site_elements at all must still work.
+    path = generate_plot_dxf(
+        design_id="no_site_elements_pytest",
+        plot_length_ft=40, plot_width_ft=30,
+        rooms=[{"name": "Kitchen", "x": 2, "y": 2, "length": 8, "width": 6, "color": None}],
+        road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    assert path.exists()
