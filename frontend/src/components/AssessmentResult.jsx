@@ -10,9 +10,9 @@ function AssessmentResult({
   reportId,
   onLaunchStudio
 }) {
-  if (!result) return null;
-
   const [reportLoading, setReportLoading] = useState(false);
+
+  if (!result) return null;
 
   const formatIndianCurrency = (value) => {
     if (value >= 10000000) {

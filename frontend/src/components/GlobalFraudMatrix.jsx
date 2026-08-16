@@ -186,9 +186,8 @@ export default function GlobalFraudMatrix({ data }) {
 
                         <div
                             style={{
-                                marginTop: "8px",
-                                fontSize: "14px",
                                 marginTop: "6px",
+                                fontSize: "14px",
                                 opacity: .9
                             }}
                         >
