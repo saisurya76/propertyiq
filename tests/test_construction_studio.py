@@ -266,3 +266,25 @@ def test_car_symbol_has_wheels_and_windshield(tmp_path):
     lines = [e for e in msp if e.dxftype() == "LINE" and e.dxf.layer == "SITE_ELEMENTS"]
     assert len(circles) == 4
     assert len(lines) == 1
+
+
+def test_new_material_categories_load_and_price_correctly():
+    from backend.construction_studio import get_catalog, estimate_cost
+
+    catalog = get_catalog("india")
+    new_categories = {
+        "cement", "steel", "bricks", "aggregate", "sand",
+        "painting", "kitchen_work", "sanitary_fittings", "waterproofing",
+    }
+    for cat_id in new_categories:
+        assert cat_id in catalog, f"missing category: {cat_id}"
+        assert len(catalog[cat_id]["options"]) >= 2
+
+    result = estimate_cost(
+        plot_size_sqft=1000,
+        selections={"cement": "opc_43", "steel": "tmt_fe415"},
+        region="india",
+        currency="USD",
+    )
+    assert len(result["line_items"]) == 2
+    assert result["grand_total_converted"] > 0

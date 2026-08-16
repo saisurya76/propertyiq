@@ -3,58 +3,942 @@
     "structure": {
       "label": "Structure & Framing",
       "options": [
-        {"id": "rcc_frame", "name": "RCC Frame (Reinforced Concrete)", "unit": "sqft", "base_cost_usd_per_sqft": 18.5, "regions": ["india", "thailand", "usa", "global"], "suppliers": [
-          {"name": "UltraTech Cement", "region": "india"},
-          {"name": "SCG Cement", "region": "thailand"},
-          {"name": "CEMEX", "region": "usa"},
-          {"name": "Generic Regional Supplier", "region": "global"}
-        ]},
-        {"id": "steel_frame", "name": "Structural Steel Frame", "unit": "sqft", "base_cost_usd_per_sqft": 26.0, "regions": ["usa", "global"], "suppliers": [
-          {"name": "Nucor Steel", "region": "usa"},
-          {"name": "Generic Regional Supplier", "region": "global"}
-        ]},
-        {"id": "load_bearing", "name": "Load-Bearing Brick/Block Masonry", "unit": "sqft", "base_cost_usd_per_sqft": 12.0, "regions": ["india", "global"], "suppliers": [
-          {"name": "Local Brick Kilns", "region": "india"},
-          {"name": "Generic Regional Supplier", "region": "global"}
-        ]}
+        {
+          "id": "rcc_frame",
+          "name": "RCC Frame (Reinforced Concrete)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 18.5,
+          "regions": [
+            "india",
+            "thailand",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "UltraTech Cement",
+              "region": "india"
+            },
+            {
+              "name": "SCG Cement",
+              "region": "thailand"
+            },
+            {
+              "name": "CEMEX",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "steel_frame",
+          "name": "Structural Steel Frame",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 26.0,
+          "regions": [
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Nucor Steel",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "load_bearing",
+          "name": "Load-Bearing Brick/Block Masonry",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 12.0,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Brick Kilns",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
       ]
     },
     "roofing": {
       "label": "Roofing",
       "options": [
-        {"id": "rcc_slab", "name": "RCC Flat Slab Roof", "unit": "sqft", "base_cost_usd_per_sqft": 7.0, "regions": ["india", "thailand", "global"], "suppliers": [{"name": "UltraTech Cement", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "clay_tile", "name": "Clay/Terracotta Tile Sloped Roof", "unit": "sqft", "base_cost_usd_per_sqft": 9.5, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Wienerberger", "region": "global"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "metal_roof", "name": "Standing Seam Metal Roof", "unit": "sqft", "base_cost_usd_per_sqft": 11.0, "regions": ["usa", "global"], "suppliers": [{"name": "Metal Sales Manufacturing", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+        {
+          "id": "rcc_slab",
+          "name": "RCC Flat Slab Roof",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 7.0,
+          "regions": [
+            "india",
+            "thailand",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "UltraTech Cement",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "clay_tile",
+          "name": "Clay/Terracotta Tile Sloped Roof",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 9.5,
+          "regions": [
+            "india",
+            "thailand",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Wienerberger",
+              "region": "global"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "metal_roof",
+          "name": "Standing Seam Metal Roof",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 11.0,
+          "regions": [
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Metal Sales Manufacturing",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
       ]
     },
     "flooring": {
       "label": "Flooring",
       "options": [
-        {"id": "vitrified_tile", "name": "Vitrified Tile", "unit": "sqft", "base_cost_usd_per_sqft": 3.2, "regions": ["india", "global"], "suppliers": [{"name": "Kajaria Ceramics", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "engineered_wood", "name": "Engineered Hardwood", "unit": "sqft", "base_cost_usd_per_sqft": 8.5, "regions": ["usa", "global"], "suppliers": [{"name": "Shaw Floors", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "natural_stone", "name": "Natural Stone (Marble/Granite)", "unit": "sqft", "base_cost_usd_per_sqft": 12.0, "regions": ["india", "usa", "global"], "suppliers": [{"name": "RK Marbles", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+        {
+          "id": "vitrified_tile",
+          "name": "Vitrified Tile",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 3.2,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Kajaria Ceramics",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "engineered_wood",
+          "name": "Engineered Hardwood",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 8.5,
+          "regions": [
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Shaw Floors",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "natural_stone",
+          "name": "Natural Stone (Marble/Granite)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 12.0,
+          "regions": [
+            "india",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "RK Marbles",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
       ]
     },
     "doors_windows": {
       "label": "Doors & Windows",
       "options": [
-        {"id": "upvc", "name": "UPVC Frames", "unit": "sqft_opening", "base_cost_usd_per_sqft": 14.0, "regions": ["india", "thailand", "global"], "suppliers": [{"name": "Fenesta", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "aluminum", "name": "Aluminum Frames", "unit": "sqft_opening", "base_cost_usd_per_sqft": 17.0, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Jindal Aluminium", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "wood_frame", "name": "Solid Wood Frames", "unit": "sqft_opening", "base_cost_usd_per_sqft": 22.0, "regions": ["usa", "global"], "suppliers": [{"name": "Andersen Windows", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+        {
+          "id": "upvc",
+          "name": "UPVC Frames",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 14.0,
+          "regions": [
+            "india",
+            "thailand",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Fenesta",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "aluminum",
+          "name": "Aluminum Frames",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 17.0,
+          "regions": [
+            "india",
+            "thailand",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Jindal Aluminium",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "wood_frame",
+          "name": "Solid Wood Frames",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 22.0,
+          "regions": [
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Andersen Windows",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
       ]
     },
     "electrical": {
       "label": "Electrical",
       "options": [
-        {"id": "standard_electrical", "name": "Standard Copper Wiring + Modular Switches", "unit": "sqft", "base_cost_usd_per_sqft": 2.8, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Havells", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "smart_home", "name": "Smart Home Wiring (IoT-ready)", "unit": "sqft", "base_cost_usd_per_sqft": 5.5, "regions": ["india", "thailand", "usa", "global"], "suppliers": [{"name": "Schneider Electric", "region": "global"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+        {
+          "id": "standard_electrical",
+          "name": "Standard Copper Wiring + Modular Switches",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.8,
+          "regions": [
+            "india",
+            "thailand",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Havells",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "smart_home",
+          "name": "Smart Home Wiring (IoT-ready)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 5.5,
+          "regions": [
+            "india",
+            "thailand",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Schneider Electric",
+              "region": "global"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
       ]
     },
     "plumbing": {
       "label": "Plumbing",
       "options": [
-        {"id": "cpvc_standard", "name": "CPVC Standard Plumbing", "unit": "sqft", "base_cost_usd_per_sqft": 2.2, "regions": ["india", "thailand", "global"], "suppliers": [{"name": "Astral Pipes", "region": "india"}, {"name": "Generic Regional Supplier", "region": "global"}]},
-        {"id": "copper_plumbing", "name": "Copper Plumbing", "unit": "sqft", "base_cost_usd_per_sqft": 4.0, "regions": ["usa", "global"], "suppliers": [{"name": "Mueller Industries", "region": "usa"}, {"name": "Generic Regional Supplier", "region": "global"}]}
+        {
+          "id": "cpvc_standard",
+          "name": "CPVC Standard Plumbing",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.2,
+          "regions": [
+            "india",
+            "thailand",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Astral Pipes",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "copper_plumbing",
+          "name": "Copper Plumbing",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 4.0,
+          "regions": [
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Mueller Industries",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "cement": {
+      "label": "Cement",
+      "options": [
+        {
+          "id": "opc_43",
+          "name": "OPC 43 Grade Cement",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.377,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "UltraTech Cement",
+              "region": "india"
+            },
+            {
+              "name": "ACC Cement",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "ppc",
+          "name": "PPC (Portland Pozzolana Cement)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.317,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Ambuja Cement",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "opc_53",
+          "name": "OPC 53 Grade Cement (High Strength)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.533,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "UltraTech Cement",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "steel": {
+      "label": "Steel (TMT Reinforcement)",
+      "options": [
+        {
+          "id": "tmt_fe415",
+          "name": "TMT Fe415 Bars",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.754,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "JSW Steel",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "tmt_fe500",
+          "name": "TMT Fe500 Bars",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.994,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Tata Steel (Tata Tiscon)",
+              "region": "india"
+            },
+            {
+              "name": "JSW Steel",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "tmt_fe500d",
+          "name": "TMT Fe500D Bars (Earthquake-Resistant)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 3.21,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Tata Steel (Tata Tiscon)",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "bricks": {
+      "label": "Bricks & Blocks",
+      "options": [
+        {
+          "id": "red_clay_brick",
+          "name": "Red Clay Brick",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.138,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Brick Kilns",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "fly_ash_brick",
+          "name": "Fly Ash Brick",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.054,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Fly Ash Brick Units",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "aac_block",
+          "name": "AAC Block (Lightweight, Insulated)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.293,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Biltech AAC Blocks",
+              "region": "india"
+            },
+            {
+              "name": "Magicrete",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "aggregate": {
+      "label": "Aggregate",
+      "options": [
+        {
+          "id": "coarse_aggregate",
+          "name": "Coarse Aggregate (10-20mm)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.934,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "crushed_stone",
+          "name": "Crushed Stone Aggregate",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.862,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "sand": {
+      "label": "Sand",
+      "options": [
+        {
+          "id": "river_sand",
+          "name": "River Sand",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.838,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Sand Suppliers",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "m_sand",
+          "name": "M-Sand (Manufactured Sand)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.695,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local M-Sand Units",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "painting": {
+      "label": "Painting",
+      "options": [
+        {
+          "id": "interior_emulsion",
+          "name": "Interior Emulsion Paint",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.263,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Asian Paints",
+              "region": "india"
+            },
+            {
+              "name": "Berger Paints",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "exterior_weatherproof",
+          "name": "Exterior Weatherproof Paint",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.335,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Asian Paints (Apex)",
+              "region": "india"
+            },
+            {
+              "name": "Berger (WeatherCoat)",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "premium_textured",
+          "name": "Premium Textured/Designer Paint",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.539,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Asian Paints (Royale)",
+              "region": "india"
+            },
+            {
+              "name": "Nerolac",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "kitchen_work": {
+      "label": "Kitchen Work",
+      "options": [
+        {
+          "id": "semi_modular_kitchen",
+          "name": "Semi-Modular Kitchen (Granite Platform + Basic Cabinets)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.138,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Carpentry Contractors",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "modular_laminate",
+          "name": "Modular Kitchen (Laminate Finish)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.916,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Sleek Kitchens",
+              "region": "india"
+            },
+            {
+              "name": "Godrej Interio",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "modular_acrylic",
+          "name": "Modular Kitchen (Acrylic/High-Gloss Finish)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 3.353,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Sleek Kitchens",
+              "region": "india"
+            },
+            {
+              "name": "Hafele",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "sanitary_fittings": {
+      "label": "Sanitary Fittings",
+      "options": [
+        {
+          "id": "standard_sanitaryware",
+          "name": "Standard Sanitaryware",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.24,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Parryware",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "midrange_sanitaryware",
+          "name": "Mid-Range Sanitaryware",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.419,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Cera Sanitaryware",
+              "region": "india"
+            },
+            {
+              "name": "Hindware",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "premium_sanitaryware",
+          "name": "Premium Sanitaryware",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.743,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Kohler",
+              "region": "india"
+            },
+            {
+              "name": "Jaquar",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "waterproofing": {
+      "label": "Waterproofing",
+      "options": [
+        {
+          "id": "cementitious_waterproofing",
+          "name": "Cementitious Waterproofing (Bathroom/Basic)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.156,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Dr. Fixit (Pidilite)",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "membrane_waterproofing",
+          "name": "Membrane Waterproofing (Terrace, Premium)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.347,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Dr. Fixit (Pidilite)",
+              "region": "india"
+            },
+            {
+              "name": "STP Limited",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
       ]
     }
   },
