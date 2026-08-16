@@ -53,6 +53,7 @@ function emptyAreaElement(type) {
     length: def.defaultLength,
     width: def.defaultWidth,
     color: def.color,
+    rotation: 0,
   };
 }
 
@@ -341,7 +342,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
           const isLine = el.type in LINE_ELEMENT_DEFS;
           return isLine
             ? { type: el.type, x: el.x, y: el.y, x2: el.x2, y2: el.y2, color: el.color }
-            : { type: el.type, x: el.x, y: el.y, length: el.length, width: el.width, color: el.color };
+            : { type: el.type, x: el.x, y: el.y, length: el.length, width: el.width, color: el.color, rotation: el.rotation || 0 };
         }),
       };
       const designResult = await studioApi.createConstructionDesign(payload);

@@ -128,17 +128,36 @@ def _hexagon_points(cx: float, cy: float, rx: float, ry: float) -> list[tuple[fl
     ]
 
 
+def _rotate_point(px: float, py: float, pivot_x: float, pivot_y: float, degrees: float) -> tuple[float, float]:
+    """Rotates (px, py) around (pivot_x, pivot_y). Negated angle vs. the
+    naive formula deliberately: the frontend canvas measures rotation
+    clockwise-on-screen (Konva's convention, in a y-down pixel space), but
+    this DXF's coordinate space is y-up (north-up feet, matching how the
+    plot is actually authored) — negating keeps the same *visual* rotation
+    direction when the file is opened in a real y-up CAD viewer."""
+    import math
+
+    theta = math.radians(-degrees)
+    dx, dy = px - pivot_x, py - pivot_y
+    return (
+        pivot_x + dx * math.cos(theta) - dy * math.sin(theta),
+        pivot_y + dx * math.sin(theta) + dy * math.cos(theta),
+    )
+
+
 def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
     """Draws landscaping/hardscape/site-furnishing symbols — trees, gazebo,
     pool, cars, plants, pathway, bench, and straight/dashed lines. These
-    are visually distinct real DXF entities (CIRCLE for tree/plant canopy,
-    a 6-vertex LWPOLYLINE for gazebo, rectangles for pool/car/pathway/bench,
-    LINE entities for the two line types) — not the same room-box shape
-    reused with a different label."""
+    are visually distinct real DXF entities (layered CIRCLEs for a tree's
+    canopy, a 6-vertex LWPOLYLINE for gazebo, rectangles for pool/car/
+    pathway/bench, LINE entities for the two line types) — not the same
+    room-box shape reused with a different label. Rotation, if set,
+    pivots around the element's (x, y) corner, matching the canvas."""
 
     for el in site_elements:
         el_type = el.get("type", "")
         true_color = _hex_to_true_color(el.get("color"))
+        rotation = el.get("rotation") or 0
         attribs = {"layer": "SITE_ELEMENTS"}
         if true_color is not None:
             attribs["true_color"] = true_color
@@ -154,29 +173,42 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
         length = el.get("length") or 1
         width = el.get("width") or 1
         cx, cy = x + length / 2, y + width / 2
+        rcx, rcy = _rotate_point(cx, cy, x, y, rotation) if rotation else (cx, cy)
 
         if el_type == "tree":
-            radius = min(length, width) / 2
-            msp.add_circle((cx, cy), radius, dxfattribs=attribs)
-            msp.add_circle((cx, cy), radius * 0.12, dxfattribs=attribs)  # trunk mark
+            # Layered canopy (2 overlapping circles, offset) reads as an
+            # actual tree silhouette on the printed plan, not a plain dot —
+            # plus a small trunk mark, matching common landscape-plan symbols.
+            r = min(length, width) / 2
+            msp.add_circle((rcx, rcy), r, dxfattribs=attribs)
+            msp.add_circle((rcx - r * 0.25, rcy + r * 0.2), r * 0.65, dxfattribs=attribs)
+            msp.add_circle((rcx + r * 0.28, rcy - r * 0.15), r * 0.6, dxfattribs=attribs)
+            msp.add_circle((rcx, rcy), r * 0.1, dxfattribs=attribs)  # trunk mark
         elif el_type == "plant":
-            radius = min(length, width) / 2
-            msp.add_circle((cx, cy), radius, dxfattribs=attribs)
+            r = min(length, width) / 2
+            msp.add_circle((rcx, rcy), r, dxfattribs=attribs)
+            msp.add_circle((rcx - r * 0.3, rcy), r * 0.55, dxfattribs=attribs)
+            msp.add_circle((rcx + r * 0.3, rcy), r * 0.55, dxfattribs=attribs)
         elif el_type == "gazebo":
             points = _hexagon_points(cx, cy, length / 2, width / 2)
+            if rotation:
+                points = [_rotate_point(px, py, x, y, rotation) for px, py in points]
             msp.add_lwpolyline(points + [points[0]], dxfattribs=attribs)
             msp.add_text("Gazebo", dxfattribs={**attribs, "height": 0.6}).set_placement(
-                (cx, cy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
+                (rcx, rcy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
             )
         else:
             # pool, car, pathway, bench — rectangular footprint
+            corners = [(x, y), (x + length, y), (x + length, y + width), (x, y + width)]
+            if rotation:
+                corners = [_rotate_point(px, py, x, y, rotation) for px, py in corners]
             msp.add_lwpolyline(
-                [(x, y), (x + length, y), (x + length, y + width), (x, y + width), (x, y)],
+                corners + [corners[0]],
                 dxfattribs=attribs,
             )
             label = el_type.replace("_", " ").title()
             msp.add_text(label, dxfattribs={**attribs, "height": 0.5}).set_placement(
-                (cx, cy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
+                (rcx, rcy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
             )
 
 

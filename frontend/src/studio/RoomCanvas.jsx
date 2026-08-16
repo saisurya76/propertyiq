@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Rect, Text, Line, Circle, RegularPolygon, Transformer, Group } from "react-konva";
+import Konva from "konva";
 
 const BASE_CANVAS_WIDTH = 640;
 const ROAD_SIDE_OFFSET = 14;
@@ -175,10 +176,13 @@ function RoomCanvas({
   const [zoom, setZoom] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [panMode, setPanMode] = useState(false);
-  const [guides, setGuides] = useState([]); // transient alignment guide lines, cleared after drag/resize
   const [selectionRect, setSelectionRect] = useState(null); // transient rubber-band box
   const stageRef = useRef(null);
   const transformerRef = useRef(null);
+  const guideGroupRef = useRef(null); // alignment guide lines are drawn imperatively (not React
+    // state) so they never trigger a re-render mid-drag — a re-render while
+    // Konva has an active drag gesture in progress is a known source of the
+    // shape fighting/snapping-back-to-stale-props during that gesture.
   const shapeRefs = useRef({});
 
   const hasValidPlot = Boolean(plotLengthFt) && Boolean(plotWidthFt);
@@ -359,16 +363,26 @@ function RoomCanvas({
     return { snappedX, snappedY, newGuides };
   };
 
+  const drawGuides = (newGuides) => {
+    const group = guideGroupRef.current;
+    if (!group) return;
+    group.destroyChildren();
+    for (const g of newGuides) {
+      group.add(new Konva.Line({ points: g.points, stroke: "#ec4899", strokeWidth: 1, dash: [4, 3], listening: false }));
+    }
+    group.getLayer()?.batchDraw();
+  };
+
   const handleDragMove = (item, e) => {
     const { width, height } = feetToCanvas(item);
     const { snappedX, snappedY, newGuides } = computeEdgeSnap(item._key, e.target.x(), e.target.y(), width, height);
     e.target.x(snappedX);
     e.target.y(snappedY);
-    setGuides(newGuides);
+    drawGuides(newGuides);
   };
 
   const handleDragEnd = (item, items, onChange, e) => {
-    setGuides([]);
+    drawGuides([]);
     const { x, y } = canvasToFeet(e.target.x(), e.target.y(), 0, feetToCanvas(item).height);
     onChange(items.map((it) => (it._key === item._key ? { ...it, x, y } : it)));
   };
@@ -377,6 +391,7 @@ function RoomCanvas({
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
+    const rotation = node.rotation();
     node.scaleX(1);
     node.scaleY(1);
 
@@ -384,7 +399,11 @@ function RoomCanvas({
     const newHeightPx = Math.max(MIN_ROOM_FT * baseScale, node.height() * scaleY);
 
     const { x, y, length, width } = canvasToFeet(node.x(), node.y(), newWidthPx, newHeightPx);
-    onChange(items.map((it) => (it._key === item._key ? { ...it, x, y, length, width } : it)));
+    onChange(
+      items.map((it) =>
+        it._key === item._key ? { ...it, x, y, length, width, ...("rotation" in it ? { rotation } : {}) } : it
+      )
+    );
   };
 
   const handleLineEndpointDrag = (line, endpoint, e) => {
@@ -462,9 +481,7 @@ function RoomCanvas({
 
           {roadPoints && <Line points={roadPoints} stroke="#9ca3af" strokeWidth={1.5} dash={[5, 4]} listening={false} />}
 
-          {guides.map((g) => (
-            <Line key={g.key} points={g.points} stroke="#ec4899" strokeWidth={1} dash={[4, 3]} listening={false} />
-          ))}
+          <Group ref={guideGroupRef} listening={false} />
 
           <DimensionChain segments={northDimSegments} edge="north" offsetPx={DIM_LINE_OFFSET_PX} baseScale={baseScale} plotWidthFt={safeWidthFt} />
           <DimensionChain segments={westDimSegments} edge="west" offsetPx={DIM_LINE_OFFSET_PX} baseScale={baseScale} plotWidthFt={safeWidthFt} />
@@ -542,48 +559,91 @@ function RoomCanvas({
             const isSelected = selectedKeys.includes(el._key);
             const def = ELEMENT_DEFS_FOR_RENDER[el.type] || {};
             const symbol = def.symbol;
+            const fillColor = el.color || def.color || "#e5e7eb";
 
             return (
               <Fragment key={el._key}>
-                <Group>
+                <Group
+                  ref={(node) => {
+                    if (node) shapeRefs.current[el._key] = node;
+                  }}
+                  x={x}
+                  y={y}
+                  rotation={el.rotation || 0}
+                  width={width}
+                  height={height}
+                  draggable={!panMode}
+                  dragBoundFunc={(pos) => ({
+                    x: Math.max(0, Math.min(pos.x, canvasWidth - width)),
+                    y: Math.max(0, Math.min(pos.y, canvasHeight - height)),
+                  })}
+                  onDragMove={(e) => handleDragMove(el, e)}
+                  onDragEnd={(e) => handleDragEnd(el, siteElements, onElementsChange, e)}
+                  onTransformEnd={(e) => handleTransformEnd(el, siteElements, onElementsChange, e)}
+                  onClick={(evt) => toggleSelect(el._key, evt.evt.shiftKey)}
+                  onTap={() => toggleSelect(el._key, false)}
+                >
                   <Rect
-                    ref={(node) => {
-                      if (node) shapeRefs.current[el._key] = node;
-                    }}
-                    x={x}
-                    y={y}
+                    x={0}
+                    y={0}
                     width={width}
                     height={height}
-                    fill={el.color || def.color || "#e5e7eb"}
+                    fill={fillColor}
                     stroke={isSelected ? "#4c1d95" : "#6b7280"}
                     strokeWidth={isSelected ? 2 : 1}
                     cornerRadius={def.rounded ? Math.min(width, height) * 0.15 : 0}
-                    draggable={!panMode}
-                    dragBoundFunc={(pos) => ({
-                      x: Math.max(0, Math.min(pos.x, canvasWidth - width)),
-                      y: Math.max(0, Math.min(pos.y, canvasHeight - height)),
-                    })}
-                    onDragMove={(e) => handleDragMove(el, e)}
-                    onDragEnd={(e) => handleDragEnd(el, siteElements, onElementsChange, e)}
-                    onTransformEnd={(e) => handleTransformEnd(el, siteElements, onElementsChange, e)}
-                    onClick={(evt) => toggleSelect(el._key, evt.evt.shiftKey)}
-                    onTap={() => toggleSelect(el._key, false)}
                   />
                   {symbol === "circle" && (
-                    <Circle
-                      x={x + width / 2}
-                      y={y + height / 2}
-                      radius={Math.min(width, height) / 2.6}
-                      fill={el.color || def.color}
-                      stroke="#166534"
-                      strokeWidth={1}
-                      listening={false}
-                    />
+                    <>
+                      {/* Layered canopy — an offset trio of circles reads as
+                          a tree silhouette rather than a single flat dot,
+                          matching the same real symbol drawn into the DXF. */}
+                      <Circle
+                        x={width / 2}
+                        y={height / 2}
+                        radius={Math.min(width, height) / 2.6}
+                        fill={fillColor}
+                        stroke="#166534"
+                        strokeWidth={1}
+                        listening={false}
+                      />
+                      {def.label === "Tree" && (
+                        <>
+                          <Circle
+                            x={width / 2 - width * 0.12}
+                            y={height / 2 - height * 0.1}
+                            radius={Math.min(width, height) / 4}
+                            fill={fillColor}
+                            stroke="#166534"
+                            strokeWidth={0.75}
+                            opacity={0.9}
+                            listening={false}
+                          />
+                          <Circle
+                            x={width / 2 + width * 0.14}
+                            y={height / 2 + height * 0.08}
+                            radius={Math.min(width, height) / 4.3}
+                            fill={fillColor}
+                            stroke="#166534"
+                            strokeWidth={0.75}
+                            opacity={0.9}
+                            listening={false}
+                          />
+                          <Circle
+                            x={width / 2}
+                            y={height / 2}
+                            radius={Math.min(width, height) * 0.06}
+                            fill="#78350f"
+                            listening={false}
+                          />
+                        </>
+                      )}
+                    </>
                   )}
                   {symbol === "hexagon" && (
                     <RegularPolygon
-                      x={x + width / 2}
-                      y={y + height / 2}
+                      x={width / 2}
+                      y={height / 2}
                       sides={6}
                       radius={Math.min(width, height) / 2.2}
                       fill="none"
@@ -593,8 +653,8 @@ function RoomCanvas({
                     />
                   )}
                   <Text
-                    x={x}
-                    y={y + height / 2 - 6}
+                    x={0}
+                    y={height / 2 - 6}
                     width={width}
                     align="center"
                     text={def.label || el.type}
@@ -653,7 +713,8 @@ function RoomCanvas({
 
           <Transformer
             ref={transformerRef}
-            rotateEnabled={false}
+            rotateEnabled={selectedKeys.length === 1 && areaElements.some((el) => el._key === selectedKeys[0])}
+            rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
             boundBoxFunc={(oldBox, newBox) => {
               if (newBox.width < MIN_ROOM_FT * baseScale || newBox.height < MIN_ROOM_FT * baseScale) {

@@ -195,3 +195,56 @@ def test_generate_plot_dxf_backward_compatible_without_site_elements(tmp_path):
         output_dir=tmp_path,
     )
     assert path.exists()
+
+
+def test_rotate_point_90_degrees_lands_on_axis():
+    from backend.construction_dxf import _rotate_point
+    x, y = _rotate_point(10, 0, 0, 0, 90)
+    assert abs(x) < 0.001
+
+
+def test_rotate_point_full_circle_is_identity():
+    from backend.construction_dxf import _rotate_point
+    x, y = _rotate_point(10, 5, 2, 3, 360)
+    assert abs(x - 10) < 0.001
+    assert abs(y - 5) < 0.001
+
+
+def test_rotated_element_produces_genuinely_rotated_dxf_geometry(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    site_elements = [
+        {"type": "pool", "x": 0, "y": 0, "length": 16, "width": 8, "color": None, "rotation": 45},
+    ]
+    path = generate_plot_dxf(
+        design_id="rotate_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=[], site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "SITE_ELEMENTS"][0]
+    points = list(poly.get_points())
+
+    # Pivot corner (x, y) stays put; an unrotated rect's second corner
+    # would still sit on the x-axis (y=0) — after a genuine 45deg rotation
+    # it must not.
+    assert abs(points[0][0]) < 0.01 and abs(points[0][1]) < 0.01
+    assert abs(points[1][1]) > 0.01
+
+
+def test_tree_symbol_has_layered_canopy_not_a_single_circle(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    site_elements = [{"type": "tree", "x": 2, "y": 2, "length": 6, "width": 6, "color": "#22c55e"}]
+    path = generate_plot_dxf(
+        design_id="tree_art_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=[], site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    circles = [e for e in msp if e.dxftype() == "CIRCLE" and e.dxf.layer == "SITE_ELEMENTS"]
+    assert len(circles) == 4  # main canopy + 2 offset lobes + trunk mark

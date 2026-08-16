@@ -1118,6 +1118,9 @@ class SiteElementSpec(BaseModel):
     x2: Optional[float] = None
     y2: Optional[float] = None
     color: Optional[str] = None
+    rotation: float = 0  # degrees, rotates around the element's top-left corner —
+    # matches the frontend canvas's pivot convention. Rooms stay unrotated
+    # (Vastu zone math + DXF room export both assume axis-aligned rectangles).
 
 
 class ConstructionDesignRequest(BaseModel):
