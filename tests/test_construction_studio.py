@@ -342,3 +342,36 @@ def test_doors_and_windows_are_separate_categories_with_distinct_pricing():
     # (door-type pricing vs frame-material pricing), not the same options
     # just relabeled.
     assert door_names.isdisjoint(window_names)
+
+
+def test_doors_windows_price_by_opening_area_not_full_plot():
+    from backend.construction_studio import estimate_cost
+
+    result = estimate_cost(
+        plot_size_sqft=1200,
+        selections={"windows": "upvc", "doors": "laminate_door"},
+        region="india", currency="USD",
+    )
+    window_li = next(li for li in result["line_items"] if li["category"] == "windows")
+    door_li = next(li for li in result["line_items"] if li["category"] == "doors")
+
+    # Must price against a FRACTION of plot area, not the full 1200 sqft —
+    # this was a real pre-existing bug (confirmed unchanged from the
+    # original catalog) that made a $14/sqft window price look like it
+    # covered the entire plot.
+    assert window_li["priced_area_sqft"] == 1200 * 0.12
+    assert door_li["priced_area_sqft"] == 1200 * 0.12
+    assert window_li["priced_area_sqft"] < 1200
+    assert door_li["priced_area_sqft"] < 1200
+
+
+def test_categories_without_opening_fraction_still_use_full_plot_area():
+    from backend.construction_studio import estimate_cost
+
+    result = estimate_cost(
+        plot_size_sqft=1200,
+        selections={"flooring": "vitrified_tile"},
+        region="india", currency="USD",
+    )
+    li = result["line_items"][0]
+    assert li["priced_area_sqft"] == 1200

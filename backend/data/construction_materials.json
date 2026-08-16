@@ -939,7 +939,8 @@
             }
           ]
         }
-      ]
+      ],
+      "opening_area_fraction": 0.12
     },
     "doors": {
       "label": "Doors",
@@ -1004,7 +1005,8 @@
             }
           ]
         }
-      ]
+      ],
+      "opening_area_fraction": 0.12
     }
   },
   "labor_cost_index": {

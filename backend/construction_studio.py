@@ -38,7 +38,11 @@ def _build_catalog(source: dict[str, Any], region: str = "global") -> dict[str, 
             if region in opt["regions"] or "global" in opt["regions"]
         ]
         if options:
-            categories_out[cat_id] = {"label": cat["label"], "options": options}
+            categories_out[cat_id] = {
+                "label": cat["label"],
+                "options": options,
+                "opening_area_fraction": cat.get("opening_area_fraction"),
+            }
 
     return categories_out
 
@@ -107,7 +111,20 @@ def estimate_cost(
         if not opt:
             continue
 
-        line_cost_usd = round(opt["base_cost_usd_per_sqft"] * plot_size_sqft, 2)
+        # Most categories price per sqft of the WHOLE plot (flooring, roofing,
+        # etc. — these genuinely scale with plot area). Categories with an
+        # `opening_area_fraction` (doors, windows) instead price per sqft of
+        # actual OPENING area, estimated as that fraction of the plot —
+        # window fraction (0.12) is sourced from NBC 2016's 10% minimum
+        # window-to-floor-area rule, leaning toward Telangana/Hyderabad's
+        # humid-climate recommendation (15-20%); door fraction (0.04) is a
+        # rougher estimate from typical door-schedule norms. Without this,
+        # a $14/sqft window price applied to the FULL plot produces a wildly
+        # unrealistic total, as if the entire plot were glazed.
+        opening_fraction = _CATALOG["categories"][category].get("opening_area_fraction")
+        priced_area_sqft = plot_size_sqft * opening_fraction if opening_fraction else plot_size_sqft
+
+        line_cost_usd = round(opt["base_cost_usd_per_sqft"] * priced_area_sqft, 2)
         material_subtotal_usd += line_cost_usd
 
         line_items.append({
@@ -116,6 +133,7 @@ def estimate_cost(
             "option_id": option_id,
             "name": opt["name"],
             "unit_cost_usd": opt["base_cost_usd_per_sqft"],
+            "priced_area_sqft": round(priced_area_sqft, 1),
             "line_total_usd": line_cost_usd,
             "line_total_converted": round(line_cost_usd * fx_rate, 2),
         })

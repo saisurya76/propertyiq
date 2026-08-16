@@ -84,8 +84,9 @@ function formatUnitPrice(usdAmount, unit, currency, fxRates) {
   }
 }
 
-function formatLinePrice(usdPerUnit, plotSizeSqft, currency, fxRates) {
-  const usdTotal = usdPerUnit * plotSizeSqft;
+function formatLinePrice(usdPerUnit, plotSizeSqft, currency, fxRates, openingAreaFraction) {
+  const pricedAreaSqft = openingAreaFraction ? plotSizeSqft * openingAreaFraction : plotSizeSqft;
+  const usdTotal = usdPerUnit * pricedAreaSqft;
   const rate = fxRates?.[currency];
   const amount = rate ? usdTotal * rate : usdTotal;
   const displayCurrency = rate ? currency : "USD";
@@ -578,7 +579,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                             })}
                           </td>
                           <td className="cs-material-table-price">
-                            {formatLinePrice(opt.base_cost_usd, plotSizeSqft, plot.currency, fxRates)}
+                            {formatLinePrice(opt.base_cost_usd, plotSizeSqft, plot.currency, fxRates, cat.opening_area_fraction)}
                           </td>
                         </tr>
                       );
