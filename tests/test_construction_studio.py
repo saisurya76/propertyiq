@@ -325,3 +325,20 @@ def test_estimate_backward_compatible_without_labor_selections():
     result = estimate_cost(plot_size_sqft=1000, selections={"cement": "opc_43"}, region="india", currency="USD")
     assert result["itemized_labor_subtotal_usd"] == 0
     assert result["grand_total_usd"] > 0
+
+
+def test_doors_and_windows_are_separate_categories_with_distinct_pricing():
+    from backend.construction_studio import get_catalog
+
+    catalog = get_catalog("india")
+    assert "doors_windows" not in catalog
+    assert "doors" in catalog and "windows" in catalog
+
+    door_names = {o["name"] for o in catalog["doors"]["options"]}
+    window_names = {o["name"] for o in catalog["windows"]["options"]}
+    assert "Flush Door (Basic, Hollow Core)" in door_names
+    assert "UPVC Frames" in window_names
+    # Doors and windows must have genuinely distinct pricing conventions
+    # (door-type pricing vs frame-material pricing), not the same options
+    # just relabeled.
+    assert door_names.isdisjoint(window_names)

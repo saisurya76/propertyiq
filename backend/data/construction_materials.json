@@ -209,74 +209,6 @@
         }
       ]
     },
-    "doors_windows": {
-      "label": "Doors & Windows",
-      "options": [
-        {
-          "id": "upvc",
-          "name": "UPVC Frames",
-          "unit": "sqft_opening",
-          "base_cost_usd_per_sqft": 14.0,
-          "regions": [
-            "india",
-            "thailand",
-            "global"
-          ],
-          "suppliers": [
-            {
-              "name": "Fenesta",
-              "region": "india"
-            },
-            {
-              "name": "Generic Regional Supplier",
-              "region": "global"
-            }
-          ]
-        },
-        {
-          "id": "aluminum",
-          "name": "Aluminum Frames",
-          "unit": "sqft_opening",
-          "base_cost_usd_per_sqft": 17.0,
-          "regions": [
-            "india",
-            "thailand",
-            "usa",
-            "global"
-          ],
-          "suppliers": [
-            {
-              "name": "Jindal Aluminium",
-              "region": "india"
-            },
-            {
-              "name": "Generic Regional Supplier",
-              "region": "global"
-            }
-          ]
-        },
-        {
-          "id": "wood_frame",
-          "name": "Solid Wood Frames",
-          "unit": "sqft_opening",
-          "base_cost_usd_per_sqft": 22.0,
-          "regions": [
-            "usa",
-            "global"
-          ],
-          "suppliers": [
-            {
-              "name": "Andersen Windows",
-              "region": "usa"
-            },
-            {
-              "name": "Generic Regional Supplier",
-              "region": "global"
-            }
-          ]
-        }
-      ]
-    },
     "electrical": {
       "label": "Electrical",
       "options": [
@@ -931,6 +863,139 @@
             },
             {
               "name": "STP Limited",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "windows": {
+      "label": "Windows",
+      "options": [
+        {
+          "id": "upvc",
+          "name": "UPVC Frames",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 14.0,
+          "regions": [
+            "india",
+            "thailand",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Fenesta",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "aluminum",
+          "name": "Aluminum Frames",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 17.0,
+          "regions": [
+            "india",
+            "thailand",
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Jindal Aluminium",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "wood_frame",
+          "name": "Solid Wood Frames",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 22.0,
+          "regions": [
+            "usa",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Andersen Windows",
+              "region": "usa"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "doors": {
+      "label": "Doors",
+      "options": [
+        {
+          "id": "flush_door_basic",
+          "name": "Flush Door (Basic, Hollow Core)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 1.078,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Carpentry Contractors",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "laminate_door",
+          "name": "Laminate Door (Solid Core)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 3.473,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Duroply Industries",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "solid_wood_door",
+          "name": "Solid Wood Door (Teak, Premium)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 11.377,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Carpentry Contractors",
               "region": "india"
             },
             {
