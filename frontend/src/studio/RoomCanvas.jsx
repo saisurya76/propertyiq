@@ -257,24 +257,53 @@ function RoomCanvas({
     [placedRooms, safeLengthFt, safeWidthFt]
   );
 
+  // dragBoundFunc must receive AND return positions in Konva's "absolute"
+  // coordinate space (confirmed directly from Konva's own source — see
+  // Node.js's _setDragPosition, which calls setAbsolutePosition() on
+  // whatever dragBoundFunc returns). That is NOT the same as this shape's
+  // local/model-space x/y whenever any ancestor (the Stage's zoom, pan, or
+  // the STAGE_MARGIN_PX offset added for the dimension chains) applies a
+  // transform — which they now do. Clamping the raw `pos` value directly
+  // against local-space bounds, as this used to do, silently shifted the
+  // drag boundary by exactly that transform's offset. This converts
+  // absolute -> local, clamps in local space (where the bounds actually
+  // make sense), then converts back — correct regardless of current zoom
+  // or pan, since it reads the live transform rather than assuming it.
+  function makeDragBoundFunc(width, height) {
+    return function (pos) {
+      const parentTransform = this.getParent().getAbsoluteTransform();
+      const inverse = parentTransform.copy().invert();
+      const local = inverse.point(pos);
+      const clampedLocal = {
+        x: Math.max(0, Math.min(local.x, canvasWidth - width)),
+        y: Math.max(0, Math.min(local.y, canvasHeight - height)),
+      };
+      return parentTransform.point(clampedLocal);
+    };
+  }
+
   // ---- zoom controls ----
   const clampZoom = (z) => Math.max(0.4, Math.min(3, z));
 
   const handleWheel = (e) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
-    const pointer = stage.getPointerPosition();
+    const rawPointer = stage.getPointerPosition();
     const oldScale = zoom;
     const direction = e.evt.deltaY > 0 ? -1 : 1;
     const newScale = clampZoom(oldScale + direction * 0.1);
 
-    const mousePointTo = {
-      x: (pointer.x - stagePos.x) / oldScale,
-      y: (pointer.y - stagePos.y) / oldScale,
-    };
+    // Same absolute-vs-local distinction as the dragBoundFunc fix above:
+    // getPointerPosition() is raw container pixels, not the Stage's local
+    // content coordinates. Convert via the Stage's OWN current transform
+    // (which already accounts for STAGE_MARGIN_PX) so the point under the
+    // cursor stays fixed while zooming, instead of drifting.
+    const oldTransform = stage.getAbsoluteTransform().copy();
+    const localPointUnderCursor = oldTransform.invert().point(rawPointer);
+
     setStagePos({
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
+      x: rawPointer.x - (localPointUnderCursor.x + STAGE_MARGIN_PX) * newScale,
+      y: rawPointer.y - (localPointUnderCursor.y + STAGE_MARGIN_PX) * newScale,
     });
     setZoom(newScale);
   };
@@ -320,12 +349,24 @@ function RoomCanvas({
     const y1 = Math.min(selectionRect.y1, selectionRect.y2);
     const y2 = Math.max(selectionRect.y1, selectionRect.y2);
 
-    const hits = placedRooms.filter((room) => {
-      const { x, y, width, height } = feetToCanvas(room);
+    const intersects = (item) => {
+      const { x, y, width, height } = feetToCanvas(item);
       return x < x2 && x + width > x1 && y < y2 && y + height > y1;
-    });
+    };
 
-    if (hits.length > 0) onSelectionChange(hits.map((r) => r._key));
+    const roomHits = placedRooms.filter(intersects);
+    const elementHits = areaElements.filter(intersects);
+    const lineHits = lineElements.filter((line) => {
+      const p1x = line.x * baseScale;
+      const p1y = (safeWidthFt - line.y) * baseScale;
+      const p2x = line.x2 * baseScale;
+      const p2y = (safeWidthFt - line.y2) * baseScale;
+      const inBox = (px, py) => px >= x1 && px <= x2 && py >= y1 && py <= y2;
+      return inBox(p1x, p1y) || inBox(p2x, p2y);
+    });
+    const allHits = [...roomHits, ...elementHits, ...lineHits];
+
+    if (allHits.length > 0) onSelectionChange(allHits.map((r) => r._key));
     setSelectionRect(null);
   };
 
@@ -518,10 +559,7 @@ function RoomCanvas({
                     stroke={isSelected ? "#4c1d95" : "#374151"}
                     strokeWidth={isSelected ? WALL_THICKNESS_FT * baseScale + 1.5 : WALL_THICKNESS_FT * baseScale}
                     draggable={!panMode}
-                    dragBoundFunc={(pos) => ({
-                      x: Math.max(0, Math.min(pos.x, canvasWidth - width)),
-                      y: Math.max(0, Math.min(pos.y, canvasHeight - height)),
-                    })}
+                    dragBoundFunc={makeDragBoundFunc(width, height)}
                     onDragMove={(e) => handleDragMove(room, e)}
                     onDragEnd={(e) => handleDragEnd(room, rooms, onRoomsChange, e)}
                     onTransformEnd={(e) => handleTransformEnd(room, rooms, onRoomsChange, e)}
@@ -573,10 +611,7 @@ function RoomCanvas({
                   width={width}
                   height={height}
                   draggable={!panMode}
-                  dragBoundFunc={(pos) => ({
-                    x: Math.max(0, Math.min(pos.x, canvasWidth - width)),
-                    y: Math.max(0, Math.min(pos.y, canvasHeight - height)),
-                  })}
+                  dragBoundFunc={makeDragBoundFunc(width, height)}
                   onDragMove={(e) => handleDragMove(el, e)}
                   onDragEnd={(e) => handleDragEnd(el, siteElements, onElementsChange, e)}
                   onTransformEnd={(e) => handleTransformEnd(el, siteElements, onElementsChange, e)}
@@ -717,7 +752,15 @@ function RoomCanvas({
             rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
             enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
             boundBoxFunc={(oldBox, newBox) => {
-              if (newBox.width < MIN_ROOM_FT * baseScale || newBox.height < MIN_ROOM_FT * baseScale) {
+              // Konva's Transformer reports newBox.width/height in absolute
+              // (zoom-scaled) pixels — confirmed directly from its source
+              // (__getNodeRect applies node.getAbsoluteTransform()) — but
+              // MIN_ROOM_FT * baseScale is a fixed model-space quantity.
+              // Scale the threshold by the current zoom to compare
+              // like-for-like; without this, the minimum-size clamp is
+              // wrong at any zoom level other than 1.
+              const minPx = MIN_ROOM_FT * baseScale * zoom;
+              if (newBox.width < minPx || newBox.height < minPx) {
                 return oldBox;
               }
               return newBox;
