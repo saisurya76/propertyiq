@@ -288,3 +288,40 @@ def test_new_material_categories_load_and_price_correctly():
     )
     assert len(result["line_items"]) == 2
     assert result["grand_total_converted"] > 0
+
+
+def test_labor_categories_load_and_no_double_counting():
+    from backend.construction_studio import get_labor_catalog, estimate_cost
+
+    labor_cat = get_labor_catalog("india")
+    assert set(labor_cat.keys()) == {"rcc_work", "brickwork", "plasterwork"}
+    for cat in labor_cat.values():
+        assert len(cat["options"]) == 3
+
+    # Labor categories are India-only — should be empty for other regions.
+    assert get_labor_catalog("usa") == {}
+    assert get_labor_catalog("global") == {}
+
+    result = estimate_cost(
+        plot_size_sqft=1200,
+        selections={"cement": "opc_53"},
+        labor_selections={"rcc_work": "rcc_standard_labor"},
+        region="india", currency="INR",
+    )
+    # Itemized labor + reduced blanket residual must land in a realistic
+    # total-labor range (~350-600 INR/sqft per researched norms), not
+    # double-count by stacking the OLD full blanket rate on top.
+    labor_per_sqft_inr = result["labor_cost_usd"] * 83.5 / 1200
+    assert 100 < labor_per_sqft_inr < 700, f"labor/sqft out of realistic range: {labor_per_sqft_inr}"
+
+    kinds = {li["kind"] for li in result["line_items"]}
+    assert kinds == {"material", "labor"}
+
+
+def test_estimate_backward_compatible_without_labor_selections():
+    from backend.construction_studio import estimate_cost
+
+    # Existing callers that never pass labor_selections must still work.
+    result = estimate_cost(plot_size_sqft=1000, selections={"cement": "opc_43"}, region="india", currency="USD")
+    assert result["itemized_labor_subtotal_usd"] == 0
+    assert result["grand_total_usd"] > 0

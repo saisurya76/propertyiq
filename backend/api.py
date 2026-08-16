@@ -24,6 +24,7 @@ from backend.construction_store import (
 
 from backend.construction_studio import (
     get_catalog,
+    get_labor_catalog,
     get_fx_rates,
     estimate_cost,
     check_vastu_basics,
@@ -1091,6 +1092,7 @@ def similar_properties(
 class ConstructionEstimateRequest(BaseModel):
     plot_size_sqft: float
     selections: dict[str, str]
+    labor_selections: dict[str, str] = {}
     region: str = "global"
     currency: str = "USD"
 
@@ -1128,6 +1130,7 @@ class ConstructionDesignRequest(BaseModel):
     plot_length_ft: float
     plot_width_ft: float
     selections: dict[str, str]
+    labor_selections: dict[str, str] = {}
     region: str = "global"
     currency: str = "USD"
     entrance_direction: str
@@ -1140,21 +1143,28 @@ class ConstructionDesignRequest(BaseModel):
 
 @app.get("/api/construction-studio/materials")
 def construction_materials(region: str = "global"):
-    """Available material/supplier options for a region. Base costs are in
-    USD; convert client-side or via /estimate for a specific currency."""
-    return {"region": region, "categories": get_catalog(region)}
+    """Available material/supplier options for a region, plus separate
+    contractor/labor options (RCC work, brickwork, plasterwork — India
+    only for now). Base costs are in USD; convert client-side or via
+    /estimate for a specific currency."""
+    return {
+        "region": region,
+        "categories": get_catalog(region),
+        "labor_categories": get_labor_catalog(region),
+    }
 
 
 @app.post("/api/construction-studio/estimate")
 def construction_estimate(request: ConstructionEstimateRequest):
-    """Live running cost total as the user picks materials — call this on
-    every selection change to update the on-screen total."""
+    """Live running cost total as the user picks materials/labor — call
+    this on every selection change to update the on-screen total."""
     if request.plot_size_sqft <= 0:
         raise HTTPException(status_code=400, detail="plot_size_sqft must be greater than 0")
 
     return estimate_cost(
         plot_size_sqft=request.plot_size_sqft,
         selections=request.selections,
+        labor_selections=request.labor_selections,
         region=request.region,
         currency=request.currency,
     )
@@ -1194,6 +1204,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
     cost_estimate = estimate_cost(
         plot_size_sqft=request.plot_size_sqft,
         selections=request.selections,
+        labor_selections=request.labor_selections,
         region=request.region,
         currency=request.currency,
     )
@@ -1245,6 +1256,8 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "slope_direction": request.slope_direction,
         "rooms": [r.model_dump() for r in request.rooms],
         "site_elements": [e.model_dump() for e in request.site_elements],
+        "selections": request.selections,
+        "labor_selections": request.labor_selections,
     }
 
     save_design(

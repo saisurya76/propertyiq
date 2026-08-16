@@ -416,6 +416,27 @@
   padding: 10px 14px;
 }
 
+/* Labor/contractor section — distinct amber accent so it's visually
+   separated from purple materials, matching how a real BOQ separates
+   material cost from labor cost. */
+.cs-labor-section {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 2px dashed #fcd34d;
+}
+
+.cs-labor-section h3 {
+  color: #92400e;
+}
+
+.cs-labor-table thead th {
+  background: linear-gradient(135deg, #92400e 0%, #d97706 100%);
+}
+
+.cs-labor-table tbody tr.cs-material-row-selected {
+  background: rgba(217, 119, 6, 0.1);
+}
+
 .cs-material-table tbody tr {
   cursor: pointer;
   border-top: 1px solid #f3f4f6;

@@ -115,8 +115,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   });
 
   const [catalog, setCatalog] = useState(null);
+  const [laborCatalog, setLaborCatalog] = useState(null);
   const [fxRates, setFxRates] = useState(null);
   const [selections, setSelections] = useState({});
+  const [laborSelections, setLaborSelections] = useState({});
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
@@ -169,9 +171,17 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     return warnings;
   }, [rooms, siteElements, plot.plot_length_ft, plot.plot_width_ft]);
 
-  // Load material catalog whenever region changes
+  // Load material + labor/contractor catalog whenever region changes
   useEffect(() => {
-    studioApi.getMaterials(plot.region).then((res) => setCatalog(res.categories)).catch(() => setCatalog(null));
+    studioApi.getMaterials(plot.region)
+      .then((res) => {
+        setCatalog(res.categories);
+        setLaborCatalog(res.labor_categories || {});
+      })
+      .catch(() => {
+        setCatalog(null);
+        setLaborCatalog(null);
+      });
   }, [plot.region]);
 
   useEffect(() => {
@@ -180,12 +190,13 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
 
   // Live running total whenever selections/plot size/currency change
   useEffect(() => {
-    if (Object.keys(selections).length === 0) return;
+    if (Object.keys(selections).length === 0 && Object.keys(laborSelections).length === 0) return;
     const requestId = ++estimateRequestIdRef.current;
     studioApi
       .estimateCost({
         plot_size_sqft: plotSizeSqft,
         selections,
+        labor_selections: laborSelections,
         region: plot.region,
         currency: plot.currency,
       })
@@ -196,12 +207,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         if (requestId === estimateRequestIdRef.current) setEstimate(result);
       })
       .catch(() => {});
-  }, [selections, plotSizeSqft, plot.region, plot.currency]);
+  }, [selections, laborSelections, plotSizeSqft, plot.region, plot.currency]);
 
   const updatePlotField = (field, value) => setPlot((p) => ({ ...p, [field]: value }));
 
   const toggleMaterial = (category, optionId) => {
     setSelections((s) => ({ ...s, [category]: optionId }));
+  };
+
+  const toggleLabor = (category, optionId) => {
+    setLaborSelections((s) => ({ ...s, [category]: optionId }));
   };
 
   const getFilteredOptions = (catId, options) => {
@@ -370,6 +385,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         plot_length_ft: plot.plot_length_ft,
         plot_width_ft: plot.plot_width_ft,
         selections,
+        labor_selections: laborSelections,
         region: plot.region,
         currency: plot.currency,
         entrance_direction: plot.entrance_direction,
@@ -573,6 +589,64 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
               </div>
             );
           })}
+
+          {laborCatalog && Object.keys(laborCatalog).length > 0 && (
+            <div className="cs-labor-section">
+              <h3>Contractor & Labor</h3>
+              <p className="studio-subtext">
+                Civil contractor rates for the three trades quoted separately in Indian residential
+                construction. Optional — leave unselected to rely on the general labor estimate only.
+              </p>
+              {Object.entries(laborCatalog).map(([catId, cat]) => (
+                <div className="cs-material-category" key={catId}>
+                  <div className="cs-material-category-header">
+                    <h4>{cat.label}</h4>
+                  </div>
+                  <div className="cs-material-table-wrap">
+                    <table className="cs-material-table cs-labor-table">
+                      <thead>
+                        <tr>
+                          <th></th>
+                          <th>Option</th>
+                          <th>Contractor</th>
+                          <th>Price for your plot</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.options.map((opt) => {
+                          const isSelected = laborSelections[catId] === opt.id;
+                          return (
+                            <tr
+                              key={opt.id}
+                              className={isSelected ? "cs-material-row-selected" : ""}
+                              onClick={() => toggleLabor(catId, opt.id)}
+                            >
+                              <td>
+                                <input
+                                  type="radio"
+                                  name={`labor-${catId}`}
+                                  checked={isSelected}
+                                  onChange={() => toggleLabor(catId, opt.id)}
+                                />
+                              </td>
+                              <td className="cs-material-table-name">
+                                {opt.name}
+                                <div className="cs-material-table-unit">{formatUnitPrice(opt.base_cost_usd, opt.unit, plot.currency, fxRates)}</div>
+                              </td>
+                              <td>{opt.suppliers.join(", ")}</td>
+                              <td className="cs-material-table-price">
+                                {formatLinePrice(opt.base_cost_usd, plotSizeSqft, plot.currency, fxRates)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

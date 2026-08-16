@@ -14,14 +14,15 @@ def get_fx_rates() -> dict[str, float]:
     return dict(_CATALOG["fx_rates_usd_base"])
 
 
-def get_catalog(region: str = "global") -> dict[str, Any]:
-    """Return material categories/options available for a region, with base
-    costs still in USD (currency conversion happens in estimate_cost)."""
+def _build_catalog(source: dict[str, Any], region: str = "global") -> dict[str, Any]:
+    """Shared catalog-building logic for both materials (_CATALOG["categories"])
+    and labor/contractor items (_CATALOG["labor_categories"]) — same option
+    shape, same region-filtering rules, just a different source section."""
 
     region = (region or "global").strip().lower()
     categories_out = {}
 
-    for cat_id, cat in _CATALOG["categories"].items():
+    for cat_id, cat in source.items():
         options = [
             {
                 "id": opt["id"],
@@ -42,8 +43,25 @@ def get_catalog(region: str = "global") -> dict[str, Any]:
     return categories_out
 
 
-def _find_option(category: str, option_id: str) -> Optional[dict[str, Any]]:
-    cat = _CATALOG["categories"].get(category)
+def get_catalog(region: str = "global") -> dict[str, Any]:
+    """Return material categories/options available for a region, with base
+    costs still in USD (currency conversion happens in estimate_cost)."""
+    return _build_catalog(_CATALOG["categories"], region)
+
+
+def get_labor_catalog(region: str = "global") -> dict[str, Any]:
+    """Return contractor/labor categories (RCC work, brickwork, plasterwork)
+    available for a region — separate from materials, matching how these
+    are actually quoted in Indian residential construction (a distinct
+    civil-contractor cost bucket, not a material line item). India-only
+    for now — the researched rates and regional convention are India-
+    specific; other regions simply see no labor_categories entries."""
+    return _build_catalog(_CATALOG.get("labor_categories", {}), region)
+
+
+def _find_option(category: str, option_id: str, source: dict[str, Any] = None) -> Optional[dict[str, Any]]:
+    source = _CATALOG["categories"] if source is None else source
+    cat = source.get(category)
     if not cat:
         return None
     for opt in cat["options"]:
@@ -56,12 +74,24 @@ def estimate_cost(
     *,
     plot_size_sqft: float,
     selections: dict[str, str],
+    labor_selections: Optional[dict[str, str]] = None,
     region: str = "global",
     currency: str = "USD",
 ) -> dict[str, Any]:
-    """Compute a running cost estimate given plot size and one selected
-    material option per category. selections = {category_id: option_id}.
-    Returns a line-item breakdown plus grand total, converted to `currency`.
+    """Compute a running cost estimate given plot size, one selected
+    material option per category, and (optionally) one selected labor/
+    contractor option per trade (RCC work, brickwork, plasterwork).
+    selections/labor_selections = {category_id: option_id}.
+    Returns a line-item breakdown (each tagged "kind": "material" or
+    "labor") plus grand total, converted to `currency`.
+
+    The blanket regional labor_cost_index (a flat % of material cost)
+    already accounts for ALL labor by default — but for India, it was
+    deliberately reduced (0.35 -> 0.13) specifically because RCC/brickwork/
+    plasterwork are now itemized here instead; adding both without that
+    reduction would double-count the single largest chunk of labor cost.
+    The remaining 0.13 covers electrical/plumbing/painting labor and
+    supervision overhead, which stay un-itemized.
     """
 
     region = (region or "global").strip().lower()
@@ -73,7 +103,7 @@ def estimate_cost(
     material_subtotal_usd = 0.0
 
     for category, option_id in selections.items():
-        opt = _find_option(category, option_id)
+        opt = _find_option(category, option_id, _CATALOG["categories"])
         if not opt:
             continue
 
@@ -81,6 +111,7 @@ def estimate_cost(
         material_subtotal_usd += line_cost_usd
 
         line_items.append({
+            "kind": "material",
             "category": category,
             "option_id": option_id,
             "name": opt["name"],
@@ -89,7 +120,27 @@ def estimate_cost(
             "line_total_converted": round(line_cost_usd * fx_rate, 2),
         })
 
-    labor_cost_usd = round(material_subtotal_usd * labor_index, 2)
+    itemized_labor_subtotal_usd = 0.0
+    for category, option_id in (labor_selections or {}).items():
+        opt = _find_option(category, option_id, _CATALOG.get("labor_categories", {}))
+        if not opt:
+            continue
+
+        line_cost_usd = round(opt["base_cost_usd_per_sqft"] * plot_size_sqft, 2)
+        itemized_labor_subtotal_usd += line_cost_usd
+
+        line_items.append({
+            "kind": "labor",
+            "category": category,
+            "option_id": option_id,
+            "name": opt["name"],
+            "unit_cost_usd": opt["base_cost_usd_per_sqft"],
+            "line_total_usd": line_cost_usd,
+            "line_total_converted": round(line_cost_usd * fx_rate, 2),
+        })
+
+    blanket_labor_cost_usd = round(material_subtotal_usd * labor_index, 2)
+    labor_cost_usd = round(blanket_labor_cost_usd + itemized_labor_subtotal_usd, 2)
     grand_total_usd = round(material_subtotal_usd + labor_cost_usd, 2)
 
     return {
@@ -100,6 +151,8 @@ def estimate_cost(
         "line_items": line_items,
         "material_subtotal_usd": round(material_subtotal_usd, 2),
         "material_subtotal_converted": round(material_subtotal_usd * fx_rate, 2),
+        "itemized_labor_subtotal_usd": round(itemized_labor_subtotal_usd, 2),
+        "itemized_labor_subtotal_converted": round(itemized_labor_subtotal_usd * fx_rate, 2),
         "labor_cost_usd": labor_cost_usd,
         "labor_cost_converted": round(labor_cost_usd * fx_rate, 2),
         "grand_total_usd": grand_total_usd,

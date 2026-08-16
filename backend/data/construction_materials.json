@@ -943,7 +943,7 @@
     }
   },
   "labor_cost_index": {
-    "india": 0.35,
+    "india": 0.13,
     "thailand": 0.45,
     "usa": 1.0,
     "global": 0.6
@@ -955,5 +955,157 @@
     "AED": 3.67,
     "GBP": 0.79,
     "EUR": 0.92
+  },
+  "labor_categories": {
+    "rcc_work": {
+      "label": "RCC Work (Contractor)",
+      "options": [
+        {
+          "id": "rcc_basic_labor",
+          "name": "Basic RCC Labor",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.335,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Civil Contractor",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "rcc_standard_labor",
+          "name": "Standard RCC Labor (Skilled Supervision)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.814,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Civil Contractor",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "rcc_premium_labor",
+          "name": "Premium RCC Labor (Experienced Contractor)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 3.413,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Civil Contractor",
+              "region": "india"
+            }
+          ]
+        }
+      ]
+    },
+    "brickwork": {
+      "label": "Brickwork (Contractor)",
+      "options": [
+        {
+          "id": "brickwork_basic_labor",
+          "name": "Basic Brickwork Labor",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.455,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Mason Contractor",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "brickwork_standard_labor",
+          "name": "Standard Brickwork Labor",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.575,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Mason Contractor",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "brickwork_premium_labor",
+          "name": "Premium Brickwork Labor (Skilled Mason)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.719,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Mason Contractor",
+              "region": "india"
+            }
+          ]
+        }
+      ]
+    },
+    "plasterwork": {
+      "label": "Plasterwork (Contractor)",
+      "options": [
+        {
+          "id": "plaster_cement_basic",
+          "name": "Cement Plaster (Basic)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.24,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Plastering Contractor",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "plaster_cement_smooth",
+          "name": "Cement Plaster (Smooth Finish)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.311,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Plastering Contractor",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "plaster_gypsum",
+          "name": "Gypsum Plaster (Premium Finish)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.395,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Plastering Contractor",
+              "region": "india"
+            }
+          ]
+        }
+      ]
+    }
   }
 }
