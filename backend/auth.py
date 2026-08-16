@@ -17,19 +17,35 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "PropertyIQ <noreply@propertyiqweb.com>")
 
 
-def send_otp_email(to_email: str, code: str) -> bool:
+def send_otp_email(to_email: str, code: str, purpose: str = "sign_in") -> bool:
     """Send the OTP code. Tries livingiq-auth's centralized Resend relay
     first (POST /api/notifications/email, x-internal-api-key auth — same
     contract DealIQ/AccidentIQ already use). Falls back to a direct Resend
     call if LIVINGIQ_AUTH_BASE_URL/INTERNAL_APP_API_KEY aren't set. Raises
-    a clear HTTPException if neither path is configured."""
+    a clear HTTPException if neither path is configured.
 
-    subject = "Your PropertyIQ verification code"
-    html = (
-        f"<p>Your PropertyIQ verification code is:</p>"
-        f"<h2>{code}</h2>"
-        f"<p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>"
-    )
+    `purpose` selects the email copy — "sign_in" (default) or
+    "unlock_design" (used when re-verifying a user before letting them
+    unlock a locked property; deliberately distinct wording so the person
+    understands why they're getting a second code even though they're
+    already signed in)."""
+
+    if purpose == "unlock_design":
+        subject = "Confirm unlocking your PropertyIQ design"
+        html = (
+            f"<p>Someone requested to unlock a locked PropertyIQ design on your account. "
+            f"Enter this code to confirm:</p>"
+            f"<h2>{code}</h2>"
+            f"<p>This code expires in 10 minutes. If you didn't request this, your design stays locked "
+            f"and you can ignore this email.</p>"
+        )
+    else:
+        subject = "Your PropertyIQ verification code"
+        html = (
+            f"<p>Your PropertyIQ verification code is:</p>"
+            f"<h2>{code}</h2>"
+            f"<p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>"
+        )
 
     if LIVINGIQ_AUTH_BASE_URL and INTERNAL_APP_API_KEY:
         response = requests.post(

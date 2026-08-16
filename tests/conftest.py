@@ -15,6 +15,7 @@ def _reset_database():
     from backend.insight_store import initialize_insight_store
     from backend.construction_store import initialize_construction_store
     from backend.payment_store import initialize_payment_store
+    from backend.property_store import initialize_property_store
 
     initialize_auth_store()
     initialize_config_store()
@@ -22,6 +23,7 @@ def _reset_database():
     initialize_insight_store()
     initialize_construction_store()
     initialize_payment_store()
+    initialize_property_store()
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -33,7 +35,8 @@ def _reset_database():
                     subscriptions,
                     insight_grants,
                     construction_designs,
-                    report_orders
+                    report_orders,
+                    properties, property_floors
                 RESTART IDENTITY CASCADE
                 """
             )

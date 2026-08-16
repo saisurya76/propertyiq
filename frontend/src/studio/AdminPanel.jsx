@@ -204,7 +204,7 @@ function AdminPanel({ onBack }) {
       <div className="admin-section admin-section-purple">
         <h3>Tier Configuration</h3>
         <div className="admin-tier-row admin-tier-row-header">
-          <span>Tier</span><span>Price (USD)</span><span>Quota/mo (blank = unlimited, 0 = one-time)</span><span>Label</span><span></span>
+          <span>Tier</span><span>Price (USD)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Label</span>
         </div>
         {TIER_ORDER.filter((id) => tierConfig?.[id]).map((tierId) => {
           const tier = tierConfig[tierId];
@@ -226,12 +226,19 @@ function AdminPanel({ onBack }) {
                 }
               />
               <input
+                type="number"
+                value={tier.saved_designs_limit ?? ""}
+                placeholder="unlimited"
+                onChange={(e) =>
+                  updateTierField(tierId, "saved_designs_limit", e.target.value === "" ? null : Number(e.target.value))
+                }
+              />
+              <input
                 type="text"
                 placeholder="Label"
                 value={tier.label}
                 onChange={(e) => updateTierField(tierId, "label", e.target.value)}
               />
-              <span />
             </div>
           );
         })}

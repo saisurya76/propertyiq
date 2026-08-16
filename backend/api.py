@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 
 import os
@@ -20,6 +20,19 @@ from backend.construction_store import (
     save_design,
     get_design,
     count_designs_this_month,
+)
+
+from backend.property_store import (
+    initialize_property_store,
+    create_property,
+    list_properties_for_user,
+    get_property,
+    update_property,
+    upsert_floor,
+    delete_floor,
+    set_locked,
+    delete_property,
+    count_saved_properties,
 )
 
 from backend.construction_studio import (
@@ -107,6 +120,7 @@ app = FastAPI()
 
 initialize_payment_store()
 initialize_construction_store()
+initialize_property_store()
 initialize_auth_store()
 initialize_config_store()
 initialize_subscription_store()
@@ -1303,6 +1317,190 @@ def download_construction_dxf(design_id: str):
         media_type="application/dxf",
         filename=f"PropertyIQ_ConstructionStudio_{design_id}.dxf",
     )
+
+
+class PropertyPlotSpec(BaseModel):
+    plot_size_sqft: float
+    plot_length_ft: float
+    plot_width_ft: float
+    region: str = "global"
+    currency: str = "USD"
+    entrance_direction: str
+    road_facing_side: str
+    slope_direction: Optional[str] = None
+
+
+class FloorInput(BaseModel):
+    floor_number: int
+    floor_label: str
+    rooms: list[RoomSpec] = []
+
+
+class CreatePropertyRequest(BaseModel):
+    name: str
+    plot_spec: PropertyPlotSpec
+    selections: dict[str, str] = {}
+    labor_selections: dict[str, str] = {}
+    site_elements: list[SiteElementSpec] = []
+    floors: list[FloorInput] = []
+
+
+class UpdatePropertyRequest(BaseModel):
+    name: Optional[str] = None
+    plot_spec: Optional[PropertyPlotSpec] = None
+    selections: Optional[dict[str, str]] = None
+    labor_selections: Optional[dict[str, str]] = None
+    site_elements: Optional[list[SiteElementSpec]] = None
+
+
+class UpsertFloorRequest(BaseModel):
+    floor_id: Optional[str] = None
+    floor_number: int
+    floor_label: str
+    rooms: list[RoomSpec] = []
+
+
+class ConfirmUnlockRequest(BaseModel):
+    code: str
+
+
+def _require_own_property(property_id: str, user_email: str) -> dict[str, Any]:
+    prop = get_property(property_id)
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if prop["user_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=403, detail="This property belongs to a different account")
+    return prop
+
+
+@app.post("/api/properties")
+def api_create_property(request: CreatePropertyRequest, user_email: str = Depends(get_current_user_email)):
+    """Save a new multi-floor property design. Gated by the tier's
+    saved_designs_limit (admin-configurable — separate from
+    design_quota_per_month, which limits how many times you can GENERATE
+    a design, not how many you can keep saved)."""
+
+    tier_id = get_active_tier(user_email)
+    if not tier_id:
+        raise HTTPException(status_code=403, detail="Saving designs requires an active Studio subscription.")
+
+    tier = get_tier(tier_id)
+    limit = tier["saved_designs_limit"] if tier else 0
+    if limit is not None:
+        used = count_saved_properties(user_email)
+        if used >= limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Saved design limit reached ({used}/{limit}) for the {tier['label']} tier. "
+                       f"Delete an existing saved design or upgrade your plan."
+            )
+
+    if not request.floors:
+        raise HTTPException(status_code=400, detail="A property must have at least one floor")
+
+    prop = create_property(
+        user_email=user_email,
+        name=request.name,
+        plot_spec=request.plot_spec.model_dump(),
+        selections=request.selections,
+        labor_selections=request.labor_selections,
+        site_elements=[e.model_dump() for e in request.site_elements],
+        floors=[f.model_dump() for f in request.floors],
+    )
+    return prop
+
+
+@app.get("/api/properties")
+def api_list_properties(user_email: str = Depends(get_current_user_email)):
+    """Summary list for the Studio landing page's saved-designs picker."""
+    return {"properties": list_properties_for_user(user_email)}
+
+
+@app.get("/api/properties/{property_id}")
+def api_get_property(property_id: str, user_email: str = Depends(get_current_user_email)):
+    return _require_own_property(property_id, user_email)
+
+
+@app.put("/api/properties/{property_id}")
+def api_update_property(property_id: str, request: UpdatePropertyRequest, user_email: str = Depends(get_current_user_email)):
+    _require_own_property(property_id, user_email)
+    try:
+        updated = update_property(
+            property_id=property_id,
+            name=request.name,
+            plot_spec=request.plot_spec.model_dump() if request.plot_spec else None,
+            selections=request.selections,
+            labor_selections=request.labor_selections,
+            site_elements=[e.model_dump() for e in request.site_elements] if request.site_elements is not None else None,
+        )
+    except PermissionError:
+        raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to make changes.")
+    return updated
+
+
+@app.put("/api/properties/{property_id}/floors")
+def api_upsert_floor(property_id: str, request: UpsertFloorRequest, user_email: str = Depends(get_current_user_email)):
+    _require_own_property(property_id, user_email)
+    try:
+        updated = upsert_floor(
+            property_id=property_id,
+            floor_id=request.floor_id,
+            floor_number=request.floor_number,
+            floor_label=request.floor_label,
+            rooms=[r.model_dump() for r in request.rooms],
+        )
+    except PermissionError:
+        raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to make changes.")
+    return updated
+
+
+@app.delete("/api/properties/{property_id}/floors/{floor_id}")
+def api_delete_floor(property_id: str, floor_id: str, user_email: str = Depends(get_current_user_email)):
+    _require_own_property(property_id, user_email)
+    try:
+        delete_floor(property_id=property_id, floor_id=floor_id)
+    except PermissionError:
+        raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to make changes.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return get_property(property_id)
+
+
+@app.post("/api/properties/{property_id}/lock")
+def api_lock_property(property_id: str, user_email: str = Depends(get_current_user_email)):
+    """Locking is immediate — protecting your own work never needs extra
+    verification. Only UNLOCKING requires the OTP round-trip below."""
+    _require_own_property(property_id, user_email)
+    return set_locked(property_id=property_id, locked=True)
+
+
+@app.post("/api/properties/{property_id}/request-unlock")
+def api_request_unlock(property_id: str, user_email: str = Depends(get_current_user_email)):
+    """Sends a fresh email OTP that must be confirmed before the property
+    actually unlocks. Being signed in is deliberately NOT sufficient on
+    its own — an already-open session isn't treated as authorization to
+    unlock a design someone locked on purpose."""
+    _require_own_property(property_id, user_email)
+    code = create_otp(user_email)
+    send_otp_email(user_email, code, purpose="unlock_design")
+    return {"sent": True}
+
+
+@app.post("/api/properties/{property_id}/confirm-unlock")
+def api_confirm_unlock(property_id: str, request: ConfirmUnlockRequest, user_email: str = Depends(get_current_user_email)):
+    _require_own_property(property_id, user_email)
+    if not verify_otp(user_email, request.code):
+        raise HTTPException(status_code=401, detail="Incorrect or expired code.")
+    return set_locked(property_id=property_id, locked=False)
+
+
+@app.delete("/api/properties/{property_id}")
+def api_delete_property(property_id: str, user_email: str = Depends(get_current_user_email)):
+    prop = _require_own_property(property_id, user_email)
+    if prop["locked"]:
+        raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to delete it.")
+    delete_property(property_id)
+    return {"deleted": True}
 
 
 @app.get("/")

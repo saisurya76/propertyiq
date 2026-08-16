@@ -126,7 +126,7 @@ function PlotPreview({ plotLengthFt, plotWidthFt, roadFacingSide, rooms, siteEle
             const cy = rectY + el.width / 2;
 
             return (
-              <g key={el._key || i} transform={rotation ? `rotate(${rotation}, ${el.x}, ${rectY})` : undefined}>
+              <g key={el._key || i} transform={rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined}>
                 {isRound ? (
                   <circle cx={cx} cy={cy} r={Math.min(el.length, el.width) / 2} fill={el.color || "#86efac"} stroke="#166534" strokeWidth={0.3} />
                 ) : (

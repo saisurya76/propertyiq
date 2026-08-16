@@ -12,6 +12,7 @@ DEFAULT_TIER_CONFIG = {
         "price_usd": 4,
         "features": ["similar_property_suggestions"],
         "design_quota_per_month": 0,
+        "saved_designs_limit": 0,
     },
     "studio_starter": {
         "label": "Studio Starter",
@@ -24,6 +25,7 @@ DEFAULT_TIER_CONFIG = {
             "standard_suppliers",
         ],
         "design_quota_per_month": 3,
+        "saved_designs_limit": 2,
     },
     "studio_pro": {
         "label": "Studio Pro",
@@ -36,6 +38,7 @@ DEFAULT_TIER_CONFIG = {
             "premium_global_suppliers",
         ],
         "design_quota_per_month": 15,
+        "saved_designs_limit": 10,
     },
     "studio_unlimited": {
         "label": "Studio Unlimited",
@@ -50,6 +53,7 @@ DEFAULT_TIER_CONFIG = {
             "team_seats",
         ],
         "design_quota_per_month": None,  # None = unlimited
+        "saved_designs_limit": None,  # None = unlimited
     },
 }
 
