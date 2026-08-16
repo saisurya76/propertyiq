@@ -516,6 +516,10 @@
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 12px 32px rgba(76, 29, 149, 0.35);
+  pointer-events: none; /* display-only, no click handler — must never
+    intercept mouse events, since it floats on top of the Room Layout
+    canvas and would otherwise interrupt a drag gesture mid-motion when
+    the cursor crosses under it near the bottom of the screen */
 }
 
 .cs-floating-total .cs-total-label {
