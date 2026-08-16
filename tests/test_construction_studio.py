@@ -100,3 +100,57 @@ def test_dxf_hex_to_true_color_conversion():
     assert _hex_to_true_color("") is None
     assert _hex_to_true_color("not-a-color") is None
     assert _hex_to_true_color("#zzzzzz") is None
+
+
+def test_dimension_chain_segments_sum_to_full_plot():
+    from backend.construction_dxf import _compute_edge_dimension_segments
+
+    rooms = [
+        {"name": "Living Room", "x": 0, "y": 20, "length": 20, "width": 10},
+        {"name": "Bedroom", "x": 20, "y": 20, "length": 10, "width": 10},
+        {"name": "Bathroom", "x": 0, "y": 0, "length": 8, "width": 8},
+        {"name": "Master Bedroom", "x": 0, "y": 12, "length": 10, "width": 8},
+    ]
+    plot_length_ft, plot_width_ft = 40, 30
+
+    north = _compute_edge_dimension_segments(rooms, plot_length_ft, plot_width_ft, "north")
+    west = _compute_edge_dimension_segments(rooms, plot_length_ft, plot_width_ft, "west")
+
+    assert abs(sum(s["length"] for s in north) - plot_length_ft) < 0.01
+    assert abs(sum(s["length"] for s in west) - plot_width_ft) < 0.01
+    assert len(north) == 3
+    assert len(west) == 4
+
+
+def test_dimension_chain_no_rooms_touching_edge_falls_back_to_full_span():
+    from backend.construction_dxf import _compute_edge_dimension_segments
+
+    rooms = [{"name": "Center Room", "x": 15, "y": 10, "length": 10, "width": 10}]
+    segments = _compute_edge_dimension_segments(rooms, 40, 30, "north")
+    assert len(segments) == 1
+    assert segments[0]["length"] == 40
+
+
+def test_generated_dxf_contains_real_dimension_entities(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    rooms = [
+        {"name": "Living Room", "x": 0, "y": 20, "length": 20, "width": 10, "color": None},
+        {"name": "Bedroom", "x": 20, "y": 20, "length": 10, "width": 10, "color": None},
+    ]
+    path = generate_plot_dxf(
+        design_id="dim_pytest",
+        plot_length_ft=40,
+        plot_width_ft=30,
+        rooms=rooms,
+        road_facing_side="north",
+        output_dir=tmp_path,
+    )
+
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    dim_texts = [e.dxf.text for e in msp if e.dxftype() == "TEXT" and e.dxf.layer == "DIMENSIONS"]
+
+    assert "40' total" in dim_texts
+    assert any("20" in t for t in dim_texts)

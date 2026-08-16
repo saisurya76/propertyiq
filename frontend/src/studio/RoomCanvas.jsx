@@ -7,9 +7,112 @@ const GRID_STEP_FT = 2; // grid line every 2ft
 const SNAP_FT = 0.5; // rooms snap to the nearest 0.5ft on drag/resize
 const EDGE_SNAP_PX = 6; // snap-to-other-room edge alignment threshold, in screen px (pre-zoom)
 const MIN_ROOM_FT = 3; // smallest a room can be resized to
+const WALL_THICKNESS_FT = 0.4; // ~5in interior partition wall
+const EDGE_TOUCH_TOLERANCE_FT = 0.6; // how close to a plot edge counts as "touching" it for dimensioning
+const DIM_LINE_OFFSET_PX = 22; // distance of the segmented dimension chain from the plot edge
+const DIM_TOTAL_OFFSET_PX = 44; // distance of the overall-total dimension line, further out
+const STAGE_MARGIN_PX = DIM_TOTAL_OFFSET_PX + 20; // canvas padding — must clear the outermost dimension + its label
 
 function snap(value, step) {
   return Math.round(value / step) * step;
+}
+
+/**
+ * Architectural-style dimension chain: finds every room touching the given
+ * plot edge, collects their boundary positions along that edge, and
+ * returns consecutive segments that span the FULL edge with no gaps or
+ * overlaps — same convention as the segmented measurement chains in a
+ * real architectural drawing (e.g. "3000 | 7000 | 1200 | 3000").
+ */
+function computeEdgeDimensionSegments(rooms, plotLengthFt, plotWidthFt, edge) {
+  const fullSpan = edge === "north" ? plotLengthFt : plotWidthFt;
+  const boundaries = new Set([0, fullSpan]);
+
+  for (const room of rooms) {
+    if (edge === "north") {
+      const touches = Math.abs(room.y + room.width - plotWidthFt) < EDGE_TOUCH_TOLERANCE_FT;
+      if (touches) {
+        boundaries.add(Math.round(room.x * 10) / 10);
+        boundaries.add(Math.round((room.x + room.length) * 10) / 10);
+      }
+    } else {
+      const touches = Math.abs(room.x - 0) < EDGE_TOUCH_TOLERANCE_FT;
+      if (touches) {
+        boundaries.add(Math.round(room.y * 10) / 10);
+        boundaries.add(Math.round((room.y + room.width) * 10) / 10);
+      }
+    }
+  }
+
+  const sorted = [...boundaries].sort((a, b) => a - b);
+  const segments = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const start = sorted[i];
+    const end = sorted[i + 1];
+    if (end - start < 0.05) continue;
+    segments.push({ start, end, length: Math.round((end - start) * 10) / 10 });
+  }
+  return segments;
+}
+
+function DimensionChain({ segments, edge, offsetPx, baseScale, plotWidthFt }) {
+  if (!segments.length) return null;
+  const tickHalf = 4;
+
+  if (edge === "north") {
+    const lineY = -offsetPx;
+    const lastX = segments[segments.length - 1].end * baseScale;
+    return (
+      <Group listening={false}>
+        {segments.map((seg, i) => {
+          const x1 = seg.start * baseScale;
+          const x2 = seg.end * baseScale;
+          return (
+            <Fragment key={i}>
+              <Line points={[x1, lineY - tickHalf, x1, lineY + tickHalf]} stroke="#111827" strokeWidth={1} />
+              <Line points={[x1, lineY, x2, lineY]} stroke="#111827" strokeWidth={1} />
+              <Text x={x1} y={lineY - 13} width={x2 - x1} align="center" text={`${seg.length}'`} fontSize={9} fill="#111827" />
+            </Fragment>
+          );
+        })}
+        <Line points={[lastX, lineY - tickHalf, lastX, lineY + tickHalf]} stroke="#111827" strokeWidth={1} />
+      </Group>
+    );
+  }
+
+  // west edge: vertical chain. Segments are in feet, south-up (0=south,
+  // plotWidthFt=north); canvas y grows downward, so flip each endpoint.
+  const canvasYForFeet = (feetY) => (plotWidthFt - feetY) * baseScale;
+  const lineX = -offsetPx;
+  const allCanvasY = segments.flatMap((s) => [canvasYForFeet(s.start), canvasYForFeet(s.end)]);
+  const extremeY = [Math.min(...allCanvasY), Math.max(...allCanvasY)];
+
+  return (
+    <Group listening={false}>
+      {segments.map((seg, i) => {
+        const y1 = canvasYForFeet(seg.start);
+        const y2 = canvasYForFeet(seg.end);
+        const midY = (y1 + y2) / 2;
+        return (
+          <Fragment key={i}>
+            <Line points={[lineX - tickHalf, y1, lineX + tickHalf, y1]} stroke="#111827" strokeWidth={1} />
+            <Line points={[lineX, y1, lineX, y2]} stroke="#111827" strokeWidth={1} />
+            <Text
+              x={lineX - 34}
+              y={midY - 5}
+              width={30}
+              align="right"
+              text={`${seg.length}'`}
+              fontSize={9}
+              fill="#111827"
+            />
+          </Fragment>
+        );
+      })}
+      <Line points={[lineX - tickHalf, extremeY[0], lineX + tickHalf, extremeY[0]]} stroke="#111827" strokeWidth={1} />
+      <Line points={[lineX - tickHalf, extremeY[1], lineX + tickHalf, extremeY[1]]} stroke="#111827" strokeWidth={1} />
+    </Group>
+  );
 }
 
 function roadLinePoints(side, canvasWidth, canvasHeight) {
@@ -116,6 +219,16 @@ function RoomCanvas({
     }
     return lines;
   }, [safeLengthFt, safeWidthFt, baseScale, canvasWidth, canvasHeight]);
+
+  // ---- architectural dimension chains (north edge along the top, west edge along the left) ----
+  const northDimSegments = useMemo(
+    () => computeEdgeDimensionSegments(placedRooms, safeLengthFt, safeWidthFt, "north"),
+    [placedRooms, safeLengthFt, safeWidthFt]
+  );
+  const westDimSegments = useMemo(
+    () => computeEdgeDimensionSegments(placedRooms, safeLengthFt, safeWidthFt, "west"),
+    [placedRooms, safeLengthFt, safeWidthFt]
+  );
 
   // ---- zoom controls ----
   const clampZoom = (z) => Math.max(0.4, Math.min(3, z));
@@ -276,10 +389,10 @@ function RoomCanvas({
 
       <Stage
         ref={stageRef}
-        width={canvasWidth + 2 * ROAD_SIDE_OFFSET}
-        height={canvasHeight + 2 * ROAD_SIDE_OFFSET}
-        offsetX={-ROAD_SIDE_OFFSET}
-        offsetY={-ROAD_SIDE_OFFSET}
+        width={canvasWidth + STAGE_MARGIN_PX * 2}
+        height={canvasHeight + STAGE_MARGIN_PX * 2}
+        offsetX={-STAGE_MARGIN_PX}
+        offsetY={-STAGE_MARGIN_PX}
         scaleX={zoom}
         scaleY={zoom}
         x={stagePos.x}
@@ -291,7 +404,15 @@ function RoomCanvas({
         onMouseUp={handleStageMouseUp}
       >
         <Layer>
-          <Rect x={0} y={0} width={canvasWidth} height={canvasHeight} fill="#f5f3ff" stroke="#7c3aed" strokeWidth={1.5} />
+          <Rect
+            x={0}
+            y={0}
+            width={canvasWidth}
+            height={canvasHeight}
+            fill="#f5f3ff"
+            stroke="#1f2937"
+            strokeWidth={WALL_THICKNESS_FT * baseScale * 1.3}
+          />
 
           {gridLines.map((line) => (
             <Line key={line.key} points={line.points} stroke="#e9e4fb" strokeWidth={1} listening={false} />
@@ -302,6 +423,22 @@ function RoomCanvas({
           {guides.map((g) => (
             <Line key={g.key} points={g.points} stroke="#ec4899" strokeWidth={1} dash={[4, 3]} listening={false} />
           ))}
+
+          <DimensionChain segments={northDimSegments} edge="north" offsetPx={DIM_LINE_OFFSET_PX} baseScale={baseScale} plotWidthFt={safeWidthFt} />
+          <DimensionChain segments={westDimSegments} edge="west" offsetPx={DIM_LINE_OFFSET_PX} baseScale={baseScale} plotWidthFt={safeWidthFt} />
+
+          {/* Overall plot totals — outermost dimension line, matching the
+              unbroken outer measurement in a real architectural drawing. */}
+          <Group listening={false}>
+            <Line points={[0, -DIM_TOTAL_OFFSET_PX, canvasWidth, -DIM_TOTAL_OFFSET_PX]} stroke="#111827" strokeWidth={1} />
+            <Line points={[0, -DIM_TOTAL_OFFSET_PX - 4, 0, -DIM_TOTAL_OFFSET_PX + 4]} stroke="#111827" strokeWidth={1} />
+            <Line points={[canvasWidth, -DIM_TOTAL_OFFSET_PX - 4, canvasWidth, -DIM_TOTAL_OFFSET_PX + 4]} stroke="#111827" strokeWidth={1} />
+            <Text x={0} y={-DIM_TOTAL_OFFSET_PX - 15} width={canvasWidth} align="center" text={`${safeLengthFt}' total`} fontSize={10} fontStyle="700" fill="#111827" />
+
+            <Line points={[-DIM_TOTAL_OFFSET_PX, 0, -DIM_TOTAL_OFFSET_PX, canvasHeight]} stroke="#111827" strokeWidth={1} />
+            <Line points={[-DIM_TOTAL_OFFSET_PX - 4, 0, -DIM_TOTAL_OFFSET_PX + 4, 0]} stroke="#111827" strokeWidth={1} />
+            <Line points={[-DIM_TOTAL_OFFSET_PX - 4, canvasHeight, -DIM_TOTAL_OFFSET_PX + 4, canvasHeight]} stroke="#111827" strokeWidth={1} />
+          </Group>
 
           {placedRooms.map((room) => {
             const { x, y, width, height } = feetToCanvas(room);
@@ -319,8 +456,8 @@ function RoomCanvas({
                     width={width}
                     height={height}
                     fill={room.color || "#ede9fe"}
-                    stroke={isSelected ? "#4c1d95" : "#a78bfa"}
-                    strokeWidth={isSelected ? 2.5 : 1}
+                    stroke={isSelected ? "#4c1d95" : "#374151"}
+                    strokeWidth={isSelected ? WALL_THICKNESS_FT * baseScale + 1.5 : WALL_THICKNESS_FT * baseScale}
                     draggable={!panMode}
                     dragBoundFunc={(pos) => ({
                       x: Math.max(0, Math.min(pos.x, canvasWidth - width)),
