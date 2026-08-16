@@ -206,6 +206,24 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
                 corners + [corners[0]],
                 dxfattribs=attribs,
             )
+
+            if el_type == "car":
+                # Windshield divider + 4 wheel marks, same convention as the
+                # canvas symbol — a genuine distinctive silhouette rather
+                # than a plain rectangle.
+                divider = [(x + length * 0.32, y), (x + length * 0.32, y + width)]
+                if rotation:
+                    divider = [_rotate_point(px, py, x, y, rotation) for px, py in divider]
+                msp.add_line(divider[0], divider[1], dxfattribs=attribs)
+
+                wheel_r = min(length, width) * 0.09
+                wheel_offsets = [(0.22, 0.12), (0.22, 0.88), (0.82, 0.12), (0.82, 0.88)]
+                for fx, fy in wheel_offsets:
+                    wx, wy = x + length * fx, y + width * fy
+                    if rotation:
+                        wx, wy = _rotate_point(wx, wy, x, y, rotation)
+                    msp.add_circle((wx, wy), wheel_r, dxfattribs=attribs)
+
             label = el_type.replace("_", " ").title()
             msp.add_text(label, dxfattribs={**attribs, "height": 0.5}).set_placement(
                 (rcx, rcy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER

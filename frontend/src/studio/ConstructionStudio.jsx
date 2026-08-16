@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
 
@@ -120,6 +120,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
+  const estimateRequestIdRef = useRef(0); // guards against a slower, older request overwriting a faster, newer one
   const [layoutHistory, setLayoutHistory] = useState({
     past: [],
     present: { rooms: [emptyRoom()], elements: [] },
@@ -135,6 +136,39 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
 
   const plotSizeSqft = Math.round(plot.plot_length_ft * plot.plot_width_ft);
 
+  // Overflow validation — mouse drag/resize can no longer push a room or
+  // element outside the plot (the boundary is enforced live on the
+  // canvas), but typing a length/width/position directly into the table
+  // fields bypasses that. Check on every render and surface it as a
+  // dynamic banner rather than silently allowing an invalid layout.
+  const overflowWarnings = useMemo(() => {
+    const warnings = [];
+    const plotLengthFt = plot.plot_length_ft || 0;
+    const plotWidthFt = plot.plot_width_ft || 0;
+
+    for (const room of rooms) {
+      if (!room.name.trim()) continue;
+      if (room.length > plotLengthFt || room.width > plotWidthFt) {
+        warnings.push(`"${room.name}" (${room.length}' × ${room.width}') is larger than the plot itself (${plotLengthFt}' × ${plotWidthFt}').`);
+      } else if (room.x < 0 || room.y < 0 || room.x + room.length > plotLengthFt || room.y + room.width > plotWidthFt) {
+        warnings.push(`"${room.name}" extends outside the plot boundary.`);
+      }
+    }
+
+    for (const el of siteElements) {
+      const isLine = el.type in LINE_ELEMENT_DEFS;
+      if (isLine) continue; // lines aren't bounded to the plot
+      const label = ELEMENT_DEFS[el.type]?.label || el.type;
+      if (el.length > plotLengthFt || el.width > plotWidthFt) {
+        warnings.push(`${label} (${el.length}' × ${el.width}') is larger than the plot itself.`);
+      } else if (el.x < 0 || el.y < 0 || el.x + el.length > plotLengthFt || el.y + el.width > plotWidthFt) {
+        warnings.push(`${label} extends outside the plot boundary.`);
+      }
+    }
+
+    return warnings;
+  }, [rooms, siteElements, plot.plot_length_ft, plot.plot_width_ft]);
+
   // Load material catalog whenever region changes
   useEffect(() => {
     studioApi.getMaterials(plot.region).then((res) => setCatalog(res.categories)).catch(() => setCatalog(null));
@@ -147,6 +181,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   // Live running total whenever selections/plot size/currency change
   useEffect(() => {
     if (Object.keys(selections).length === 0) return;
+    const requestId = ++estimateRequestIdRef.current;
     studioApi
       .estimateCost({
         plot_size_sqft: plotSizeSqft,
@@ -154,7 +189,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         region: plot.region,
         currency: plot.currency,
       })
-      .then(setEstimate)
+      .then((result) => {
+        // A slower earlier request can resolve AFTER a faster later one —
+        // confirmed with a real overlapping-request test. Only apply the
+        // response if it's still the most recently issued request.
+        if (requestId === estimateRequestIdRef.current) setEstimate(result);
+      })
       .catch(() => {});
   }, [selections, plotSizeSqft, plot.region, plot.currency]);
 
@@ -382,6 +422,15 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
 
       {error && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{error}</div>}
 
+      {overflowWarnings.length > 0 && (
+        <div className="cs-overflow-banner">
+          <strong>⚠ Fix before generating:</strong>
+          <ul>
+            {overflowWarnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+
       {step === 0 && (
         <div className="cs-card">
           <h3>Plot Details</h3>
@@ -596,70 +645,76 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
 
           {siteElements.length > 0 && (
             <>
+              <h4 className="cs-list-heading">Site Elements</h4>
               <div className="cs-room-row cs-room-row-header">
                 <span>Element</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>
               </div>
-              {siteElements.map((el) => {
-                const isLine = el.type in LINE_ELEMENT_DEFS;
-                const label = isLine ? LINE_ELEMENT_DEFS[el.type].label : ELEMENT_DEFS[el.type].label;
-                return (
-                  <div
-                    className={`cs-room-row ${selectedKeys.includes(el._key) ? "cs-room-row-selected" : ""}`}
-                    key={el._key}
-                    onClick={() => setSelectedKeys([el._key])}
-                  >
-                    <span className="cs-element-label">{label}</span>
-                    {isLine ? (
-                      <span className="cs-element-note">drag endpoints on canvas</span>
-                    ) : (
-                      <>
-                        <input
-                          type="number"
-                          value={el.length}
-                          onChange={(e) => updateElement(el._key, "length", Number(e.target.value))}
-                        />
-                        <input
-                          type="number"
-                          value={el.width}
-                          onChange={(e) => updateElement(el._key, "width", Number(e.target.value))}
-                        />
-                      </>
-                    )}
-                    {!isLine && <span />}
-                    <button className="cs-remove-room" onClick={() => removeElement(el._key)}>Remove</button>
-                  </div>
-                );
-              })}
+              <div className="cs-scrollable-list">
+                {siteElements.map((el) => {
+                  const isLine = el.type in LINE_ELEMENT_DEFS;
+                  const label = isLine ? LINE_ELEMENT_DEFS[el.type].label : ELEMENT_DEFS[el.type].label;
+                  return (
+                    <div
+                      className={`cs-room-row ${selectedKeys.includes(el._key) ? "cs-room-row-selected" : ""}`}
+                      key={el._key}
+                      onClick={() => setSelectedKeys([el._key])}
+                    >
+                      <span className="cs-element-label">{label}</span>
+                      {isLine ? (
+                        <span className="cs-element-note">drag endpoints on canvas</span>
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            value={el.length}
+                            onChange={(e) => updateElement(el._key, "length", Number(e.target.value))}
+                          />
+                          <input
+                            type="number"
+                            value={el.width}
+                            onChange={(e) => updateElement(el._key, "width", Number(e.target.value))}
+                          />
+                        </>
+                      )}
+                      {!isLine && <span />}
+                      <button className="cs-remove-room" onClick={() => removeElement(el._key)}>Remove</button>
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
 
+          <h4 className="cs-list-heading">Rooms</h4>
           <div className="cs-room-row cs-room-row-header">
             <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>
           </div>
-          {rooms.map((room) => (
-            <div
-              className={`cs-room-row ${selectedKeys.includes(room._key) ? "cs-room-row-selected" : ""}`}
-              key={room._key}
-              onClick={() => setSelectedKeys([room._key])}
-            >
-              <input placeholder="Kitchen" value={room.name} onChange={(e) => updateRoom(room._key, "name", e.target.value)} />
-              <input type="number" placeholder="Length (ft)" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
-              <input type="number" placeholder="Width (ft)" value={room.width} onChange={(e) => updateRoom(room._key, "width", Number(e.target.value))} />
-              <div className="cs-room-color-swatches" onClick={(e) => e.stopPropagation()}>
-                {ROOM_COLOR_PALETTE.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`cs-room-color-swatch ${room.color === color ? "cs-room-color-swatch-active" : ""}`}
-                    style={{ background: color }}
-                    onClick={() => updateRoom(room._key, "color", color)}
-                    aria-label={`Set room color ${color}`}
-                  />
-                ))}
+          <div className="cs-scrollable-list">
+            {rooms.map((room) => (
+              <div
+                className={`cs-room-row ${selectedKeys.includes(room._key) ? "cs-room-row-selected" : ""}`}
+                key={room._key}
+                onClick={() => setSelectedKeys([room._key])}
+              >
+                <input placeholder="Kitchen" value={room.name} onChange={(e) => updateRoom(room._key, "name", e.target.value)} />
+                <input type="number" placeholder="Length (ft)" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
+                <input type="number" placeholder="Width (ft)" value={room.width} onChange={(e) => updateRoom(room._key, "width", Number(e.target.value))} />
+                <div className="cs-room-color-swatches" onClick={(e) => e.stopPropagation()}>
+                  {ROOM_COLOR_PALETTE.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`cs-room-color-swatch ${room.color === color ? "cs-room-color-swatch-active" : ""}`}
+                      style={{ background: color }}
+                      onClick={() => updateRoom(room._key, "color", color)}
+                      aria-label={`Set room color ${color}`}
+                    />
+                  ))}
+                </div>
+                <button className="cs-remove-room" onClick={() => removeRoom(room._key)}>Remove</button>
               </div>
-              <button className="cs-remove-room" onClick={() => removeRoom(room._key)}>Remove</button>
-            </div>
-          ))}
+            ))}
+          </div>
           <button className="cs-add-room-btn" onClick={addRoom}>+ Add room</button>
         </div>
       )}
@@ -675,8 +730,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                 {Object.keys(selections).length} material{Object.keys(selections).length === 1 ? "" : "s"} selected ·{" "}
                 {rooms.filter((r) => r.name.trim()).length} room(s)
               </p>
-              <button className="cs-nav-btn cs-nav-primary" onClick={generateDesign} disabled={loading}>
-                {loading ? "Generating..." : "Generate Design"}
+              <button className="cs-nav-btn cs-nav-primary" onClick={generateDesign} disabled={loading || overflowWarnings.length > 0}>
+                {loading ? "Generating..." : overflowWarnings.length > 0 ? "Fix layout errors above first" : "Generate Design"}
               </button>
             </>
           )}
@@ -754,6 +809,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
         plotWidthFt={plot.plot_width_ft}
         roadFacingSide={plot.road_facing_side}
         rooms={rooms}
+        siteElements={siteElements}
       />
 
       {estimate && Object.keys(selections).length > 0 && !result && (

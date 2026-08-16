@@ -248,3 +248,21 @@ def test_tree_symbol_has_layered_canopy_not_a_single_circle(tmp_path):
     msp = doc.modelspace()
     circles = [e for e in msp if e.dxftype() == "CIRCLE" and e.dxf.layer == "SITE_ELEMENTS"]
     assert len(circles) == 4  # main canopy + 2 offset lobes + trunk mark
+
+
+def test_car_symbol_has_wheels_and_windshield(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    site_elements = [{"type": "car", "x": 5, "y": 5, "length": 15, "width": 7, "color": None, "rotation": 30}]
+    path = generate_plot_dxf(
+        design_id="car_art_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=[], site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    circles = [e for e in msp if e.dxftype() == "CIRCLE" and e.dxf.layer == "SITE_ELEMENTS"]
+    lines = [e for e in msp if e.dxftype() == "LINE" and e.dxf.layer == "SITE_ELEMENTS"]
+    assert len(circles) == 4
+    assert len(lines) == 1

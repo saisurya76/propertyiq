@@ -26,7 +26,7 @@ function flipY(y, widthFt) {
   return widthFt - y;
 }
 
-function PlotPreview({ plotLengthFt, plotWidthFt, roadFacingSide, rooms }) {
+function PlotPreview({ plotLengthFt, plotWidthFt, roadFacingSide, rooms, siteElements = [] }) {
   if (!plotLengthFt || !plotWidthFt) return null;
 
   const padding = 20;
@@ -92,6 +92,46 @@ function PlotPreview({ plotLengthFt, plotWidthFt, roadFacingSide, rooms }) {
                 >
                   {room.name}
                 </text>
+              </g>
+            );
+          })}
+
+        {/* Site elements — same basic-shape convention as the interactive
+            canvas, simplified for this lightweight preview: circles for
+            tree/plant, a rectangle for everything else, lines for the two
+            line types. Rotation pivots around the element's corner, same
+            convention as the interactive canvas. */}
+        {siteElements
+          .filter((el) => el.type === "line" || el.type === "dotted_line" || (el.length > 0 && el.width > 0))
+          .map((el, i) => {
+            if (el.type === "line" || el.type === "dotted_line") {
+              return (
+                <line
+                  key={el._key || i}
+                  x1={el.x}
+                  y1={flipY(el.y, plotWidthFt)}
+                  x2={el.x2}
+                  y2={flipY(el.y2, plotWidthFt)}
+                  stroke={el.color || "#111827"}
+                  strokeWidth={0.4}
+                  strokeDasharray={el.type === "dotted_line" ? "1.5,1" : undefined}
+                />
+              );
+            }
+
+            const rectY = flipY(el.y + el.width, plotWidthFt);
+            const rotation = el.rotation || 0;
+            const isRound = el.type === "tree" || el.type === "plant";
+            const cx = el.x + el.length / 2;
+            const cy = rectY + el.width / 2;
+
+            return (
+              <g key={el._key || i} transform={rotation ? `rotate(${rotation}, ${el.x}, ${rectY})` : undefined}>
+                {isRound ? (
+                  <circle cx={cx} cy={cy} r={Math.min(el.length, el.width) / 2} fill={el.color || "#86efac"} stroke="#166534" strokeWidth={0.3} />
+                ) : (
+                  <rect x={el.x} y={rectY} width={el.length} height={el.width} fill={el.color || "#cbd5e1"} stroke="#6b7280" strokeWidth={0.3} />
+                )}
               </g>
             );
           })}

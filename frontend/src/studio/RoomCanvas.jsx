@@ -157,7 +157,7 @@ const ELEMENT_DEFS_FOR_RENDER = {
   plant: { label: "Plant", color: "#bbf7d0", symbol: "circle" },
   gazebo: { label: "Gazebo", color: "#e7d4b5", symbol: "hexagon" },
   pool: { label: "Swimming Pool", color: "#7dd3fc", symbol: null, rounded: true },
-  car: { label: "Car", color: "#cbd5e1", symbol: null, rounded: true },
+  car: { label: "Car", color: "#cbd5e1", symbol: "car", rounded: true },
   pathway: { label: "Pathway", color: "#e7e5e4", symbol: null },
   bench: { label: "Bench", color: "#c4a484", symbol: null, rounded: true },
 };
@@ -282,6 +282,35 @@ function RoomCanvas({
     };
   }
 
+  // Site elements use CENTER-pivot rotation (see the areaElements render
+  // loop), so their drag-bound must clamp the CENTER position such that
+  // the element's true ROTATED footprint — not its unrotated width/height —
+  // never exceeds the plot. A rotated rectangle's axis-aligned bounding
+  // half-extents are a standard, well-defined formula; using the plain
+  // unrotated width/height here (as an earlier version did) is exactly
+  // what let rotated elements (e.g. a rotated pool) visually escape the
+  // plot boundary even though their nominal x/y stayed "in bounds".
+  function makeElementDragBoundFunc(width, height, rotationDeg) {
+    const hw = width / 2;
+    const hh = height / 2;
+    const theta = (rotationDeg * Math.PI) / 180;
+    const c = Math.abs(Math.cos(theta));
+    const s = Math.abs(Math.sin(theta));
+    const boundHalfWidth = hw * c + hh * s;
+    const boundHalfHeight = hw * s + hh * c;
+
+    return function (pos) {
+      const parentTransform = this.getParent().getAbsoluteTransform();
+      const inverse = parentTransform.copy().invert();
+      const local = inverse.point(pos); // this Group's local x/y IS its center
+      const clampedLocal = {
+        x: Math.max(boundHalfWidth, Math.min(local.x, canvasWidth - boundHalfWidth)),
+        y: Math.max(boundHalfHeight, Math.min(local.y, canvasHeight - boundHalfHeight)),
+      };
+      return parentTransform.point(clampedLocal);
+    };
+  }
+
   // ---- zoom controls ----
   const clampZoom = (z) => Math.max(0.4, Math.min(3, z));
 
@@ -322,6 +351,78 @@ function RoomCanvas({
       );
     } else {
       onSelectionChange([key]);
+    }
+  };
+
+  // ---- multi-select group drag: moving any one selected shape moves all
+  // other currently-selected shapes by the same delta. Works uniformly for
+  // rooms (corner-anchored) and elements (center-anchored, post rotation
+  // refactor) since a translation delta is agnostic to what the anchor
+  // point represents — only the FINAL per-shape commit needs to know which
+  // convention applies. ----
+  const multiDragRef = useRef(null);
+
+  const handleAnyDragStart = (key) => {
+    if (selectedKeys.length > 1 && selectedKeys.includes(key)) {
+      const startPositions = {};
+      for (const k of selectedKeys) {
+        const node = shapeRefs.current[k];
+        if (node) startPositions[k] = { x: node.x(), y: node.y() };
+      }
+      multiDragRef.current = { anchorKey: key, startPositions };
+    } else {
+      multiDragRef.current = null;
+    }
+  };
+
+  const applyMultiDragDelta = (anchorKey, e) => {
+    const md = multiDragRef.current;
+    if (!md || md.anchorKey !== anchorKey) return;
+    const anchorStart = md.startPositions[anchorKey];
+    const dx = e.target.x() - anchorStart.x;
+    const dy = e.target.y() - anchorStart.y;
+    for (const [key, start] of Object.entries(md.startPositions)) {
+      if (key === anchorKey) continue;
+      const node = shapeRefs.current[key];
+      if (node) {
+        node.x(start.x + dx);
+        node.y(start.y + dy);
+      }
+    }
+  };
+
+  // Returns the OTHER selected keys that were moved (excluding the anchor,
+  // which the caller commits separately via its own normal path), or null
+  // if this wasn't a multi-drag.
+  const finishMultiDrag = (anchorKey) => {
+    const md = multiDragRef.current;
+    if (!md || md.anchorKey !== anchorKey) return null;
+    multiDragRef.current = null;
+    return Object.keys(md.startPositions).filter((k) => k !== anchorKey);
+  };
+
+  // Commits a moved shape's CURRENT Konva node position back to React
+  // state, looking up whether it's a room (corner-anchored) or an element
+  // (center-anchored) to apply the right conversion.
+  const commitMovedShapeByKey = (key, roomUpdates, elementUpdates) => {
+    const node = shapeRefs.current[key];
+    if (!node) return;
+
+    const room = rooms.find((r) => r._key === key);
+    if (room) {
+      const { height } = feetToCanvas(room);
+      const { x, y } = canvasToFeet(node.x(), node.y(), 0, height);
+      roomUpdates.push({ key, x, y });
+      return;
+    }
+
+    const el = areaElements.find((it) => it._key === key);
+    if (el) {
+      const { width, height } = feetToCanvas(el);
+      const topLeftCanvasX = node.x() - width / 2;
+      const topLeftCanvasY = node.y() - height / 2;
+      const { x, y } = canvasToFeet(topLeftCanvasX, topLeftCanvasY, width, height);
+      elementUpdates.push({ key, x, y });
     }
   };
 
@@ -420,12 +521,40 @@ function RoomCanvas({
     e.target.x(snappedX);
     e.target.y(snappedY);
     drawGuides(newGuides);
+    applyMultiDragDelta(item._key, e);
+  };
+
+  const finishMultiDragAndCommit = (anchorKey) => {
+    const otherKeys = finishMultiDrag(anchorKey);
+    if (!otherKeys || otherKeys.length === 0) return;
+
+    const roomUpdates = [];
+    const elementUpdates = [];
+    for (const key of otherKeys) commitMovedShapeByKey(key, roomUpdates, elementUpdates);
+
+    if (roomUpdates.length > 0) {
+      onRoomsChange(
+        rooms.map((r) => {
+          const u = roomUpdates.find((ru) => ru.key === r._key);
+          return u ? { ...r, x: u.x, y: u.y } : r;
+        })
+      );
+    }
+    if (elementUpdates.length > 0) {
+      onElementsChange(
+        siteElements.map((el) => {
+          const u = elementUpdates.find((eu) => eu.key === el._key);
+          return u ? { ...el, x: u.x, y: u.y } : el;
+        })
+      );
+    }
   };
 
   const handleDragEnd = (item, items, onChange, e) => {
     drawGuides([]);
     const { x, y } = canvasToFeet(e.target.x(), e.target.y(), 0, feetToCanvas(item).height);
     onChange(items.map((it) => (it._key === item._key ? { ...it, x, y } : it)));
+    finishMultiDragAndCommit(item._key);
   };
 
   const handleTransformEnd = (item, items, onChange, e) => {
@@ -447,11 +576,81 @@ function RoomCanvas({
     );
   };
 
+  const handleElementDragMove = (el, e) => {
+    applyMultiDragDelta(el._key, e);
+  };
+
+  const handleElementDragEnd = (el, e) => {
+    const { width, height } = feetToCanvas(el); // pixel size, unaffected by drag
+    const topLeftCanvasX = e.target.x() - width / 2;
+    const topLeftCanvasY = e.target.y() - height / 2;
+    const { x, y } = canvasToFeet(topLeftCanvasX, topLeftCanvasY, width, height);
+    onElementsChange(siteElements.map((it) => (it._key === el._key ? { ...it, x, y } : it)));
+    finishMultiDragAndCommit(el._key);
+  };
+
+  const handleElementTransformEnd = (el, e) => {
+    const node = e.target;
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
+    const rotation = node.rotation();
+    node.scaleX(1);
+    node.scaleY(1);
+
+    const newWidthPx = Math.max(MIN_ROOM_FT * baseScale, node.width() * scaleX);
+    const newHeightPx = Math.max(MIN_ROOM_FT * baseScale, node.height() * scaleY);
+
+    // Keep the node's own offset in sync with its new size immediately —
+    // otherwise there's a one-frame visual glitch before React's next
+    // render (which derives offsetX/Y fresh from the committed state)
+    // catches up.
+    node.offsetX(newWidthPx / 2);
+    node.offsetY(newHeightPx / 2);
+
+    const topLeftCanvasX = node.x() - newWidthPx / 2;
+    const topLeftCanvasY = node.y() - newHeightPx / 2;
+    const { x, y, length, width } = canvasToFeet(topLeftCanvasX, topLeftCanvasY, newWidthPx, newHeightPx);
+
+    onElementsChange(
+      siteElements.map((it) => (it._key === el._key ? { ...it, x, y, length, width, rotation } : it))
+    );
+  };
+
   const handleLineEndpointDrag = (line, endpoint, e) => {
     const { x, y } = canvasToFeet(e.target.x(), e.target.y(), 0, 0);
     const field1 = endpoint === "start" ? "x" : "x2";
     const field2 = endpoint === "start" ? "y" : "y2";
     onElementsChange(siteElements.map((el) => (el._key === line._key ? { ...el, [field1]: x, [field2]: y } : el)));
+  };
+
+  // Rotates the WHOLE line around its own midpoint, keeping its length
+  // fixed — distinct from dragging a single endpoint (which stretches
+  // that end freely and changes length). Committed on drag end only (no
+  // live imperative preview during the gesture, unlike shape drags —
+  // an acceptable simplification for this smaller, less-used control).
+  const handleLineRotateDrag = (line, e) => {
+    const p1x = line.x * baseScale;
+    const p1y = (safeWidthFt - line.y) * baseScale;
+    const p2x = line.x2 * baseScale;
+    const p2y = (safeWidthFt - line.y2) * baseScale;
+    const midX = (p1x + p2x) / 2;
+    const midY = (p1y + p2y) / 2;
+    const lengthPx = Math.hypot(p2x - p1x, p2y - p1y);
+
+    const angle = Math.atan2(e.target.y() - midY, e.target.x() - midX);
+    const newP1x = midX - (lengthPx / 2) * Math.cos(angle);
+    const newP1y = midY - (lengthPx / 2) * Math.sin(angle);
+    const newP2x = midX + (lengthPx / 2) * Math.cos(angle);
+    const newP2y = midY + (lengthPx / 2) * Math.sin(angle);
+
+    const feet1 = canvasToFeet(newP1x, newP1y, 0, 0);
+    const feet2 = canvasToFeet(newP2x, newP2y, 0, 0);
+
+    onElementsChange(
+      siteElements.map((el) =>
+        el._key === line._key ? { ...el, x: feet1.x, y: feet1.y, x2: feet2.x, y2: feet2.y } : el
+      )
+    );
   };
 
   const handleLineBodyDragEnd = (line, e) => {
@@ -560,6 +759,7 @@ function RoomCanvas({
                     strokeWidth={isSelected ? WALL_THICKNESS_FT * baseScale + 1.5 : WALL_THICKNESS_FT * baseScale}
                     draggable={!panMode}
                     dragBoundFunc={makeDragBoundFunc(width, height)}
+                    onDragStart={() => handleAnyDragStart(room._key)}
                     onDragMove={(e) => handleDragMove(room, e)}
                     onDragEnd={(e) => handleDragEnd(room, rooms, onRoomsChange, e)}
                     onTransformEnd={(e) => handleTransformEnd(room, rooms, onRoomsChange, e)}
@@ -593,7 +793,9 @@ function RoomCanvas({
           })}
 
           {areaElements.map((el) => {
-            const { x, y, width, height } = feetToCanvas(el);
+            const { x: topLeftX, y: topLeftY, width, height } = feetToCanvas(el);
+            const cx = topLeftX + width / 2;
+            const cy = topLeftY + height / 2;
             const isSelected = selectedKeys.includes(el._key);
             const def = ELEMENT_DEFS_FOR_RENDER[el.type] || {};
             const symbol = def.symbol;
@@ -601,20 +803,30 @@ function RoomCanvas({
 
             return (
               <Fragment key={el._key}>
+                {/* Center-pivot Group: x/y is the CENTER (converted from the
+                    stored top-left corner just for rendering — the stored
+                    data model stays top-left, matching rooms/backend/DXF).
+                    Rotating around the center, not a corner, is both more
+                    intuitive and makes the boundary-clamping math tractable
+                    (a rotated rectangle's true footprint is well-defined
+                    relative to its own center, not one of its corners). */}
                 <Group
                   ref={(node) => {
                     if (node) shapeRefs.current[el._key] = node;
                   }}
-                  x={x}
-                  y={y}
+                  x={cx}
+                  y={cy}
+                  offsetX={width / 2}
+                  offsetY={height / 2}
                   rotation={el.rotation || 0}
                   width={width}
                   height={height}
                   draggable={!panMode}
-                  dragBoundFunc={makeDragBoundFunc(width, height)}
-                  onDragMove={(e) => handleDragMove(el, e)}
-                  onDragEnd={(e) => handleDragEnd(el, siteElements, onElementsChange, e)}
-                  onTransformEnd={(e) => handleTransformEnd(el, siteElements, onElementsChange, e)}
+                  dragBoundFunc={makeElementDragBoundFunc(width, height, el.rotation || 0)}
+                  onDragStart={() => handleAnyDragStart(el._key)}
+                  onDragMove={(e) => handleElementDragMove(el, e)}
+                  onDragEnd={(e) => handleElementDragEnd(el, e)}
+                  onTransformEnd={(e) => handleElementTransformEnd(el, e)}
                   onClick={(evt) => toggleSelect(el._key, evt.evt.shiftKey)}
                   onTap={() => toggleSelect(el._key, false)}
                 >
@@ -687,6 +899,49 @@ function RoomCanvas({
                       listening={false}
                     />
                   )}
+                  {symbol === "car" && (
+                    <>
+                      {/* Windshield divider + two wheel marks — a simple,
+                          genuine flat-icon silhouette rather than a plain
+                          rectangle. Not licensed clipart, which isn't
+                          something that can be sourced or bundled here —
+                          a distinctive hand-built symbol instead. */}
+                      <Line
+                        points={[width * 0.32, 0, width * 0.32, height]}
+                        stroke="#4b5563"
+                        strokeWidth={1}
+                        listening={false}
+                      />
+                      <Circle
+                        x={width * 0.22}
+                        y={height * 0.12}
+                        radius={Math.min(width, height) * 0.09}
+                        fill="#374151"
+                        listening={false}
+                      />
+                      <Circle
+                        x={width * 0.22}
+                        y={height * 0.88}
+                        radius={Math.min(width, height) * 0.09}
+                        fill="#374151"
+                        listening={false}
+                      />
+                      <Circle
+                        x={width * 0.82}
+                        y={height * 0.12}
+                        radius={Math.min(width, height) * 0.09}
+                        fill="#374151"
+                        listening={false}
+                      />
+                      <Circle
+                        x={width * 0.82}
+                        y={height * 0.88}
+                        radius={Math.min(width, height) * 0.09}
+                        fill="#374151"
+                        listening={false}
+                      />
+                    </>
+                  )}
                   <Text
                     x={0}
                     y={height / 2 - 6}
@@ -742,6 +997,40 @@ function RoomCanvas({
                   onDragMove={(e) => handleLineEndpointDrag(line, "end", e)}
                   onClick={() => toggleSelect(line._key, false)}
                 />
+                {isSelected &&
+                  (() => {
+                    const midX = (p1x + p2x) / 2;
+                    const midY = (p1y + p2y) / 2;
+                    const dx = p2x - p1x;
+                    const dy = p2y - p1y;
+                    const len = Math.hypot(dx, dy) || 1;
+                    // Perpendicular unit vector, offset outward by a fixed
+                    // pixel distance, so the rotate handle sits clearly off
+                    // to the side rather than overlapping the line itself.
+                    const perpX = (-dy / len) * 22;
+                    const perpY = (dx / len) * 22;
+                    return (
+                      <>
+                        <Line
+                          points={[midX, midY, midX + perpX, midY + perpY]}
+                          stroke="#f59e0b"
+                          strokeWidth={1}
+                          dash={[2, 2]}
+                          listening={false}
+                        />
+                        <Circle
+                          x={midX + perpX}
+                          y={midY + perpY}
+                          radius={5}
+                          fill="#f59e0b"
+                          stroke="#92400e"
+                          strokeWidth={1}
+                          draggable={!panMode}
+                          onDragEnd={(e) => handleLineRotateDrag(line, e)}
+                        />
+                      </>
+                    );
+                  })()}
               </Fragment>
             );
           })}
@@ -763,6 +1052,30 @@ function RoomCanvas({
               if (newBox.width < minPx || newBox.height < minPx) {
                 return oldBox;
               }
+
+              // Also reject any resize that would push the shape's true
+              // bounding box (Konva's __getNodeRect already accounts for
+              // the shape's own rotation here) outside the plot. newBox is
+              // in absolute space; convert to local/model space via the
+              // attached node's own parent transform (boundBoxFunc is
+              // invoked directly, not via .call, so `this` isn't the
+              // Transformer here — read the live attached node from the
+              // ref instead).
+              const attachedNode = transformerRef.current?.nodes()?.[0];
+              if (attachedNode) {
+                const parentTransform = attachedNode.getParent().getAbsoluteTransform();
+                const inverse = parentTransform.copy().invert();
+                const topLeft = inverse.point({ x: newBox.x, y: newBox.y });
+                const bottomRight = inverse.point({ x: newBox.x + newBox.width, y: newBox.y + newBox.height });
+                const minX = Math.min(topLeft.x, bottomRight.x);
+                const maxX = Math.max(topLeft.x, bottomRight.x);
+                const minY = Math.min(topLeft.y, bottomRight.y);
+                const maxY = Math.max(topLeft.y, bottomRight.y);
+                if (minX < -0.01 || minY < -0.01 || maxX > canvasWidth + 0.01 || maxY > canvasHeight + 0.01) {
+                  return oldBox;
+                }
+              }
+
               return newBox;
             }}
           />

@@ -262,6 +262,35 @@
   padding-bottom: 90px; /* clearance for the fixed floating total bar */
 }
 
+.cs-overflow-banner {
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  color: #991b1b;
+  font-size: 13px;
+  animation: cs-banner-in 0.15s ease-out;
+}
+
+.cs-overflow-banner strong {
+  font-size: 13px;
+}
+
+.cs-overflow-banner ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.cs-overflow-banner li {
+  margin-bottom: 2px;
+}
+
+@keyframes cs-banner-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .cs-steps {
   display: flex;
   justify-content: center;
@@ -692,6 +721,22 @@
   padding: 8px 12px;
   cursor: pointer;
   font-size: 13px;
+}
+
+.cs-list-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 18px 0 6px;
+}
+
+.cs-scrollable-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 10px;
 }
 
 .cs-add-room-btn {
