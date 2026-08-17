@@ -609,8 +609,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         // One request for the property fields AND the complete floor set
         // (previously: one update call + one call per floor + a final
         // re-fetch — more requests meant more chances for any single one
-        // to fail, which is exactly what a "Failed to fetch" report
-        // traced back to; this also fixes a real correctness bug where a
+        // to fail; this also fixes a real correctness bug where a
         // locally-removed floor was never actually deleted server-side).
         const synced = await studioApi.syncProperty(propertyId, {
           ...buildPropertyPayload(propertyName),
@@ -621,14 +620,33 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             rooms: f.rooms.map(stripKey),
           })),
         });
+
+        // Validate the response shape HERE, synchronously, inside the
+        // try block — if this throws, the catch below actually catches
+        // it. A previous version of this code read `synced.floors`
+        // straight from inside the setLayoutHistory updater function
+        // instead; React invokes that updater during its own
+        // reconciliation, OUTSIDE this try/catch's synchronous scope, so
+        // a malformed response there produced an UNCAUGHT crash of the
+        // whole component (confirmed directly: simulating a malformed
+        // /sync response reproduced exactly this — a TypeError from deep
+        // inside React's updateReducer, no error boundary, whole tree
+        // torn down) rather than the clear save-failed message the user
+        // should have seen.
+        if (!synced || !Array.isArray(synced.floors)) {
+          throw new Error("The server's response was missing expected data — please try saving again.");
+        }
+        const syncedFloorIds = synced.floors.map((f) => f.floor_id);
+
         // Pick up server-assigned floor_ids for any newly-created floors
         // so the next save updates them in place instead of duplicating —
-        // keep local rooms/_keys as the source of truth, only borrow the id.
+        // keep local rooms/_keys as the source of truth, only borrow the
+        // id (from the plain array above, not `synced` itself).
         setLayoutHistory((s) => ({
           ...s,
           present: {
             ...s.present,
-            floors: s.present.floors.map((f, i) => ({ ...f, floor_id: synced.floors[i]?.floor_id || f.floor_id })),
+            floors: s.present.floors.map((f, i) => ({ ...f, floor_id: syncedFloorIds[i] || f.floor_id })),
           },
         }));
         setSaveStatus("Saved.");
@@ -637,20 +655,26 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         setPropertyId(created.property_id);
         setSaveStatus("Saved.");
       }
-    } catch (e) {
-      // "Failed to fetch" is the browser's own message for a network-
-      // level failure (no connection, DNS, or the request never reached
-      // the server) — distinct from a normal API error response, and
-      // worth a clearer message than the raw browser text.
-      const isNetworkFailure = e instanceof TypeError || /failed to fetch/i.test(e.message || "");
-      setSaveStatus(
-        isNetworkFailure
-          ? "Couldn't reach the server — check your connection and try again."
-          : e.message || "Couldn't save this design."
-      );
-    } finally {
       setSaving(false);
       setTimeout(() => setSaveStatus(""), 4000);
+    } catch (e) {
+      // Only the browser's own network-failure wording counts as "can't
+      // reach the server" — matching on `instanceof TypeError` alone was
+      // too broad and mislabeled genuine code bugs (which also throw
+      // TypeError, e.g. reading a property of an unexpected response
+      // shape) as a connectivity problem, hiding the real error.
+      const isNetworkFailure = /failed to fetch|networkerror|load failed/i.test(e.message || "");
+      // Always log the raw error — the on-screen message is deliberately
+      // generic, but the real error (visible in the browser console) is
+      // what actually diagnoses a repeat report.
+      console.error("Save failed:", e);
+      setSaveStatus(
+        isNetworkFailure
+          ? "Couldn't reach the server. This can happen if the backend just woke up from being idle — wait a few seconds and try Save again."
+          : e.message || "Couldn't save this design."
+      );
+      setSaving(false);
+      setTimeout(() => setSaveStatus(""), 10000); // errors stay up longer than the brief "Saved." confirmation — worth reading
     }
   };
 
