@@ -606,28 +606,29 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     setSaveStatus("");
     try {
       if (propertyId) {
-        // Update the property-level fields, then upsert each floor
-        // individually (each floor keeps its own floor_id so existing
-        // floors update in place rather than duplicating).
-        await studioApi.updateProperty(propertyId, buildPropertyPayload(propertyName));
-        for (const floor of floors) {
-          await studioApi.upsertFloor(propertyId, {
-            floor_id: floor.floor_id,
-            floor_number: floor.floor_number,
-            floor_label: floor.floor_label,
-            rooms: floor.rooms.map(stripKey),
-          });
-        }
-        // Re-fetch just to pick up server-assigned floor_ids for any
-        // newly-created floors (so the next save updates them in place
-        // instead of duplicating) — keep local rooms/_keys as the source
-        // of truth, only borrow the id.
-        const refreshed = await studioApi.getProperty(propertyId);
+        // One request for the property fields AND the complete floor set
+        // (previously: one update call + one call per floor + a final
+        // re-fetch — more requests meant more chances for any single one
+        // to fail, which is exactly what a "Failed to fetch" report
+        // traced back to; this also fixes a real correctness bug where a
+        // locally-removed floor was never actually deleted server-side).
+        const synced = await studioApi.syncProperty(propertyId, {
+          ...buildPropertyPayload(propertyName),
+          floors: floors.map((f) => ({
+            floor_id: f.floor_id,
+            floor_number: f.floor_number,
+            floor_label: f.floor_label,
+            rooms: f.rooms.map(stripKey),
+          })),
+        });
+        // Pick up server-assigned floor_ids for any newly-created floors
+        // so the next save updates them in place instead of duplicating —
+        // keep local rooms/_keys as the source of truth, only borrow the id.
         setLayoutHistory((s) => ({
           ...s,
           present: {
             ...s.present,
-            floors: s.present.floors.map((f, i) => ({ ...f, floor_id: refreshed.floors[i]?.floor_id || f.floor_id })),
+            floors: s.present.floors.map((f, i) => ({ ...f, floor_id: synced.floors[i]?.floor_id || f.floor_id })),
           },
         }));
         setSaveStatus("Saved.");
@@ -637,7 +638,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         setSaveStatus("Saved.");
       }
     } catch (e) {
-      setSaveStatus(e.message || "Couldn't save this design.");
+      // "Failed to fetch" is the browser's own message for a network-
+      // level failure (no connection, DNS, or the request never reached
+      // the server) — distinct from a normal API error response, and
+      // worth a clearer message than the raw browser text.
+      const isNetworkFailure = e instanceof TypeError || /failed to fetch/i.test(e.message || "");
+      setSaveStatus(
+        isNetworkFailure
+          ? "Couldn't reach the server — check your connection and try again."
+          : e.message || "Couldn't save this design."
+      );
     } finally {
       setSaving(false);
       setTimeout(() => setSaveStatus(""), 4000);

@@ -145,3 +145,76 @@ def test_master_plan_elements_round_trip():
 
     r2 = client.get(f"/api/properties/{property_id}", headers=headers)
     assert r2.json()["plot_spec"]["master_plan_elements"] == payload["plot_spec"]["master_plan_elements"]
+
+
+def test_sync_property_deletes_floors_omitted_from_save():
+    headers = _signin_with_tier("pytest_property_sync_delete@example.com")
+
+    payload = _base_payload("Sync Delete Test")
+    payload["floors"] = [
+        {"floor_number": 0, "floor_label": "Ground Floor", "rooms": []},
+        {"floor_number": 1, "floor_label": "First Floor", "rooms": []},
+        {"floor_number": 2, "floor_label": "Second Floor", "rooms": []},
+    ]
+    r = client.post("/api/properties", headers=headers, json=payload)
+    prop = r.json()
+    property_id = prop["property_id"]
+    floor_ids = [f["floor_id"] for f in prop["floors"]]
+
+    sync_payload = {"floors": [
+        {"floor_id": floor_ids[0], "floor_number": 0, "floor_label": "Ground Floor", "rooms": [{"name": "Kitchen", "x": 0, "y": 0, "length": 10, "width": 10}]},
+        {"floor_id": floor_ids[1], "floor_number": 1, "floor_label": "First Floor", "rooms": []},
+    ]}
+    r = client.put(f"/api/properties/{property_id}/sync", headers=headers, json=sync_payload)
+    assert r.status_code == 200
+    synced = r.json()
+    assert len(synced["floors"]) == 2
+    assert synced["floors"][0]["rooms"][0]["name"] == "Kitchen"
+
+    # Confirm it's really gone, not just missing from THIS response
+    r2 = client.get(f"/api/properties/{property_id}", headers=headers)
+    assert len(r2.json()["floors"]) == 2
+
+
+def test_sync_property_creates_new_floor_and_keeps_existing():
+    headers = _signin_with_tier("pytest_property_sync_new@example.com")
+
+    r = client.post("/api/properties", headers=headers, json=_base_payload())
+    prop = r.json()
+    property_id = prop["property_id"]
+    existing_floor_id = prop["floors"][0]["floor_id"]
+
+    sync_payload = {"name": "Renamed via sync", "floors": [
+        {"floor_id": existing_floor_id, "floor_number": 0, "floor_label": "Ground Floor", "rooms": []},
+        {"floor_id": None, "floor_number": 1, "floor_label": "New Floor", "rooms": []},
+    ]}
+    r = client.put(f"/api/properties/{property_id}/sync", headers=headers, json=sync_payload)
+    assert r.status_code == 200
+    synced = r.json()
+    assert synced["name"] == "Renamed via sync"
+    assert len(synced["floors"]) == 2
+    assert synced["floors"][0]["floor_id"] == existing_floor_id  # unchanged, updated in place
+    assert synced["floors"][1]["floor_id"] is not None  # brand new id assigned
+
+
+def test_sync_property_locked_refuses():
+    headers = _signin_with_tier("pytest_property_sync_locked@example.com")
+
+    r = client.post("/api/properties", headers=headers, json=_base_payload())
+    property_id = r.json()["property_id"]
+    client.post(f"/api/properties/{property_id}/lock", headers=headers)
+
+    r = client.put(f"/api/properties/{property_id}/sync", headers=headers, json={"floors": [
+        {"floor_number": 0, "floor_label": "x", "rooms": []},
+    ]})
+    assert r.status_code == 423
+
+
+def test_sync_property_requires_at_least_one_floor():
+    headers = _signin_with_tier("pytest_property_sync_empty@example.com")
+
+    r = client.post("/api/properties", headers=headers, json=_base_payload())
+    property_id = r.json()["property_id"]
+
+    r = client.put(f"/api/properties/{property_id}/sync", headers=headers, json={"floors": []})
+    assert r.status_code == 400

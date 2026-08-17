@@ -283,6 +283,95 @@ def delete_floor(*, property_id: str, floor_id: str) -> None:
         connection.commit()
 
 
+def sync_property(
+    *,
+    property_id: str,
+    name: Optional[str] = None,
+    plot_spec: Optional[dict[str, Any]] = None,
+    selections: Optional[dict[str, str]] = None,
+    labor_selections: Optional[dict[str, str]] = None,
+    site_elements: Optional[list[dict[str, Any]]] = None,
+    floors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Saves the property's fields AND its complete floor set in ONE
+    database round-trip, instead of the old pattern of one HTTP request
+    for the property fields plus one more per floor plus a final re-fetch
+    — that chain meant more requests, more chances for any single one to
+    fail (a real "Failed to fetch" report traced to exactly this), and a
+    real correctness bug: floors removed locally were never actually
+    deleted server-side (upsert-only, never sync), so a deleted floor
+    would silently reappear on the next load.
+
+    `floors` is the COMPLETE current set — each with an optional floor_id
+    (present = update in place, absent = brand new). Any existing floor
+    NOT included here is deleted. Must include at least one floor."""
+
+    if not floors:
+        raise ValueError("a property must have at least one floor")
+
+    existing = get_property(property_id)
+    if existing is None:
+        raise ValueError("property not found")
+    if existing["locked"]:
+        raise PermissionError("property is locked")
+
+    now = datetime.now(timezone.utc).isoformat()
+    fields = {
+        "name": name if name is not None else existing["name"],
+        "plot_spec": json.dumps(plot_spec if plot_spec is not None else existing["plot_spec"]),
+        "selections": json.dumps(selections if selections is not None else existing["selections"]),
+        "labor_selections": json.dumps(labor_selections if labor_selections is not None else existing["labor_selections"]),
+        "site_elements": json.dumps(site_elements if site_elements is not None else existing["site_elements"]),
+    }
+
+    incoming_floor_ids = {f["floor_id"] for f in floors if f.get("floor_id")}
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE properties SET
+                    name = %s, plot_spec = %s, selections = %s, labor_selections = %s,
+                    site_elements = %s, updated_at = %s
+                WHERE property_id = %s
+                """,
+                (fields["name"], fields["plot_spec"], fields["selections"], fields["labor_selections"],
+                 fields["site_elements"], now, property_id),
+            )
+
+            # Delete any floor that existed before but isn't in this save.
+            for existing_floor in existing["floors"]:
+                if existing_floor["floor_id"] not in incoming_floor_ids:
+                    cursor.execute(
+                        "DELETE FROM property_floors WHERE floor_id = %s AND property_id = %s",
+                        (existing_floor["floor_id"], property_id),
+                    )
+
+            for floor in floors:
+                floor_id = floor.get("floor_id")
+                if floor_id:
+                    cursor.execute(
+                        """
+                        UPDATE property_floors SET floor_number = %s, floor_label = %s, rooms = %s, updated_at = %s
+                        WHERE floor_id = %s AND property_id = %s
+                        """,
+                        (floor["floor_number"], floor["floor_label"], json.dumps(floor["rooms"]), now,
+                         floor_id, property_id),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO property_floors (floor_id, property_id, floor_number, floor_label, rooms, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (str(uuid.uuid4()), property_id, floor["floor_number"], floor["floor_label"],
+                         json.dumps(floor["rooms"]), now, now),
+                    )
+        connection.commit()
+
+    return get_property(property_id)
+
+
 def set_locked(*, property_id: str, locked: bool) -> Optional[dict[str, Any]]:
     """Locking never requires extra verification (protecting your own
     work is always allowed). Unlocking's OTP gate is enforced by the

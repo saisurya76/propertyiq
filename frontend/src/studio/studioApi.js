@@ -103,6 +103,9 @@ export const studioApi = {
   upsertFloor: (propertyId, payload) =>
     apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/floors`, { method: "PUT", body: JSON.stringify(payload) }),
 
+  syncProperty: (propertyId, payload) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/sync`, { method: "PUT", body: JSON.stringify(payload) }),
+
   deleteFloor: (propertyId, floorId) =>
     apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/floors/${encodeURIComponent(floorId)}`, { method: "DELETE" }),
 

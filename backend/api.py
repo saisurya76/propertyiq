@@ -30,6 +30,7 @@ from backend.property_store import (
     update_property,
     upsert_floor,
     delete_floor,
+    sync_property,
     set_locked,
     delete_property,
     count_saved_properties,
@@ -1370,6 +1371,21 @@ class UpsertFloorRequest(BaseModel):
     rooms: list[RoomSpec] = []
 
 
+class SyncPropertyRequest(BaseModel):
+    """Saves everything — property fields and the complete floor set — in
+    one request. Preferred over the individual update/floors endpoints
+    for the Studio's Save button specifically: one HTTP round-trip instead
+    of 2+N, and floors omitted here are actually deleted server-side
+    (the old per-floor-upsert flow never did, so a locally-removed floor
+    would silently reappear on next load)."""
+    name: Optional[str] = None
+    plot_spec: Optional[PropertyPlotSpec] = None
+    selections: Optional[dict[str, str]] = None
+    labor_selections: Optional[dict[str, str]] = None
+    site_elements: Optional[list[SiteElementSpec]] = None
+    floors: list[UpsertFloorRequest]
+
+
 class ConfirmUnlockRequest(BaseModel):
     code: str
 
@@ -1461,6 +1477,30 @@ def api_upsert_floor(property_id: str, request: UpsertFloorRequest, user_email: 
         )
     except PermissionError:
         raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to make changes.")
+    return updated
+
+
+@app.put("/api/properties/{property_id}/sync")
+def api_sync_property(property_id: str, request: SyncPropertyRequest, user_email: str = Depends(get_current_user_email)):
+    """One-request save for the Studio's Save button — property fields
+    plus the complete floor set (floors omitted here are deleted, not
+    just left untouched). Preferred over calling update + floors
+    individually per floor."""
+    _require_own_property(property_id, user_email)
+    try:
+        updated = sync_property(
+            property_id=property_id,
+            name=request.name,
+            plot_spec=request.plot_spec.model_dump() if request.plot_spec else None,
+            selections=request.selections,
+            labor_selections=request.labor_selections,
+            site_elements=[e.model_dump() for e in request.site_elements] if request.site_elements is not None else None,
+            floors=[f.model_dump() for f in request.floors],
+        )
+    except PermissionError:
+        raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to make changes.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return updated
 
 
