@@ -101,7 +101,7 @@ function formatLinePrice(usdPerUnit, plotSizeSqft, currency, fxRates, openingAre
   }
 }
 
-function ConstructionStudio({ onBack, onQuotaExceeded }) {
+function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const [step, setStep] = useState(0);
 
   const [plot, setPlot] = useState({
@@ -124,14 +124,36 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
   const estimateRequestIdRef = useRef(0); // guards against a slower, older request overwriting a faster, newer one
+
+  // Site elements (trees, pool, etc.) and material/labor selections are
+  // shared across the whole property (a pool or a chosen flooring tile
+  // realistically applies to the whole build, not one floor) — only rooms
+  // are per-floor. `floors` lives in undo/redo history; which floor is
+  // currently ACTIVE deliberately does not (switching floors shouldn't be
+  // an undoable action).
   const [layoutHistory, setLayoutHistory] = useState({
     past: [],
-    present: { rooms: [emptyRoom()], elements: [] },
+    present: {
+      floors: [{ floor_id: null, floor_number: 0, floor_label: "Ground Floor", rooms: [emptyRoom()] }],
+      elements: [],
+    },
     future: [],
   });
-  const rooms = layoutHistory.present.rooms;
+  const [activeFloorIndex, setActiveFloorIndex] = useState(0);
+  const floors = layoutHistory.present.floors;
+  const rooms = useMemo(() => floors[activeFloorIndex]?.rooms || [], [floors, activeFloorIndex]);
   const siteElements = layoutHistory.present.elements;
   const [selectedKeys, setSelectedKeys] = useState([]);
+
+  // Save/load/lock state
+  const [propertyId, setPropertyId] = useState(null);
+  const [propertyName, setPropertyName] = useState("Untitled Property");
+  const [locked, setLocked] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(""); // transient "Saved" / error message
+  const [saving, setSaving] = useState(false);
+  const [unlockStep, setUnlockStep] = useState(null); // null | "requesting" | "code_sent"
+  const [unlockCode, setUnlockCode] = useState("");
+  const [unlockError, setUnlockError] = useState("");
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -188,6 +210,42 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   useEffect(() => {
     studioApi.getFxRates().then(setFxRates).catch(() => {}); // silent — falls back to USD display
   }, []);
+
+  // Load a saved property when resuming (vs. starting fresh) — hydrates
+  // plot spec, materials/labor selections, all floors' rooms, and site
+  // elements from the server, and remembers propertyId so Save updates
+  // this property instead of creating a new one.
+  useEffect(() => {
+    if (!resumePropertyId) return;
+    studioApi
+      .getProperty(resumePropertyId)
+      .then((prop) => {
+        setPropertyId(prop.property_id);
+        setPropertyName(prop.name);
+        setLocked(prop.locked);
+        setPlot((p) => ({ ...p, ...prop.plot_spec, city: p.city }));
+        setSelections(prop.selections || {});
+        setLaborSelections(prop.labor_selections || {});
+        setLayoutHistory({
+          past: [],
+          present: {
+            floors: prop.floors.length > 0
+              ? prop.floors.map((f) => ({
+                  floor_id: f.floor_id,
+                  floor_number: f.floor_number,
+                  floor_label: f.floor_label,
+                  rooms: f.rooms.map((r) => ({ ...r, _key: r._key || Math.random().toString(36).slice(2) })),
+                }))
+              : [{ floor_id: null, floor_number: 0, floor_label: "Ground Floor", rooms: [emptyRoom()] }],
+            elements: (prop.site_elements || []).map((el) => ({ ...el, _key: el._key || Math.random().toString(36).slice(2) })),
+          },
+          future: [],
+        });
+        setActiveFloorIndex(0);
+        setStep(2); // jump straight to Room Layout — plot/materials are already set
+      })
+      .catch(() => setSaveStatus("Couldn't load that saved design."));
+  }, [resumePropertyId]);
 
   // Live running total whenever selections/plot size/currency change
   useEffect(() => {
@@ -254,7 +312,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     });
   };
 
-  const commitRooms = (newRooms) => commitLayout({ rooms: newRooms });
+  const commitRooms = (newRooms) =>
+    commitLayout({ floors: floors.map((f, i) => (i === activeFloorIndex ? { ...f, rooms: newRooms } : f)) });
   const commitElements = (newElements) => commitLayout({ elements: newElements });
 
   // Continuous edits (typing in a name/length/width field) update live on
@@ -263,7 +322,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const commitRoomsDebounced = (newRooms) => {
     setLayoutHistory((s) => {
       if (editBaselineRef.current === null) editBaselineRef.current = s.present;
-      return { ...s, present: { ...s.present, rooms: newRooms } };
+      const newFloors = s.present.floors.map((f, i) => (i === activeFloorIndex ? { ...f, rooms: newRooms } : f));
+      return { ...s, present: { ...s.present, floors: newFloors } };
     });
     if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
     historyDebounceRef.current = setTimeout(() => {
@@ -306,7 +366,11 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
       } else if ((e.key === "Delete" || e.key === "Backspace") && !isTyping && selectedKeys.length > 0) {
         e.preventDefault();
         commitLayout({
-          rooms: rooms.filter((r) => !selectedKeys.includes(r._key)),
+          floors: floors.map((f, i) =>
+            i === activeFloorIndex
+              ? { ...f, rooms: f.rooms.filter((r) => !selectedKeys.includes(r._key)) }
+              : f
+          ),
           elements: siteElements.filter((el) => !selectedKeys.includes(el._key)),
         });
         setSelectedKeys([]);
@@ -314,7 +378,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [rooms, siteElements, selectedKeys]);
+  }, [floors, activeFloorIndex, siteElements, selectedKeys]);
 
   const updateRoom = (key, field, value) => {
     const newRooms = rooms.map((r) => (r._key === key ? { ...r, [field]: value } : r));
@@ -352,6 +416,30 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
     setSelectedKeys((sk) => sk.filter((k) => k !== key));
   };
 
+  // ---- floor management (item #10 — tabs per floor) ----
+  const addFloor = () => {
+    const nextNumber = Math.max(...floors.map((f) => f.floor_number)) + 1;
+    const newFloors = [
+      ...floors,
+      { floor_id: null, floor_number: nextNumber, floor_label: `Floor ${nextNumber}`, rooms: [emptyRoom()] },
+    ];
+    commitLayout({ floors: newFloors });
+    setActiveFloorIndex(newFloors.length - 1);
+    setSelectedKeys([]);
+  };
+
+  const removeFloor = (index) => {
+    if (floors.length <= 1) return; // a property must have at least one floor
+    const newFloors = floors.filter((_, i) => i !== index);
+    commitLayout({ floors: newFloors });
+    setActiveFloorIndex((current) => Math.min(current, newFloors.length - 1));
+    setSelectedKeys([]);
+  };
+
+  const renameFloor = (index, label) => {
+    commitLayout({ floors: floors.map((f, i) => (i === index ? { ...f, floor_label: label } : f)) });
+  };
+
   const addElement = (type) => {
     const isLine = type in LINE_ELEMENT_DEFS;
     const newElement = isLine
@@ -375,6 +463,106 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
   const removeElement = (key) => {
     commitElements(siteElements.filter((el) => el._key !== key));
     setSelectedKeys((sk) => sk.filter((k) => k !== key));
+  };
+
+  // Strips the frontend-only `_key` field before sending rooms/elements to
+  // the backend, which doesn't know about it (it's purely for React keys
+  // and Konva node refs).
+  const stripKey = (item) => {
+    // eslint-disable-next-line no-unused-vars -- intentionally destructured out
+    const { _key, ...rest } = item;
+    return rest;
+  };
+
+  const buildPropertyPayload = (name) => ({
+    name,
+    plot_spec: {
+      plot_size_sqft: plotSizeSqft,
+      plot_length_ft: plot.plot_length_ft,
+      plot_width_ft: plot.plot_width_ft,
+      region: plot.region,
+      currency: plot.currency,
+      entrance_direction: plot.entrance_direction,
+      road_facing_side: plot.road_facing_side,
+      slope_direction: plot.slope_direction,
+    },
+    selections,
+    labor_selections: laborSelections,
+    site_elements: siteElements.map(stripKey),
+    floors: floors.map((f) => ({
+      floor_number: f.floor_number,
+      floor_label: f.floor_label,
+      rooms: f.rooms.map(stripKey),
+    })),
+  });
+
+  const handleSaveDesign = async () => {
+    setSaving(true);
+    setSaveStatus("");
+    try {
+      if (propertyId) {
+        // Update the property-level fields, then upsert each floor
+        // individually (each floor keeps its own floor_id so existing
+        // floors update in place rather than duplicating).
+        await studioApi.updateProperty(propertyId, buildPropertyPayload(propertyName));
+        for (const floor of floors) {
+          await studioApi.upsertFloor(propertyId, {
+            floor_id: floor.floor_id,
+            floor_number: floor.floor_number,
+            floor_label: floor.floor_label,
+            rooms: floor.rooms.map(stripKey),
+          });
+        }
+        // Re-fetch just to pick up server-assigned floor_ids for any
+        // newly-created floors (so the next save updates them in place
+        // instead of duplicating) — keep local rooms/_keys as the source
+        // of truth, only borrow the id.
+        const refreshed = await studioApi.getProperty(propertyId);
+        setLayoutHistory((s) => ({
+          ...s,
+          present: {
+            ...s.present,
+            floors: s.present.floors.map((f, i) => ({ ...f, floor_id: refreshed.floors[i]?.floor_id || f.floor_id })),
+          },
+        }));
+        setSaveStatus("Saved.");
+      } else {
+        const created = await studioApi.createProperty(buildPropertyPayload(propertyName));
+        setPropertyId(created.property_id);
+        setSaveStatus("Saved.");
+      }
+    } catch (e) {
+      setSaveStatus(e.message || "Couldn't save this design.");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveStatus(""), 4000);
+    }
+  };
+
+  const handleLock = async () => {
+    if (!propertyId) return;
+    const updated = await studioApi.lockProperty(propertyId);
+    setLocked(updated.locked);
+  };
+
+  const handleRequestUnlock = async () => {
+    if (!propertyId) return;
+    setUnlockError("");
+    await studioApi.requestUnlock(propertyId);
+    setUnlockStep("code_sent");
+  };
+
+  const handleConfirmUnlock = async () => {
+    if (!propertyId) return;
+    setUnlockError("");
+    try {
+      const updated = await studioApi.confirmUnlock(propertyId, unlockCode);
+      setLocked(updated.locked);
+      setUnlockStep(null);
+      setUnlockCode("");
+    } catch (e) {
+      setUnlockError(e.message || "Incorrect or expired code.");
+    }
   };
 
   const generateDesign = async () => {
@@ -438,6 +626,53 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
       </div>
 
       {error && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{error}</div>}
+
+      <div className="cs-save-bar">
+        <input
+          type="text"
+          className="cs-property-name-input"
+          value={propertyName}
+          onChange={(e) => setPropertyName(e.target.value)}
+          placeholder="Untitled Property"
+          readOnly={locked}
+        />
+        {locked && <span className="studio-design-lock-badge">🔒 Locked</span>}
+        <div className="cs-save-bar-actions">
+          {saveStatus && <span className="cs-save-status">{saveStatus}</span>}
+          {!locked && (
+            <button type="button" className="rc-tool-btn" onClick={handleSaveDesign} disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </button>
+          )}
+          {propertyId && !locked && (
+            <button type="button" className="rc-tool-btn" onClick={handleLock}>
+              🔒 Lock
+            </button>
+          )}
+          {propertyId && locked && unlockStep === null && (
+            <button type="button" className="rc-tool-btn" onClick={handleRequestUnlock}>
+              Unlock...
+            </button>
+          )}
+          {unlockStep === "code_sent" && (
+            <div className="cs-unlock-confirm">
+              <input
+                type="text"
+                placeholder="Code from email"
+                value={unlockCode}
+                onChange={(e) => setUnlockCode(e.target.value)}
+              />
+              <button type="button" className="rc-tool-btn" onClick={handleConfirmUnlock}>
+                Confirm
+              </button>
+              <button type="button" className="rc-tool-btn" onClick={() => { setUnlockStep(null); setUnlockCode(""); setUnlockError(""); }}>
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+        {unlockError && <div className="cs-unlock-error">{unlockError}</div>}
+      </div>
 
       {overflowWarnings.length > 0 && (
         <div className="cs-overflow-banner">
@@ -673,13 +908,44 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                 className="rc-tool-btn rc-tool-btn-danger"
                 onClick={() => {
                   commitLayout({
-                    rooms: rooms.filter((r) => !selectedKeys.includes(r._key)),
+                    floors: floors.map((f, i) =>
+                      i === activeFloorIndex
+                        ? { ...f, rooms: f.rooms.filter((r) => !selectedKeys.includes(r._key)) }
+                        : f
+                    ),
                     elements: siteElements.filter((el) => !selectedKeys.includes(el._key)),
                   });
                   setSelectedKeys([]);
                 }}
               >
                 Delete selected ({selectedKeys.length})
+              </button>
+            )}
+          </div>
+
+          <div className="rc-floor-tabs">
+            {floors.map((floor, i) => (
+              <div key={floor.floor_id || `new-${i}`} className={`rc-floor-tab ${i === activeFloorIndex ? "rc-floor-tab-active" : ""}`}>
+                <input
+                  type="text"
+                  value={floor.floor_label}
+                  onClick={() => {
+                    setActiveFloorIndex(i);
+                    setSelectedKeys([]);
+                  }}
+                  onChange={(e) => renameFloor(i, e.target.value)}
+                  readOnly={locked}
+                />
+                {floors.length > 1 && !locked && (
+                  <button type="button" className="rc-floor-tab-remove" onClick={() => removeFloor(i)} aria-label={`Remove ${floor.floor_label}`}>
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            {!locked && (
+              <button type="button" className="rc-floor-tab-add" onClick={addFloor}>
+                + Floor
               </button>
             )}
           </div>
@@ -692,13 +958,14 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
                 type="button"
                 className="rc-tool-btn"
                 onClick={() => addElement(type)}
+                disabled={locked}
                 style={{ borderLeft: `4px solid ${def.color}` }}
               >
                 {def.label}
               </button>
             ))}
             {Object.entries(LINE_ELEMENT_DEFS).map(([type, def]) => (
-              <button key={type} type="button" className="rc-tool-btn" onClick={() => addElement(type)}>
+              <button key={type} type="button" className="rc-tool-btn" onClick={() => addElement(type)} disabled={locked}>
                 {def.label}
               </button>
             ))}
@@ -715,6 +982,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
               onElementsChange={commitElements}
               selectedKeys={selectedKeys}
               onSelectionChange={setSelectedKeys}
+              locked={locked}
             />
           </Suspense>
 
@@ -790,7 +1058,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded }) {
               </div>
             ))}
           </div>
-          <button className="cs-add-room-btn" onClick={addRoom}>+ Add room</button>
+          <button className="cs-add-room-btn" onClick={addRoom} disabled={locked}>+ Add room</button>
         </div>
       )}
 

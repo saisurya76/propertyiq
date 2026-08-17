@@ -172,6 +172,7 @@ function RoomCanvas({
   onElementsChange,
   selectedKeys,
   onSelectionChange,
+  locked = false,
 }) {
   const [zoom, setZoom] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -757,7 +758,7 @@ function RoomCanvas({
                     fill={room.color || "#ede9fe"}
                     stroke={isSelected ? "#4c1d95" : "#374151"}
                     strokeWidth={isSelected ? WALL_THICKNESS_FT * baseScale + 1.5 : WALL_THICKNESS_FT * baseScale}
-                    draggable={!panMode}
+                    draggable={!panMode && !locked}
                     dragBoundFunc={makeDragBoundFunc(width, height)}
                     onDragStart={() => handleAnyDragStart(room._key)}
                     onDragMove={(e) => handleDragMove(room, e)}
@@ -821,7 +822,7 @@ function RoomCanvas({
                   rotation={el.rotation || 0}
                   width={width}
                   height={height}
-                  draggable={!panMode}
+                  draggable={!panMode && !locked}
                   dragBoundFunc={makeElementDragBoundFunc(width, height, el.rotation || 0)}
                   onDragStart={() => handleAnyDragStart(el._key)}
                   onDragMove={(e) => handleElementDragMove(el, e)}
@@ -973,7 +974,7 @@ function RoomCanvas({
                   stroke={line.color || "#111827"}
                   strokeWidth={isSelected ? 3 : 2}
                   dash={dashed ? [8, 6] : undefined}
-                  draggable={!panMode}
+                  draggable={!panMode && !locked}
                   onDragEnd={(e) => handleLineBodyDragEnd(line, e)}
                   onClick={(evt) => toggleSelect(line._key, evt.evt.shiftKey)}
                   onTap={() => toggleSelect(line._key, false)}
@@ -984,7 +985,7 @@ function RoomCanvas({
                   y={p1y}
                   radius={5}
                   fill={isSelected ? "#4c1d95" : "#6b7280"}
-                  draggable={!panMode}
+                  draggable={!panMode && !locked}
                   onDragMove={(e) => handleLineEndpointDrag(line, "start", e)}
                   onClick={() => toggleSelect(line._key, false)}
                 />
@@ -993,7 +994,7 @@ function RoomCanvas({
                   y={p2y}
                   radius={5}
                   fill={isSelected ? "#4c1d95" : "#6b7280"}
-                  draggable={!panMode}
+                  draggable={!panMode && !locked}
                   onDragMove={(e) => handleLineEndpointDrag(line, "end", e)}
                   onClick={() => toggleSelect(line._key, false)}
                 />
@@ -1025,7 +1026,7 @@ function RoomCanvas({
                           fill="#f59e0b"
                           stroke="#92400e"
                           strokeWidth={1}
-                          draggable={!panMode}
+                          draggable={!panMode && !locked}
                           onDragEnd={(e) => handleLineRotateDrag(line, e)}
                         />
                       </>

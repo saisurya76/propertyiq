@@ -89,4 +89,32 @@ export const studioApi = {
 
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
+
+  listProperties: () => apiFetch("/api/properties"),
+
+  getProperty: (propertyId) => apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`),
+
+  createProperty: (payload) =>
+    apiFetch("/api/properties", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateProperty: (propertyId, payload) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`, { method: "PUT", body: JSON.stringify(payload) }),
+
+  upsertFloor: (propertyId, payload) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/floors`, { method: "PUT", body: JSON.stringify(payload) }),
+
+  deleteFloor: (propertyId, floorId) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/floors/${encodeURIComponent(floorId)}`, { method: "DELETE" }),
+
+  lockProperty: (propertyId) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/lock`, { method: "POST" }),
+
+  requestUnlock: (propertyId) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/request-unlock`, { method: "POST" }),
+
+  confirmUnlock: (propertyId, code) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/confirm-unlock`, { method: "POST", body: JSON.stringify({ code }) }),
+
+  deleteProperty: (propertyId) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
 };

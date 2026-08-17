@@ -8,6 +8,7 @@ import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
 import StudioPricing from "./studio/StudioPricing";
 import ConstructionStudio from "./studio/ConstructionStudio";
+import StudioDesigns from "./studio/StudioDesigns";
 import AdminPanel from "./studio/AdminPanel";
 import SessionBar from "./studio/SessionBar";
 import StudioTopBar from "./studio/StudioTopBar";
@@ -334,6 +335,7 @@ function App() {
   };
 
   const [quotaMessage, setQuotaMessage] = useState("");
+  const [resumePropertyId, setResumePropertyId] = useState(null);
   const [checkingSession, setCheckingSession] = useState(false);
 
   const launchStudio = async () => {
@@ -372,7 +374,7 @@ function App() {
 
   const launchConstructionStudio = () => {
     setQuotaMessage("");
-    setStudioView("construction");
+    setStudioView("designs");
   };
 
   const handleQuotaExceeded = (message) => {
@@ -420,11 +422,33 @@ function App() {
     );
   }
 
+  if (studioView === "designs") {
+    return (
+      <div className="app">
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
+        <StudioDesigns
+          onStartNew={() => {
+            setResumePropertyId(null);
+            setStudioView("construction");
+          }}
+          onResume={(propertyId) => {
+            setResumePropertyId(propertyId);
+            setStudioView("construction");
+          }}
+        />
+      </div>
+    );
+  }
+
   if (studioView === "construction") {
     return (
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
-        <ConstructionStudio onBack={() => setStudioView("pricing")} onQuotaExceeded={handleQuotaExceeded} />
+        <ConstructionStudio
+          onBack={() => setStudioView("designs")}
+          onQuotaExceeded={handleQuotaExceeded}
+          resumePropertyId={resumePropertyId}
+        />
       </div>
     );
   }
