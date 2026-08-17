@@ -17,6 +17,23 @@ const CURRENCIES = ["USD", "INR", "THB", "AED", "GBP", "EUR"];
 
 const DIRECTIONS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
 
+// Surrounding-site context — what's OUTSIDE the plot boundary in each
+// direction (a river to the northeast, a hill to the west, etc). Distinct
+// from `site_elements` (objects actually drawn ON the plot, like a pool).
+// Water/forest/mountain/open-space were the explicit ask; road and
+// religious-structure added as sensible extras matching the app's
+// existing Vastu-conscious framing (mentioned to the user, not silently
+// assumed — same precedent as pathway/bench being added to the site
+// elements toolbar earlier).
+const MASTER_PLAN_ELEMENT_TYPES = {
+  water_body: "Water Body / Stream",
+  forest: "Forest / Green Belt",
+  mountain: "Mountain / Hill",
+  open_space: "Open Space / Park",
+  main_road: "Main Road",
+  religious_structure: "Temple / Religious Structure",
+};
+
 const STEPS = ["Plot Details", "Materials", "Room Layout", "Review & Generate"];
 
 function emptyRoom() {
@@ -66,8 +83,20 @@ function emptyLineElement(type, plotLengthFt, plotWidthFt) {
     x2: plotLengthFt * 0.75,
     y2: plotWidthFt * 0.5,
     color: "#111827",
+    dash_style: type === "dotted_line" ? "dotted" : "solid",
+    stroke_width: 1.5,
   };
 }
+
+// Konva dash arrays live in RoomCanvas.jsx (which does the actual
+// rendering) — this file only needs the human-readable labels for the
+// dropdown.
+const LINE_DASH_STYLE_LABELS = {
+  solid: "Solid",
+  dotted: "Dotted",
+  dash: "Dashed",
+  "dash-dot": "Dash-dot",
+};
 
 function formatUnitPrice(usdAmount, unit, currency, fxRates) {
   const rate = fxRates?.[currency];
@@ -113,6 +142,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     entrance_direction: "north-east",
     road_facing_side: "north",
     slope_direction: "north",
+    master_plan_elements: [],
   });
 
   const [catalog, setCatalog] = useState(null);
@@ -269,6 +299,26 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   }, [selections, laborSelections, plotSizeSqft, plot.region, plot.currency]);
 
   const updatePlotField = (field, value) => setPlot((p) => ({ ...p, [field]: value }));
+
+  const addMasterPlanElement = () => {
+    const usedTypes = new Set((plot.master_plan_elements || []).map((el) => el.type));
+    const firstUnused = Object.keys(MASTER_PLAN_ELEMENT_TYPES).find((t) => !usedTypes.has(t)) || "water_body";
+    setPlot((p) => ({
+      ...p,
+      master_plan_elements: [...(p.master_plan_elements || []), { type: firstUnused, direction: "north" }],
+    }));
+  };
+
+  const updateMasterPlanElement = (index, field, value) => {
+    setPlot((p) => ({
+      ...p,
+      master_plan_elements: p.master_plan_elements.map((el, i) => (i === index ? { ...el, [field]: value } : el)),
+    }));
+  };
+
+  const removeMasterPlanElement = (index) => {
+    setPlot((p) => ({ ...p, master_plan_elements: p.master_plan_elements.filter((_, i) => i !== index) }));
+  };
 
   const toggleMaterial = (category, optionId) => {
     setSelections((s) => ({ ...s, [category]: optionId }));
@@ -539,6 +589,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
       entrance_direction: plot.entrance_direction,
       road_facing_side: plot.road_facing_side,
       slope_direction: plot.slope_direction,
+      master_plan_elements: plot.master_plan_elements || [],
     },
     selections,
     labor_selections: laborSelections,
@@ -634,6 +685,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         entrance_direction: plot.entrance_direction,
         road_facing_side: plot.road_facing_side,
         slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
+        master_plan_elements: plot.master_plan_elements || [],
         rooms: rooms
           .filter((r) => r.name.trim())
           .map(({ name, x, y, length, width, color }) => ({ name, x, y, length, width, color })),
@@ -786,6 +838,26 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             </div>
           </div>
           <p className="studio-subtext">Plot area: <strong>{plotSizeSqft} sqft</strong></p>
+
+          <h4 className="cs-list-heading">Surrounding Site Context</h4>
+          <p className="studio-subtext">
+            What's around the plot, and in which direction — a river to the northeast, a hill to
+            the west. Optional, but useful context for site planning.
+          </p>
+          {(plot.master_plan_elements || []).map((el, i) => (
+            <div className="cs-master-plan-row" key={i}>
+              <select value={el.type} onChange={(e) => updateMasterPlanElement(i, "type", e.target.value)}>
+                {Object.entries(MASTER_PLAN_ELEMENT_TYPES).map(([type, label]) => (
+                  <option key={type} value={type}>{label}</option>
+                ))}
+              </select>
+              <select value={el.direction} onChange={(e) => updateMasterPlanElement(i, "direction", e.target.value)}>
+                {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <button type="button" className="cs-remove-room" onClick={() => removeMasterPlanElement(i)}>Remove</button>
+            </div>
+          ))}
+          <button type="button" className="cs-add-room-btn" onClick={addMasterPlanElement}>+ Add site context</button>
         </div>
       )}
 
@@ -1054,7 +1126,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             <>
               <h4 className="cs-list-heading">Site Elements</h4>
               <div className="cs-room-row cs-room-row-header">
-                <span>Element</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>
+                <span>Element</span><span>Length (ft) / Style</span><span>Width (ft) / Thickness</span><span>Color</span><span></span>
               </div>
               <div className="cs-scrollable-list">
                 {siteElements.map((el) => {
@@ -1068,7 +1140,27 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                     >
                       <span className="cs-element-label">{label}</span>
                       {isLine ? (
-                        <span className="cs-element-note">drag endpoints on canvas</span>
+                        <>
+                          <select
+                            value={el.dash_style || "solid"}
+                            onChange={(e) => updateElement(el._key, "dash_style", e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {Object.entries(LINE_DASH_STYLE_LABELS).map(([style, styleLabel]) => (
+                              <option key={style} value={style}>{styleLabel}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min="0.5"
+                            max="6"
+                            step="0.5"
+                            value={el.stroke_width || 1.5}
+                            title="Thickness (px)"
+                            onChange={(e) => updateElement(el._key, "stroke_width", Number(e.target.value))}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </>
                       ) : (
                         <>
                           <input
@@ -1083,7 +1175,17 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                           />
                         </>
                       )}
-                      {!isLine && <span />}
+                      {isLine ? (
+                        <input
+                          type="color"
+                          className="cs-line-color-input"
+                          value={el.color || "#111827"}
+                          onChange={(e) => updateElement(el._key, "color", e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span />
+                      )}
                       <button className="cs-remove-room" onClick={() => removeElement(el._key)}>Remove</button>
                     </div>
                   );

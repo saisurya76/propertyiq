@@ -1137,6 +1137,13 @@ class SiteElementSpec(BaseModel):
     rotation: float = 0  # degrees, rotates around the element's top-left corner —
     # matches the frontend canvas's pivot convention. Rooms stay unrotated
     # (Vastu zone math + DXF room export both assume axis-aligned rectangles).
+    dash_style: Optional[str] = None  # solid | dotted | dash | dash-dot — lines only
+    stroke_width: Optional[float] = None  # line thickness in ft — lines only
+
+
+class MasterPlanElementSpec(BaseModel):
+    type: str  # water_body | forest | mountain | open_space | main_road | religious_structure
+    direction: str  # north | north-east | east | south-east | south | south-west | west | north-west
 
 
 class ConstructionDesignRequest(BaseModel):
@@ -1150,6 +1157,7 @@ class ConstructionDesignRequest(BaseModel):
     entrance_direction: str
     road_facing_side: str
     slope_direction: Optional[str] = None
+    master_plan_elements: list[MasterPlanElementSpec] = []
     rooms: list[RoomSpec] = []
     site_elements: list[SiteElementSpec] = []
     has_imported_materials: bool = False
@@ -1268,6 +1276,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "entrance_direction": request.entrance_direction,
         "road_facing_side": request.road_facing_side,
         "slope_direction": request.slope_direction,
+        "master_plan_elements": [e.model_dump() for e in request.master_plan_elements],
         "rooms": [r.model_dump() for r in request.rooms],
         "site_elements": [e.model_dump() for e in request.site_elements],
         "selections": request.selections,
@@ -1328,6 +1337,7 @@ class PropertyPlotSpec(BaseModel):
     entrance_direction: str
     road_facing_side: str
     slope_direction: Optional[str] = None
+    master_plan_elements: list[MasterPlanElementSpec] = []
 
 
 class FloorInput(BaseModel):

@@ -179,7 +179,11 @@ def test_site_elements_produce_distinct_dxf_entities(tmp_path):
 
     assert any(e.dxftype() == "CIRCLE" for e in entities)
     assert any(e.dxftype() == "LWPOLYLINE" and len(e.get_points()) == 7 for e in entities)  # gazebo hexagon
-    assert any(e.dxftype() == "LINE" and e.dxf.linetype == "DASHED" for e in entities)
+    # dotted_line with no explicit dash_style falls back to a genuine
+    # DOTTED linetype now (was previously mapped to DASHED — a mislabel,
+    # since a "dotted" line rendering as dashes was never actually
+    # correct; fixed when per-line style fields were added).
+    assert any(e.dxftype() == "LINE" and e.dxf.linetype == "DOTTED" for e in entities)
     assert any(e.dxftype() == "LINE" and e.dxf.linetype != "DASHED" for e in entities)
 
 
@@ -375,3 +379,28 @@ def test_categories_without_opening_fraction_still_use_full_plot_area():
     )
     li = result["line_items"][0]
     assert li["priced_area_sqft"] == 1200
+
+
+def test_line_style_fields_produce_correct_dxf_attributes(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    site_elements = [
+        {"type": "line", "x": 5, "y": 5, "x2": 20, "y2": 5, "color": "#111827", "dash_style": "dash-dot", "stroke_width": 3},
+        {"type": "line", "x": 5, "y": 10, "x2": 20, "y2": 10, "color": "#22c55e", "dash_style": "dotted", "stroke_width": 1},
+        {"type": "line", "x": 5, "y": 15, "x2": 20, "y2": 15, "color": "#000000"},  # no style fields — old-format fallback
+    ]
+    path = generate_plot_dxf(
+        design_id="line_style_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=[], site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    lines = [e for e in msp if e.dxftype() == "LINE" and e.dxf.layer == "SITE_ELEMENTS"]
+    assert len(lines) == 3
+    assert lines[0].dxf.linetype == "DASHDOT"
+    assert lines[1].dxf.linetype == "DOTTED"
+    # Old-format line (no dash_style/stroke_width) falls back to solid/default,
+    # not a crash.
+    assert lines[2].dxf.linetype in ("BYLAYER", "Continuous", "ByLayer")

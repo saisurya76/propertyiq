@@ -164,8 +164,23 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
 
         if el_type in ("line", "dotted_line"):
             line_attribs = dict(attribs)
-            if el_type == "dotted_line":
-                line_attribs["linetype"] = "DASHED"
+            # Fall back to the old type-based dashed/solid behavior for
+            # elements saved before per-line style existed.
+            dash_style = el.get("dash_style") or ("dotted" if el_type == "dotted_line" else "solid")
+            linetype_by_style = {"dotted": "DOTTED", "dash": "DASHED", "dash-dot": "DASHDOT"}
+            if dash_style in linetype_by_style:
+                line_attribs["linetype"] = linetype_by_style[dash_style]
+
+            stroke_width = el.get("stroke_width")
+            if stroke_width:
+                # DXF lineweight is in hundredths of mm, from a fixed set
+                # of valid enum values — this is an approximate mapping
+                # from the frontend's arbitrary 0.5-6 px stroke scale, not
+                # a precise unit conversion.
+                valid_lineweights = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100]
+                target = round(stroke_width * 10)
+                line_attribs["lineweight"] = min(valid_lineweights, key=lambda lw: abs(lw - target))
+
             msp.add_line((el["x"], el["y"]), (el.get("x2", el["x"]), el.get("y2", el["y"])), dxfattribs=line_attribs)
             continue
 
@@ -275,6 +290,8 @@ def generate_plot_dxf(
     doc.layers.add(name="DIMENSIONS", color=7)
     doc.layers.add(name="SITE_ELEMENTS", color=2)
     doc.linetypes.add("DASHED", pattern="A,.5,-.25", description="dashed line")
+    doc.linetypes.add("DOTTED", pattern="A,.0,-.2", description="dotted line")
+    doc.linetypes.add("DASHDOT", pattern="A,.5,-.25,0,-.25", description="dash-dot line")
 
     msp = doc.modelspace()
 

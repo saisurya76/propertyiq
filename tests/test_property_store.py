@@ -128,3 +128,20 @@ def test_cannot_delete_the_only_floor():
 
     r = client.delete(f"/api/properties/{prop['property_id']}/floors/{floor_id}", headers=headers)
     assert r.status_code == 400
+
+
+def test_master_plan_elements_round_trip():
+    headers = _signin_with_tier("pytest_property_masterplan@example.com")
+
+    payload = _base_payload("Master Plan Test")
+    payload["plot_spec"]["master_plan_elements"] = [
+        {"type": "water_body", "direction": "north-east"},
+        {"type": "mountain", "direction": "west"},
+    ]
+    r = client.post("/api/properties", headers=headers, json=payload)
+    assert r.status_code == 200
+    property_id = r.json()["property_id"]
+    assert r.json()["plot_spec"]["master_plan_elements"] == payload["plot_spec"]["master_plan_elements"]
+
+    r2 = client.get(f"/api/properties/{property_id}", headers=headers)
+    assert r2.json()["plot_spec"]["master_plan_elements"] == payload["plot_spec"]["master_plan_elements"]

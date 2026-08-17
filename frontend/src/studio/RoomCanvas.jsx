@@ -9,6 +9,16 @@ const SNAP_FT = 0.5; // rooms snap to the nearest 0.5ft on drag/resize
 const EDGE_SNAP_PX = 6; // snap-to-other-room edge alignment threshold, in screen px (pre-zoom)
 const MIN_ROOM_FT = 3; // smallest a room can be resized to
 const WALL_THICKNESS_FT = 0.4; // ~5in interior partition wall
+
+// Konva dash arrays per line style — solid uses `undefined` (Konva treats
+// a missing dash prop as solid). Kept in sync with ConstructionStudio.jsx's
+// copy of the same map.
+const LINE_DASH_PATTERNS = {
+  solid: undefined,
+  dotted: [2, 3],
+  dash: [8, 6],
+  "dash-dot": [10, 4, 2, 4],
+};
 const EDGE_TOUCH_TOLERANCE_FT = 0.6; // how close to a plot edge counts as "touching" it for dimensioning
 const DIM_LINE_OFFSET_PX = 22; // distance of the segmented dimension chain from the plot edge
 const DIM_TOTAL_OFFSET_PX = 44; // distance of the overall-total dimension line, further out
@@ -672,6 +682,23 @@ function RoomCanvas({
 
   return (
     <div className="room-canvas-wrap">
+      {/* North is always "up" in this app's plot coordinate convention
+          (confirmed by feetToCanvas's y-flip), and x increases eastward —
+          standard map orientation, so this compass is static, not
+          rotated to match anything. Plain HTML/SVG overlay rather than a
+          Konva shape: the whole Stage shares one pan/zoom transform, so
+          a shape drawn inside it would zoom and pan along with the
+          drawing instead of staying fixed in the corner. */}
+      <svg className="rc-compass" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="28" cy="28" r="26" fill="white" stroke="#d1d5db" strokeWidth="1.5" />
+        <polygon points="28,8 32,28 28,24 24,28" fill="#4c1d95" />
+        <polygon points="28,48 32,28 28,32 24,28" fill="#9ca3af" />
+        <text x="28" y="16" textAnchor="middle" fontSize="10" fontWeight="700" fill="#111827">N</text>
+        <text x="46" y="31" textAnchor="middle" fontSize="9" fill="#6b7280">E</text>
+        <text x="28" y="45" textAnchor="middle" fontSize="9" fill="#6b7280">S</text>
+        <text x="10" y="31" textAnchor="middle" fontSize="9" fill="#6b7280">W</text>
+      </svg>
+
       <div className="room-canvas-toolbar">
         <button type="button" className="rc-tool-btn" onClick={() => zoomBy(0.15)} title="Zoom in">＋</button>
         <button type="button" className="rc-tool-btn" onClick={() => zoomBy(-0.15)} title="Zoom out">－</button>
@@ -965,15 +992,19 @@ function RoomCanvas({
             const p1y = (safeWidthFt - line.y) * baseScale;
             const p2x = line.x2 * baseScale;
             const p2y = (safeWidthFt - line.y2) * baseScale;
-            const dashed = line.type === "dotted_line";
+            // Fall back to the old type-based dashed/solid behavior for
+            // lines saved before per-line style existed.
+            const dashStyle = line.dash_style || (line.type === "dotted_line" ? "dotted" : "solid");
+            const strokeWidth = line.stroke_width || 1.5;
+            const dashPattern = LINE_DASH_PATTERNS[dashStyle];
 
             return (
               <Fragment key={line._key}>
                 <Line
                   points={[p1x, p1y, p2x, p2y]}
                   stroke={line.color || "#111827"}
-                  strokeWidth={isSelected ? 3 : 2}
-                  dash={dashed ? [8, 6] : undefined}
+                  strokeWidth={isSelected ? strokeWidth + 1 : strokeWidth}
+                  dash={dashPattern}
                   draggable={!panMode && !locked}
                   onDragEnd={(e) => handleLineBodyDragEnd(line, e)}
                   onClick={(evt) => toggleSelect(line._key, evt.evt.shiftKey)}

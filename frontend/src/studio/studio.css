@@ -802,6 +802,16 @@
   cursor: default;
 }
 
+.cs-line-color-input {
+  width: 32px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+}
+
 .cs-room-color-swatch {
   width: 22px;
   height: 22px;
@@ -826,6 +836,18 @@
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 20px;
+  position: relative;
+}
+
+.rc-compass {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  width: 56px;
+  height: 56px;
+  z-index: 5;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.15));
 }
 
 .room-canvas-toolbar {
@@ -936,6 +958,21 @@
   text-transform: uppercase;
   letter-spacing: 0.4px;
   margin: 18px 0 6px;
+}
+
+.cs-master-plan-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cs-master-plan-row select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 .cs-scrollable-list {
