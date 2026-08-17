@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
 
@@ -299,6 +299,19 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   };
 
   const editBaselineRef = useRef(null);
+
+  // Strips the frontend-only `_key` field before sending rooms/elements to
+  // the backend, which doesn't know about it (it's purely for React keys
+  // and Konva node refs) — also used by copy/paste when cloning items,
+  // so a pasted copy gets a genuinely fresh key rather than inheriting
+  // the original's.
+  const stripKey = (item) => {
+    // eslint-disable-next-line no-unused-vars -- intentionally destructured out
+    const { _key, ...rest } = item;
+    return rest;
+  };
+  const clipboardRef = useRef({ rooms: [], elements: [] });
+  const [hasClipboard, setHasClipboard] = useState(false);
   const historyDebounceRef = useRef(null);
 
   // Discrete actions (drag end, resize end, add/remove, color pick) push
@@ -352,6 +365,50 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     });
   };
 
+  const copySelection = useCallback(() => {
+    if (selectedKeys.length === 0) return;
+    clipboardRef.current = {
+      rooms: rooms.filter((r) => selectedKeys.includes(r._key)).map(stripKey),
+      elements: siteElements.filter((el) => selectedKeys.includes(el._key)).map(stripKey),
+    };
+    setHasClipboard(true);
+  }, [rooms, siteElements, selectedKeys]);
+
+  const pasteClipboard = useCallback(() => {
+    if (locked) return;
+    const { rooms: clipRooms, elements: clipElements } = clipboardRef.current;
+    if (clipRooms.length === 0 && clipElements.length === 0) return;
+
+    // Offset the pasted copy so it doesn't land exactly on top of the
+    // original — same reasoning as the auto-staggered placement used for
+    // brand-new rooms/elements elsewhere in this file.
+    const OFFSET_FT = 2;
+    const newRooms = clipRooms.map((r) => ({
+      ...r,
+      x: r.x + OFFSET_FT,
+      y: r.y + OFFSET_FT,
+      _key: Math.random().toString(36).slice(2),
+    }));
+    const newElements = clipElements.map((el) => {
+      const isLine = el.type === "line" || el.type === "dotted_line";
+      return {
+        ...el,
+        x: el.x + OFFSET_FT,
+        y: el.y + OFFSET_FT,
+        ...(isLine ? { x2: el.x2 + OFFSET_FT, y2: el.y2 + OFFSET_FT } : {}),
+        _key: Math.random().toString(36).slice(2),
+      };
+    });
+
+    commitLayout({
+      floors: floors.map((f, i) =>
+        i === activeFloorIndex ? { ...f, rooms: [...f.rooms, ...newRooms] } : f
+      ),
+      elements: [...siteElements, ...newElements],
+    });
+    setSelectedKeys([...newRooms.map((r) => r._key), ...newElements.map((el) => el._key)]);
+  }, [floors, activeFloorIndex, siteElements, locked]);
+
   useEffect(() => {
     const onKeyDown = (e) => {
       const tag = document.activeElement?.tagName;
@@ -363,7 +420,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
       } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) {
         e.preventDefault();
         redo();
-      } else if ((e.key === "Delete" || e.key === "Backspace") && !isTyping && selectedKeys.length > 0) {
+      } else if ((e.key === "Delete" || e.key === "Backspace") && !isTyping && selectedKeys.length > 0 && !locked) {
         e.preventDefault();
         commitLayout({
           floors: floors.map((f, i) =>
@@ -374,11 +431,17 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
           elements: siteElements.filter((el) => !selectedKeys.includes(el._key)),
         });
         setSelectedKeys([]);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && !isTyping && selectedKeys.length > 0) {
+        e.preventDefault();
+        copySelection();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && !isTyping && !locked) {
+        e.preventDefault();
+        pasteClipboard();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [floors, activeFloorIndex, siteElements, selectedKeys]);
+  }, [floors, activeFloorIndex, siteElements, selectedKeys, locked, copySelection, pasteClipboard]);
 
   const updateRoom = (key, field, value) => {
     const newRooms = rooms.map((r) => (r._key === key ? { ...r, [field]: value } : r));
@@ -463,15 +526,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const removeElement = (key) => {
     commitElements(siteElements.filter((el) => el._key !== key));
     setSelectedKeys((sk) => sk.filter((k) => k !== key));
-  };
-
-  // Strips the frontend-only `_key` field before sending rooms/elements to
-  // the backend, which doesn't know about it (it's purely for React keys
-  // and Konva node refs).
-  const stripKey = (item) => {
-    // eslint-disable-next-line no-unused-vars -- intentionally destructured out
-    const { _key, ...rest } = item;
-    return rest;
   };
 
   const buildPropertyPayload = (name) => ({
@@ -902,7 +956,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             <button type="button" className="rc-tool-btn" onClick={redo} disabled={layoutHistory.future.length === 0}>
               ↷ Redo
             </button>
-            {selectedKeys.length > 0 && (
+            {selectedKeys.length > 0 && !locked && (
               <button
                 type="button"
                 className="rc-tool-btn rc-tool-btn-danger"
@@ -919,6 +973,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                 }}
               >
                 Delete selected ({selectedKeys.length})
+              </button>
+            )}
+            {selectedKeys.length > 0 && (
+              <button type="button" className="rc-tool-btn" onClick={copySelection}>
+                Copy ({selectedKeys.length})
+              </button>
+            )}
+            {hasClipboard && !locked && (
+              <button type="button" className="rc-tool-btn" onClick={pasteClipboard}>
+                Paste
               </button>
             )}
           </div>
