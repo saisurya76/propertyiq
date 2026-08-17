@@ -218,8 +218,9 @@ def test_rotated_element_produces_genuinely_rotated_dxf_geometry(tmp_path):
     from backend.construction_dxf import generate_plot_dxf
     import ezdxf
 
+    x, y, length, width = 0, 0, 16, 8
     site_elements = [
-        {"type": "pool", "x": 0, "y": 0, "length": 16, "width": 8, "color": None, "rotation": 45},
+        {"type": "pool", "x": x, "y": y, "length": length, "width": width, "color": None, "rotation": 45},
     ]
     path = generate_plot_dxf(
         design_id="rotate_pytest", plot_length_ft=40, plot_width_ft=30,
@@ -231,11 +232,23 @@ def test_rotated_element_produces_genuinely_rotated_dxf_geometry(tmp_path):
     poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "SITE_ELEMENTS"][0]
     points = list(poly.get_points())
 
-    # Pivot corner (x, y) stays put; an unrotated rect's second corner
-    # would still sit on the x-axis (y=0) — after a genuine 45deg rotation
-    # it must not.
-    assert abs(points[0][0]) < 0.01 and abs(points[0][1]) < 0.01
-    assert abs(points[1][1]) > 0.01
+    # Rotation pivots around the element's CENTER, not the top-left corner
+    # — matching the interactive canvas (RoomCanvas.jsx) exactly. This
+    # test used to assert the OPPOSITE (that the corner stays put) — that
+    # was the actual bug (confirmed via a real, reported "misplaced
+    # swimming pool" DXF export, displacing a real pool's position by a
+    # measured 4.63ft in one reproduction) — a genuinely rotated shape
+    # must NOT leave its corner fixed; its CENTER is what stays fixed.
+    center_x = sum(p[0] for p in points[:4]) / 4
+    center_y = sum(p[1] for p in points[:4]) / 4
+    expected_cx, expected_cy = x + length / 2, y + width / 2
+    assert abs(center_x - expected_cx) < 0.01
+    assert abs(center_y - expected_cy) < 0.01
+
+    # Still confirm it's a GENUINE rotation (not just unrotated corners) —
+    # an unrotated rect's first corner would sit exactly at (x, y); after
+    # a real 45deg rotation around the center, it must not.
+    assert abs(points[0][0] - x) > 0.01 or abs(points[0][1] - y) > 0.01
 
 
 def test_tree_symbol_has_layered_canopy_not_a_single_circle(tmp_path):
@@ -404,3 +417,85 @@ def test_line_style_fields_produce_correct_dxf_attributes(tmp_path):
     # Old-format line (no dash_style/stroke_width) falls back to solid/default,
     # not a crash.
     assert lines[2].dxf.linetype in ("BYLAYER", "Continuous", "ByLayer")
+
+
+def test_rotated_site_element_dxf_pivots_around_center_not_corner(tmp_path):
+    """Real, reported bug: a rotated element (most visibly the large
+    swimming pool) landed in the wrong position in the exported DXF,
+    because rotation pivoted around the top-left corner while the
+    interactive canvas (RoomCanvas.jsx) uses center-pivot rotation for
+    these same elements — the same bug class fixed in PlotPreview.jsx
+    earlier, but never applied to the DXF exporter itself."""
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    x, y, length, width, rotation = 15, 2, 16, 8, 30
+    site_elements = [{"type": "pool", "x": x, "y": y, "length": length, "width": width, "color": "#7dd3fc", "rotation": rotation}]
+    path = generate_plot_dxf(
+        design_id="pool_center_pivot_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=[], site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    pool_poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "SITE_ELEMENTS"][0]
+    corners = list(pool_poly.get_points("xy"))[:4]
+
+    center_x = sum(c[0] for c in corners) / 4
+    center_y = sum(c[1] for c in corners) / 4
+    expected_cx, expected_cy = x + length / 2, y + width / 2
+
+    # Center-pivot rotation must leave the center exactly where it was —
+    # this is the defining, directly-verifiable property that distinguishes
+    # it from the old buggy corner-pivot behavior (which displaced it by
+    # a real, confirmed 4.63ft for this exact scenario).
+    assert abs(center_x - expected_cx) < 0.01
+    assert abs(center_y - expected_cy) < 0.01
+
+
+def test_room_and_element_border_styling_in_dxf(tmp_path):
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    rooms = [
+        {"name": "Kitchen", "x": 0, "y": 0, "length": 10, "width": 10, "color": "#7c3aed",
+         "border_style": "dash-dot", "border_color": "#ef4444", "border_width": 3},
+    ]
+    site_elements = [
+        {"type": "pool", "x": 15, "y": 2, "length": 16, "width": 8, "color": "#7dd3fc",
+         "border_style": "dotted", "border_color": "#0369a1", "border_width": 2},
+    ]
+    path = generate_plot_dxf(
+        design_id="border_style_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=rooms, site_elements=site_elements, road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+
+    room_poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "ROOMS"][0]
+    assert room_poly.dxf.linetype == "DASHDOT"
+    assert room_poly.dxf.lineweight == 30
+    assert (room_poly.dxf.true_color >> 16) & 0xFF == 0xEF  # red channel of #ef4444
+
+    pool_poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "SITE_ELEMENTS"][0]
+    assert pool_poly.dxf.linetype == "DOTTED"
+    assert pool_poly.dxf.lineweight == 20
+
+
+def test_room_without_border_fields_still_works(tmp_path):
+    """Rooms saved before border styling existed (no border_style/color/
+    width keys at all) must not crash — the old default look."""
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    rooms = [{"name": "Old Room", "x": 0, "y": 0, "length": 10, "width": 10, "color": None}]
+    path = generate_plot_dxf(
+        design_id="border_style_backcompat_pytest", plot_length_ft=40, plot_width_ft=30,
+        rooms=rooms, site_elements=[], road_facing_side="north",
+        output_dir=tmp_path,
+    )
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    room_poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "ROOMS"][0]
+    assert room_poly.dxf.linetype in ("BYLAYER", "Continuous", "ByLayer")

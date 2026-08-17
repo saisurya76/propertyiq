@@ -152,7 +152,15 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
     canopy, a 6-vertex LWPOLYLINE for gazebo, rectangles for pool/car/
     pathway/bench, LINE entities for the two line types) — not the same
     room-box shape reused with a different label. Rotation, if set,
-    pivots around the element's (x, y) corner, matching the canvas."""
+    pivots around the element's CENTER — matching the interactive canvas
+    (RoomCanvas.jsx) exactly. This used to pivot around the top-left
+    corner instead (the same bug class fixed in PlotPreview.jsx earlier,
+    but never applied here) — confirmed as a real, reported bug: any
+    rotated element, most visibly a large swimming pool, would land in a
+    completely different position in the exported DXF than what the user
+    sees and expects from the canvas, since corner-pivot and center-pivot
+    rotation of the same stored (x, y, rotation) produce different
+    final positions whenever rotation is non-zero."""
 
     for el in site_elements:
         el_type = el.get("type", "")
@@ -161,6 +169,28 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
         attribs = {"layer": "SITE_ELEMENTS"}
         if true_color is not None:
             attribs["true_color"] = true_color
+
+        # Border style/color/thickness for area elements (pool, car, tree,
+        # gazebo, etc — not lines, which already have their own dash_style/
+        # stroke_width/color above). DXF entities here are all outline-
+        # based (no true 2D fill without a separate HATCH entity), so a
+        # chosen border_color consistently becomes the whole shape's color,
+        # matching how these entities already work.
+        if el_type not in ("line", "dotted_line"):
+            border_style = el.get("border_style") or "solid"
+            linetype_by_style = {"dotted": "DOTTED", "dash": "DASHED", "dash-dot": "DASHDOT"}
+            if border_style in linetype_by_style:
+                attribs["linetype"] = linetype_by_style[border_style]
+
+            border_color = _hex_to_true_color(el.get("border_color"))
+            if border_color is not None:
+                attribs["true_color"] = border_color
+
+            border_width = el.get("border_width")
+            if border_width:
+                valid_lineweights = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100]
+                target = round(border_width * 10)
+                attribs["lineweight"] = min(valid_lineweights, key=lambda lw: abs(lw - target))
 
         if el_type in ("line", "dotted_line"):
             line_attribs = dict(attribs)
@@ -188,12 +218,18 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
         length = el.get("length") or 1
         width = el.get("width") or 1
         cx, cy = x + length / 2, y + width / 2
-        rcx, rcy = _rotate_point(cx, cy, x, y, rotation) if rotation else (cx, cy)
+        # Rotating a shape around its own center never moves the center
+        # itself — unlike the old corner-pivot code, which rotated cx/cy
+        # AROUND the corner and therefore incorrectly displaced it.
+        rcx, rcy = cx, cy
 
         if el_type == "tree":
             # Layered canopy (2 overlapping circles, offset) reads as an
             # actual tree silhouette on the printed plan, not a plain dot —
             # plus a small trunk mark, matching common landscape-plan symbols.
+            # (Circles are rotation-invariant in shape, so no rotation
+            # needed for these — only their center position matters, and
+            # that's already correctly the unrotated cx/cy.)
             r = min(length, width) / 2
             msp.add_circle((rcx, rcy), r, dxfattribs=attribs)
             msp.add_circle((rcx - r * 0.25, rcy + r * 0.2), r * 0.65, dxfattribs=attribs)
@@ -207,7 +243,7 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
         elif el_type == "gazebo":
             points = _hexagon_points(cx, cy, length / 2, width / 2)
             if rotation:
-                points = [_rotate_point(px, py, x, y, rotation) for px, py in points]
+                points = [_rotate_point(px, py, cx, cy, rotation) for px, py in points]
             msp.add_lwpolyline(points + [points[0]], dxfattribs=attribs)
             msp.add_text("Gazebo", dxfattribs={**attribs, "height": 0.6}).set_placement(
                 (rcx, rcy), align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER
@@ -216,7 +252,7 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
             # pool, car, pathway, bench — rectangular footprint
             corners = [(x, y), (x + length, y), (x + length, y + width), (x, y + width)]
             if rotation:
-                corners = [_rotate_point(px, py, x, y, rotation) for px, py in corners]
+                corners = [_rotate_point(px, py, cx, cy, rotation) for px, py in corners]
             msp.add_lwpolyline(
                 corners + [corners[0]],
                 dxfattribs=attribs,
@@ -228,7 +264,7 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
                 # than a plain rectangle.
                 divider = [(x + length * 0.32, y), (x + length * 0.32, y + width)]
                 if rotation:
-                    divider = [_rotate_point(px, py, x, y, rotation) for px, py in divider]
+                    divider = [_rotate_point(px, py, cx, cy, rotation) for px, py in divider]
                 msp.add_line(divider[0], divider[1], dxfattribs=attribs)
 
                 wheel_r = min(length, width) * 0.09
@@ -236,7 +272,7 @@ def _draw_site_elements(msp, site_elements: list[dict[str, Any]]) -> None:
                 for fx, fy in wheel_offsets:
                     wx, wy = x + length * fx, y + width * fy
                     if rotation:
-                        wx, wy = _rotate_point(wx, wy, x, y, rotation)
+                        wx, wy = _rotate_point(wx, wy, cx, cy, rotation)
                     msp.add_circle((wx, wy), wheel_r, dxfattribs=attribs)
 
             label = el_type.replace("_", " ").title()
@@ -327,6 +363,28 @@ def generate_plot_dxf(
         if true_color is not None:
             poly_attribs["true_color"] = true_color
             label_attribs["true_color"] = true_color
+
+        # Border style (dash pattern), color, and thickness — independent
+        # of the room's fill color above. Border color overrides the fill
+        # color on the outline specifically when set; border_width is a
+        # display-only style thickness, distinct from the real physical
+        # WALL_THICKNESS_FT used elsewhere (kept separate deliberately, so
+        # a decorative thicker outline doesn't get mistaken for an actual
+        # structural wall dimension).
+        border_style = room.get("border_style") or "solid"
+        linetype_by_style = {"dotted": "DOTTED", "dash": "DASHED", "dash-dot": "DASHDOT"}
+        if border_style in linetype_by_style:
+            poly_attribs["linetype"] = linetype_by_style[border_style]
+
+        border_color = _hex_to_true_color(room.get("border_color"))
+        if border_color is not None:
+            poly_attribs["true_color"] = border_color
+
+        border_width = room.get("border_width")
+        if border_width:
+            valid_lineweights = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100]
+            target = round(border_width * 10)
+            poly_attribs["lineweight"] = min(valid_lineweights, key=lambda lw: abs(lw - target))
 
         msp.add_lwpolyline(
             [(x, y), (x + length, y), (x + length, y + width), (x, y + width), (x, y)],

@@ -257,7 +257,7 @@
 /* --- Construction Studio wizard --- */
 
 .cs-wizard {
-  max-width: 900px;
+  max-width: 1100px; /* matches .studio-header/.session-bar/.admin-dashboard's width — was 900px, visibly narrower than its own header on desktop */
   margin: 0 auto;
   padding-bottom: 90px; /* clearance for the fixed floating total bar */
 }
@@ -385,7 +385,7 @@
 }
 
 .studio-designs {
-  max-width: 900px;
+  max-width: 1100px; /* matches the rest of the Studio shell — was 900px */
   margin: 0 auto;
   padding: 20px;
 }
@@ -769,8 +769,8 @@
 
 .cs-room-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.6fr auto;
-  gap: 10px;
+  grid-template-columns: 1.6fr 0.7fr 0.7fr 1.1fr 1fr 0.6fr 0.7fr auto;
+  gap: 8px;
   align-items: center;
   margin-bottom: 10px;
   padding: 6px;
@@ -792,6 +792,15 @@
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cs-room-row select {
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -1656,7 +1665,7 @@
 /* --- Live plot preview (Construction Studio wizard) --- */
 
 .plot-preview {
-  max-width: 900px;
+  max-width: 1100px; /* matches the rest of the Studio shell — was 900px */
   margin: 20px auto 0;
   background: white;
   border: 1px solid #e5e7eb;

@@ -37,7 +37,11 @@ const MASTER_PLAN_ELEMENT_TYPES = {
 const STEPS = ["Plot Details", "Materials", "Room Layout", "Review & Generate"];
 
 function emptyRoom() {
-  return { name: "", x: 0, y: 0, length: 10, width: 10, color: null, _key: Math.random().toString(36).slice(2) };
+  return {
+    name: "", x: 0, y: 0, length: 10, width: 10, color: null,
+    border_style: "solid", border_color: null, border_width: null,
+    _key: Math.random().toString(36).slice(2),
+  };
 }
 
 // Site elements: landscaping/hardscape/site furnishings — distinct from
@@ -71,6 +75,9 @@ function emptyAreaElement(type) {
     width: def.defaultWidth,
     color: def.color,
     rotation: 0,
+    border_style: "solid",
+    border_color: null,
+    border_width: null,
   };
 }
 
@@ -181,6 +188,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const [locked, setLocked] = useState(false);
   const [saveStatus, setSaveStatus] = useState(""); // transient "Saved" / error message
   const [saving, setSaving] = useState(false);
+  const lastSavedSignatureRef = useRef(null); // used by autosave to detect genuine changes vs. no-op re-renders
+  const autosaveTimerRef = useRef(null);
   const [unlockStep, setUnlockStep] = useState(null); // null | "requesting" | "code_sent"
   const [unlockCode, setUnlockCode] = useState("");
   const [unlockError, setUnlockError] = useState("");
@@ -273,6 +282,23 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         });
         setActiveFloorIndex(0);
         setStep(2); // jump straight to Room Layout — plot/materials are already set
+
+        // Seed the autosave baseline from the freshly-loaded data (not by
+        // calling buildPropertyPayload, which reads component state via
+        // closure — the setPlot/setSelections/etc calls above haven't
+        // actually applied to state yet inside this same callback, so
+        // that would capture stale pre-load values). Without this,
+        // autosave would see the just-loaded content as "different from
+        // nothing" and fire an immediate, pointless save right after load.
+        lastSavedSignatureRef.current = JSON.stringify({
+          name: prop.name,
+          plot_spec: prop.plot_spec,
+          selections: prop.selections || {},
+          labor_selections: prop.labor_selections || {},
+          site_elements: prop.site_elements || [],
+          floors: (prop.floors.length > 0 ? prop.floors : [{ floor_number: 0, floor_label: "Ground Floor", rooms: [] }])
+            .map((f) => ({ floor_number: f.floor_number, floor_label: f.floor_label, rooms: f.rooms })),
+        });
       })
       .catch(() => setSaveStatus("Couldn't load that saved design."));
   }, [resumePropertyId]);
@@ -601,9 +627,9 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     })),
   });
 
-  const handleSaveDesign = async () => {
+  const handleSaveDesign = async (isAutosave = false) => {
     setSaving(true);
-    setSaveStatus("");
+    setSaveStatus(isAutosave ? "Saving..." : "");
     try {
       if (propertyId) {
         // One request for the property fields AND the complete floor set
@@ -649,14 +675,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             floors: s.present.floors.map((f, i) => ({ ...f, floor_id: syncedFloorIds[i] || f.floor_id })),
           },
         }));
+        lastSavedSignatureRef.current = JSON.stringify(buildPropertyPayload(propertyName));
         setSaveStatus("Saved.");
       } else {
         const created = await studioApi.createProperty(buildPropertyPayload(propertyName));
         setPropertyId(created.property_id);
+        lastSavedSignatureRef.current = JSON.stringify(buildPropertyPayload(propertyName));
         setSaveStatus("Saved.");
       }
       setSaving(false);
-      setTimeout(() => setSaveStatus(""), 4000);
+      setTimeout(() => setSaveStatus(""), isAutosave ? 2000 : 4000);
     } catch (e) {
       // Only the browser's own network-failure wording counts as "can't
       // reach the server" — matching on `instanceof TypeError` alone was
@@ -677,6 +705,34 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
       setTimeout(() => setSaveStatus(""), 10000); // errors stay up longer than the brief "Saved." confirmation — worth reading
     }
   };
+
+  // Autosave — debounced, only once a property has been explicitly saved
+  // at least once (propertyId exists; a brand-new never-saved design
+  // still requires one deliberate first Save, so exploring the wizard
+  // doesn't silently create abandoned properties), never while locked,
+  // and never overlapping a save already in flight. Compares against
+  // lastSavedSignatureRef so a successful save's own floor_id backfill
+  // (which touches layoutHistory, a dependency below) doesn't re-trigger
+  // itself — buildPropertyPayload's floors shape never includes floor_id
+  // in the first place, so that backfill doesn't even change the
+  // signature, but the explicit comparison is what actually prevents
+  // any accidental loop regardless.
+  useEffect(() => {
+    if (!propertyId || locked) return;
+
+    const currentSignature = JSON.stringify(buildPropertyPayload(propertyName));
+    if (currentSignature === lastSavedSignatureRef.current) return;
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      if (!saving) handleSaveDesign(true);
+    }, 2500);
+
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildPropertyPayload/handleSaveDesign close over the same state already listed here; adding them would just re-run this identically on every render
+  }, [propertyId, locked, propertyName, plot, selections, laborSelections, layoutHistory.present, siteElements]);
 
   const handleLock = async () => {
     if (!propertyId) return;
@@ -780,7 +836,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         <div className="cs-save-bar-actions">
           {saveStatus && <span className="cs-save-status">{saveStatus}</span>}
           {!locked && (
-            <button type="button" className="rc-tool-btn" onClick={handleSaveDesign} disabled={saving}>
+            <button type="button" className="rc-tool-btn" onClick={() => handleSaveDesign(false)} disabled={saving}>
               {saving ? "Saving..." : "Save"}
             </button>
           )}
@@ -1160,7 +1216,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             <>
               <h4 className="cs-list-heading">Site Elements</h4>
               <div className="cs-room-row cs-room-row-header">
-                <span>Element</span><span>Length (ft) / Style</span><span>Width (ft) / Thickness</span><span>Color</span><span></span>
+                <span>Element</span><span>Length (ft) / Style</span><span>Width (ft) / Thickness</span><span>Fill / Line color</span><span>Border style</span><span>Border color</span><span>Border thickness</span><span></span>
               </div>
               <div className="cs-scrollable-list">
                 {siteElements.map((el) => {
@@ -1220,6 +1276,42 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                       ) : (
                         <span />
                       )}
+                      {isLine ? (
+                        <>
+                          <span /><span /><span />
+                        </>
+                      ) : (
+                        <>
+                          <select
+                            value={el.border_style || "solid"}
+                            onChange={(e) => updateElement(el._key, "border_style", e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {Object.entries(LINE_DASH_STYLE_LABELS).map(([style, styleLabel]) => (
+                              <option key={style} value={style}>{styleLabel}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="color"
+                            className="cs-line-color-input"
+                            value={el.border_color || "#6b7280"}
+                            title="Border color (leave default to keep the standard look)"
+                            onChange={(e) => updateElement(el._key, "border_color", e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <input
+                            type="number"
+                            min="0.5"
+                            max="6"
+                            step="0.5"
+                            placeholder="auto"
+                            value={el.border_width || ""}
+                            title="Border thickness (px)"
+                            onChange={(e) => updateElement(el._key, "border_width", e.target.value === "" ? null : Number(e.target.value))}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </>
+                      )}
                       <button className="cs-remove-room" onClick={() => removeElement(el._key)}>Remove</button>
                     </div>
                   );
@@ -1230,7 +1322,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
 
           <h4 className="cs-list-heading">Rooms</h4>
           <div className="cs-room-row cs-room-row-header">
-            <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Color</span><span></span>
+            <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Fill</span><span>Border style</span><span>Border color</span><span>Thickness</span><span></span>
           </div>
           <div className="cs-scrollable-list">
             {rooms.map((room) => (
@@ -1254,6 +1346,34 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                     />
                   ))}
                 </div>
+                <select
+                  value={room.border_style || "solid"}
+                  onChange={(e) => updateRoom(room._key, "border_style", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {Object.entries(LINE_DASH_STYLE_LABELS).map(([style, styleLabel]) => (
+                    <option key={style} value={style}>{styleLabel}</option>
+                  ))}
+                </select>
+                <input
+                  type="color"
+                  className="cs-line-color-input"
+                  value={room.border_color || "#374151"}
+                  title="Border color (leave default to keep the standard wall look)"
+                  onChange={(e) => updateRoom(room._key, "border_color", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <input
+                  type="number"
+                  min="0.5"
+                  max="6"
+                  step="0.5"
+                  placeholder="auto"
+                  value={room.border_width || ""}
+                  title="Border thickness (px) — leave blank to use the real wall thickness"
+                  onChange={(e) => updateRoom(room._key, "border_width", e.target.value === "" ? null : Number(e.target.value))}
+                  onClick={(e) => e.stopPropagation()}
+                />
                 <button className="cs-remove-room" onClick={() => removeRoom(room._key)}>Remove</button>
               </div>
             ))}

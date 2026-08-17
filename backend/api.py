@@ -1154,6 +1154,9 @@ class RoomSpec(BaseModel):
     length: float
     width: float
     color: Optional[str] = None  # "#rrggbb" — carried through to the real DXF export
+    border_style: Optional[str] = None  # solid | dotted | dash | dash-dot
+    border_color: Optional[str] = None  # "#rrggbb" — None keeps the standard wall look
+    border_width: Optional[float] = None  # px — None uses the real wall-thickness-based width
 
 
 # Site elements are landscaping/hardscape/site furnishings — distinct from
@@ -1175,6 +1178,9 @@ class SiteElementSpec(BaseModel):
     # (Vastu zone math + DXF room export both assume axis-aligned rectangles).
     dash_style: Optional[str] = None  # solid | dotted | dash | dash-dot — lines only
     stroke_width: Optional[float] = None  # line thickness in ft — lines only
+    border_style: Optional[str] = None  # solid | dotted | dash | dash-dot — area elements only (pool/car/tree/etc, not lines)
+    border_color: Optional[str] = None  # "#rrggbb" — None keeps the standard look
+    border_width: Optional[float] = None  # px — None uses the default 1px outline
 
 
 class MasterPlanElementSpec(BaseModel):

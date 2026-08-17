@@ -783,8 +783,11 @@ function RoomCanvas({
                     width={width}
                     height={height}
                     fill={room.color || "#ede9fe"}
-                    stroke={isSelected ? "#4c1d95" : "#374151"}
-                    strokeWidth={isSelected ? WALL_THICKNESS_FT * baseScale + 1.5 : WALL_THICKNESS_FT * baseScale}
+                    stroke={room.border_color || (isSelected ? "#4c1d95" : "#374151")}
+                    strokeWidth={
+                      (room.border_width || WALL_THICKNESS_FT * baseScale) + (isSelected ? 1.5 : 0)
+                    }
+                    dash={LINE_DASH_PATTERNS[room.border_style || "solid"]}
                     draggable={!panMode && !locked}
                     dragBoundFunc={makeDragBoundFunc(width, height)}
                     onDragStart={() => handleAnyDragStart(room._key)}
@@ -864,8 +867,9 @@ function RoomCanvas({
                     width={width}
                     height={height}
                     fill={fillColor}
-                    stroke={isSelected ? "#4c1d95" : "#6b7280"}
-                    strokeWidth={isSelected ? 2 : 1}
+                    stroke={el.border_color || (isSelected ? "#4c1d95" : "#6b7280")}
+                    strokeWidth={(el.border_width || 1) + (isSelected ? 1 : 0)}
+                    dash={LINE_DASH_PATTERNS[el.border_style || "solid"]}
                     cornerRadius={def.rounded ? Math.min(width, height) * 0.15 : 0}
                   />
                   {symbol === "circle" && (
