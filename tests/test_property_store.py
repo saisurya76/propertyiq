@@ -218,3 +218,52 @@ def test_sync_property_requires_at_least_one_floor():
 
     r = client.put(f"/api/properties/{property_id}/sync", headers=headers, json={"floors": []})
     assert r.status_code == 400
+
+
+def test_create_property_survives_stale_tier_config_missing_newer_field():
+    """Reproduces the exact production bug: a tier_config persisted BEFORE
+    saved_designs_limit existed as a field. Without config_store.get_tier()
+    merging in current defaults for missing fields, this throws a real
+    KeyError -> 500 (which, due to a separate Starlette gotcha, also drops
+    CORS headers and shows the browser a misleading "Failed to fetch")."""
+    from backend.config_store import set_tier_config, DEFAULT_TIER_CONFIG
+
+    stale_config = {
+        tier_id: {k: v for k, v in tier.items() if k != "saved_designs_limit"}
+        for tier_id, tier in DEFAULT_TIER_CONFIG.items()
+    }
+    set_tier_config(stale_config)
+
+    headers = _signin_with_tier("pytest_stale_config@example.com", tier_id="studio_starter")
+    r = client.post("/api/properties", headers=headers, json=_base_payload())
+    assert r.status_code == 200, f"stale config should not crash property creation: {r.text}"
+
+    # Restore a full, current config so this doesn't leak into other tests
+    set_tier_config(DEFAULT_TIER_CONFIG)
+
+
+def test_unhandled_exception_still_returns_cors_headers():
+    """The confirmed Starlette gotcha: ServerErrorMiddleware sits outside
+    CORSMiddleware, so even a registered exception_handler's response
+    skips CORS header injection unless set manually. Verifies the actual
+    fix (headers set by hand in the handler), not just that a handler
+    exists."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    import backend.api as api_module
+
+    local_client = TestClient(app, raise_server_exceptions=False)
+    email = "pytest_exc_cors@example.com"
+    headers = _signin_with_tier(email)
+    headers["Origin"] = "https://app.propertyiqweb.com"
+
+    original = api_module.get_active_tier
+    api_module.get_active_tier = lambda e: (_ for _ in ()).throw(RuntimeError("simulated"))
+    try:
+        r = local_client.post("/api/properties", headers=headers, json=_base_payload())
+        assert r.status_code == 500
+        assert r.headers.get("access-control-allow-origin") == "https://app.propertyiqweb.com"
+        assert r.headers.get("access-control-allow-credentials") == "true"
+        assert r.json()["detail"]  # clean JSON body, not a raw crash
+    finally:
+        api_module.get_active_tier = original

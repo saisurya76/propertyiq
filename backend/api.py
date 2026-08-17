@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from typing import Any, Optional
 from pydantic import BaseModel
 
@@ -70,6 +70,7 @@ from backend.config_store import (
     get_tier_config,
     set_tier_config,
     get_tier,
+    get_all_tiers_merged,
 )
 
 from backend.subscription_store import (
@@ -188,6 +189,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Defense-in-depth: without this, an unhandled exception's default
+    error response skips CORSMiddleware entirely — a confirmed Starlette
+    architecture gotcha (ServerErrorMiddleware sits OUTSIDE CORSMiddleware
+    in the stack, so even a registered exception_handler's response never
+    passes back through it — see Starlette #2876, FastAPI discussions
+    #7847/#13398/#14313). The browser then reports it as "blocked by CORS
+    policy" / "Failed to fetch", hiding that a genuine server-side 500
+    occurred — confirmed as the actual root cause of exactly that report
+    here (traced to a KeyError from stale persisted tier config missing a
+    newer field). The documented, community-confirmed fix is to set the
+    CORS headers manually on this response, matching what CORSMiddleware
+    itself would have set (echoing the specific request Origin, since
+    allow_credentials=True makes a literal "*" invalid) — verified
+    directly: this exact scenario reproduced the missing header with only
+    the handler registered, and setting these manually is what actually
+    fixed it, not just registering the handler."""
+    import traceback
+    traceback.print_exc()
+
+    headers = {}
+    origin = request.headers.get("origin")
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong on our end. Please try again in a moment."},
+        headers=headers,
+    )
 
 
 class PropertyRequest(BaseModel):
@@ -864,7 +899,7 @@ def list_tiers():
     """Public tier/pricing config for the pricing page. Base prices are USD;
     convert client-side for display using the same fx table Construction
     Studio uses."""
-    return get_tier_config()
+    return get_all_tiers_merged()
 
 
 @app.get("/api/fx-rates")
@@ -892,7 +927,7 @@ def admin_overview(request: AdminAuthRequest):
     _require_admin_password(request.password)
 
     return {
-        "tier_config": get_tier_config(),
+        "tier_config": get_all_tiers_merged(),
         "subscriptions": list_all_subscriptions(),
         "insight_grants": list_all_grants(),
     }
@@ -910,7 +945,7 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
     tier = get_tier(request.tier_id)
     if tier is None:
         raise HTTPException(status_code=404, detail=f"Unknown tier: {request.tier_id}")
-    if tier["billing"] != "subscription":
+    if tier.get("billing") != "subscription":
         raise HTTPException(status_code=400, detail=f"Tier '{request.tier_id}' is not a subscription tier")
 
     if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
@@ -1051,7 +1086,7 @@ def subscribe_status(user_email: str = Depends(get_current_user_email)):
         return {"tier_id": None, "status": sub["status"] if sub else "none", "design_quota_per_month": 0, "designs_used_this_month": 0}
 
     tier = get_tier(tier_id)
-    quota = tier["design_quota_per_month"] if tier else 0
+    quota = tier.get("design_quota_per_month", 0) if tier else 0
     used = count_designs_this_month(user_email)
 
     return {
@@ -1211,7 +1246,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         )
 
     tier = get_tier(tier_id)
-    quota = tier["design_quota_per_month"] if tier else 0
+    quota = tier.get("design_quota_per_month", 0) if tier else 0
     if quota is not None:
         used = count_designs_this_month(user_email)
         if used >= quota:
@@ -1411,7 +1446,7 @@ def api_create_property(request: CreatePropertyRequest, user_email: str = Depend
         raise HTTPException(status_code=403, detail="Saving designs requires an active Studio subscription.")
 
     tier = get_tier(tier_id)
-    limit = tier["saved_designs_limit"] if tier else 0
+    limit = tier.get("saved_designs_limit", 0) if tier else 0
     if limit is not None:
         used = count_saved_properties(user_email)
         if used >= limit:

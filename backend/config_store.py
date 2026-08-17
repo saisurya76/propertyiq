@@ -103,5 +103,43 @@ def set_tier_config(config: dict[str, Any]) -> None:
 
 
 def get_tier(tier_id: str) -> dict[str, Any] | None:
-    config = get_tier_config() or DEFAULT_TIER_CONFIG
-    return config.get(tier_id)
+    """Merges the persisted (possibly stale) tier config over the current
+    code's DEFAULT_TIER_CONFIG, field by field, per tier — NOT a raw
+    passthrough of whatever's in the database.
+
+    This matters because config_store deliberately never overwrites an
+    admin's existing saved config (see initialize_config_store's comment) —
+    so if a NEW field gets added to DEFAULT_TIER_CONFIG after production
+    already has a saved tier_config row, that field is simply missing from
+    the persisted data forever, with no migration. A caller doing
+    tier["new_field"] on that stale data throws a real KeyError -> 500 —
+    confirmed as the actual root cause of a "Failed to fetch"/CORS-blocked
+    report that was really an unhandled server exception dropping CORS
+    headers on its error response, not a network or CORS problem at all.
+    Merging defaults underneath the persisted values keeps admin edits to
+    EXISTING fields intact while safely filling in anything newer."""
+
+    persisted = get_tier_config()
+    default_tier = DEFAULT_TIER_CONFIG.get(tier_id)
+
+    if persisted is None:
+        return default_tier
+
+    persisted_tier = persisted.get(tier_id)
+    if persisted_tier is None:
+        return default_tier
+    if default_tier is None:
+        return persisted_tier
+
+    return {**default_tier, **persisted_tier}
+
+
+def get_all_tiers_merged() -> dict[str, Any]:
+    """Same merge as get_tier(), but for every tier at once — used by the
+    pricing page and admin panel so neither ever displays or relies on a
+    field silently missing from stale persisted config."""
+    persisted = get_tier_config() or {}
+    return {
+        tier_id: {**default_tier, **persisted.get(tier_id, {})}
+        for tier_id, default_tier in DEFAULT_TIER_CONFIG.items()
+    }
