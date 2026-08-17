@@ -855,3 +855,48 @@ body {
     border-radius: 12px;
   }
 }
+
+.scroll-fab-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+}
+
+.scroll-fab {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #4c1d95;
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(76, 29, 149, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.scroll-fab:hover {
+  background: #6d28d9;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 640px) {
+  .scroll-fab-stack {
+    right: 14px;
+    bottom: 18px;
+  }
+
+  .scroll-fab {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}

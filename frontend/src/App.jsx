@@ -9,6 +9,7 @@ import StudioAuth from "./studio/StudioAuth";
 import StudioPricing from "./studio/StudioPricing";
 import ConstructionStudio from "./studio/ConstructionStudio";
 import StudioDesigns from "./studio/StudioDesigns";
+import ScrollToTopBottom from "./components/ScrollToTopBottom";
 import AdminPanel from "./studio/AdminPanel";
 import SessionBar from "./studio/SessionBar";
 import StudioTopBar from "./studio/StudioTopBar";
@@ -393,6 +394,7 @@ function App() {
         <div className="studio-panel">
           <p className="studio-subtext">Checking your session...</p>
         </div>
+        <ScrollToTopBottom />
       </div>
     );
   }
@@ -401,6 +403,7 @@ function App() {
     return (
       <div className="app">
         <StudioAuth onAuthenticated={handleStudioAuthenticated} onBack={backToReport} />
+        <ScrollToTopBottom />
       </div>
     );
   }
@@ -418,6 +421,7 @@ function App() {
           </div>
         )}
         <StudioPricing reportId={reportId} currency={currency} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} />
+        <ScrollToTopBottom />
       </div>
     );
   }
@@ -436,6 +440,7 @@ function App() {
             setStudioView("construction");
           }}
         />
+        <ScrollToTopBottom />
       </div>
     );
   }
@@ -449,6 +454,7 @@ function App() {
           onQuotaExceeded={handleQuotaExceeded}
           resumePropertyId={resumePropertyId}
         />
+        <ScrollToTopBottom />
       </div>
     );
   }
@@ -458,6 +464,7 @@ function App() {
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <AdminPanel onBack={backToReport} />
+        <ScrollToTopBottom />
       </div>
     );
   }
@@ -535,6 +542,8 @@ function App() {
       <p>© 2026 PropertyIQ</p>
 
     </footer>
+
+    <ScrollToTopBottom />
 
     </div>
   );
