@@ -160,6 +160,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
+  const [bom, setBom] = useState(null);
+  const [boq, setBoq] = useState(null);
+  const [bomBoqLoading, setBomBoqLoading] = useState(null); // "bom" | "boq" | null
+  const [bomBoqError, setBomBoqError] = useState("");
   const estimateRequestIdRef = useRef(0); // guards against a slower, older request overwriting a faster, newer one
 
   // Site elements (trees, pool, etc.) and material/labor selections are
@@ -805,6 +809,86 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     window.open(url, "_blank", "noopener");
   };
 
+  // Downloads a plain array of objects as a CSV file via a Blob + temporary
+  // link click — standard browser pattern, no extra dependency needed for
+  // something this simple.
+  const downloadCsv = (filename, rows) => {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = [headers.join(","), ...rows.map((row) => headers.map((h) => escape(row[h])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const fetchBom = async () => {
+    setBomBoqLoading("bom");
+    setBomBoqError("");
+    try {
+      const data = await studioApi.getBillOfMaterials({
+        plot_size_sqft: plotSizeSqft,
+        selections,
+        region: plot.region,
+        currency: plot.currency,
+      });
+      setBom(data);
+    } catch (e) {
+      setBomBoqError(e.message || "Couldn't load the Bill of Materials.");
+    } finally {
+      setBomBoqLoading(null);
+    }
+  };
+
+  const fetchBoq = async () => {
+    setBomBoqLoading("boq");
+    setBomBoqError("");
+    try {
+      const data = await studioApi.getBillOfQuantities({
+        plot_size_sqft: plotSizeSqft,
+        selections,
+        labor_selections: laborSelections,
+        region: plot.region,
+        currency: plot.currency,
+      });
+      setBoq(data);
+    } catch (e) {
+      setBomBoqError(e.message || "Couldn't load the Bill of Quantities.");
+    } finally {
+      setBomBoqLoading(null);
+    }
+  };
+
+  const downloadBomCsv = () => {
+    if (!bom) return;
+    downloadCsv(
+      "bill_of_materials.csv",
+      bom.items.map((i) => ({
+        Material: i.name, Quantity: i.quantity, Unit: i.unit, Suppliers: i.suppliers.join("; "),
+      }))
+    );
+  };
+
+  const downloadBoqCsv = () => {
+    if (!boq) return;
+    const rows = [];
+    for (const trade of boq.trades) {
+      for (const item of trade.items) {
+        rows.push({
+          Trade: trade.trade, Description: item.description, Type: item.kind,
+          Quantity: item.quantity, Unit: item.unit,
+          "Unit Rate": item.unit_rate_converted.toFixed(2),
+          "Line Total": item.line_total_converted.toFixed(2),
+        });
+      }
+    }
+    downloadCsv("bill_of_quantities.csv", rows);
+  };
+
   const canProceedFromPlot = plot.plot_length_ft > 0 && plot.plot_width_ft > 0 && plot.city.trim();
   const canProceedFromMaterials = catalog && Object.keys(selections).length > 0;
 
@@ -1385,6 +1469,88 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
       {step === 3 && (
         <div className="cs-card">
           <h3>Review & Generate</h3>
+
+          {Object.keys(selections).length > 0 && (
+            <div className="cs-bom-boq-section">
+              <h4>Documents</h4>
+              <p className="studio-subtext">
+                A Bill of Materials (what to order, and how much) and a Bill of Quantities (the full
+                trade-by-trade cost breakdown for tendering/contracts) — available as soon as materials
+                are selected, no need to generate the full design first.
+              </p>
+              <div className="cs-bom-boq-buttons">
+                <button type="button" className="rc-tool-btn" onClick={fetchBom} disabled={bomBoqLoading === "bom"}>
+                  {bomBoqLoading === "bom" ? "Loading..." : "View Bill of Materials"}
+                </button>
+                <button type="button" className="rc-tool-btn" onClick={fetchBoq} disabled={bomBoqLoading === "boq"}>
+                  {bomBoqLoading === "boq" ? "Loading..." : "View Bill of Quantities"}
+                </button>
+              </div>
+
+              {bomBoqError && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{bomBoqError}</div>}
+
+              {bom && (
+                <div className="cs-bom-boq-table-wrap">
+                  <div className="cs-bom-boq-table-header">
+                    <h5>Bill of Materials</h5>
+                    <button type="button" className="rc-tool-btn" onClick={downloadBomCsv}>Download CSV</button>
+                  </div>
+                  <table className="cs-bom-boq-table">
+                    <thead>
+                      <tr><th>Material</th><th>Quantity</th><th>Unit</th><th>Suppliers</th></tr>
+                    </thead>
+                    <tbody>
+                      {bom.items.map((item, i) => (
+                        <tr key={i}>
+                          <td>{item.name}</td>
+                          <td>{item.quantity.toLocaleString()}</td>
+                          <td>{item.unit}</td>
+                          <td>{item.suppliers.join(", ")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {boq && (
+                <div className="cs-bom-boq-table-wrap">
+                  <div className="cs-bom-boq-table-header">
+                    <h5>Bill of Quantities</h5>
+                    <button type="button" className="rc-tool-btn" onClick={downloadBoqCsv}>Download CSV</button>
+                  </div>
+                  {boq.trades.map((trade, ti) => (
+                    <div key={ti} className="cs-boq-trade">
+                      <div className="cs-boq-trade-header">
+                        <strong>{trade.trade}</strong>
+                        <span>{boq.currency} {trade.subtotal_converted.toLocaleString()}</span>
+                      </div>
+                      <table className="cs-bom-boq-table">
+                        <thead>
+                          <tr><th>Description</th><th>Type</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Total</th></tr>
+                        </thead>
+                        <tbody>
+                          {trade.items.map((item, i) => (
+                            <tr key={i}>
+                              <td>{item.description}</td>
+                              <td>{item.kind}</td>
+                              <td>{item.quantity.toLocaleString()}</td>
+                              <td>{item.unit}</td>
+                              <td>{item.unit_rate_converted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                              <td>{item.line_total_converted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                  <div className="cs-boq-grand-total">
+                    Grand total: {boq.currency} {boq.grand_total_converted.toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {!result && (
             <>

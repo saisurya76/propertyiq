@@ -1062,6 +1062,87 @@
   line-height: 1.7;
 }
 
+.cs-bom-boq-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  background: #fafaf9;
+}
+
+.cs-bom-boq-section h4 {
+  margin: 0 0 4px;
+}
+
+.cs-bom-boq-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.cs-bom-boq-table-wrap {
+  margin-top: 18px;
+  overflow-x: auto;
+}
+
+.cs-bom-boq-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cs-bom-boq-table-header h5 {
+  margin: 0;
+}
+
+.cs-bom-boq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cs-bom-boq-table th {
+  text-align: left;
+  background: #f3f4f6;
+  padding: 8px 10px;
+  font-weight: 700;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.cs-bom-boq-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #111827;
+}
+
+.cs-boq-trade {
+  margin-bottom: 18px;
+}
+
+.cs-boq-trade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: #ede9fe;
+  border-radius: 8px 8px 0 0;
+  color: #4c1d95;
+  font-size: 14px;
+}
+
+.cs-boq-grand-total {
+  text-align: right;
+  font-weight: 700;
+  font-size: 16px;
+  color: #111827;
+  padding: 12px 10px 0;
+  border-top: 2px solid #e5e7eb;
+  margin-top: 8px;
+}
+
 .cs-download-btn {
   background: #c084fc;
   color: #1e1b3a;

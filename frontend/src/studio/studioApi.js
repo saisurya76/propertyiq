@@ -84,6 +84,12 @@ export const studioApi = {
   estimateCost: (payload) =>
     apiFetch("/api/construction-studio/estimate", { method: "POST", body: JSON.stringify(payload) }),
 
+  getBillOfMaterials: (payload) =>
+    apiFetch("/api/construction-studio/bill-of-materials", { method: "POST", body: JSON.stringify(payload) }),
+
+  getBillOfQuantities: (payload) =>
+    apiFetch("/api/construction-studio/bill-of-quantities", { method: "POST", body: JSON.stringify(payload) }),
+
   adminOverview: (password) =>
     apiFetch("/api/admin/overview", { method: "POST", body: JSON.stringify({ password }) }),
 
