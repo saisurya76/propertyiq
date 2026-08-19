@@ -515,6 +515,16 @@ function App() {
         independent, explainable and evidence-based intelligence.
       </p>
 
+      <div className="hero-studio-cta">
+        <div className="hero-studio-cta-text">
+          <span className="hero-studio-cta-badge">Construction Studio</span>
+          <p>Design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF — no property report needed.</p>
+        </div>
+        <button type="button" className="hero-studio-cta-btn" onClick={launchStudio}>
+          Open Construction Studio →
+        </button>
+      </div>
+
       </div>
 
       <PropertyForm
