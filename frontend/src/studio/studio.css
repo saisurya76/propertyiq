@@ -322,6 +322,41 @@
   margin-top: 4px;
 }
 
+.cs-adjacency-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.cs-adjacency-bar label {
+  color: #374151;
+  font-weight: 600;
+}
+
+.cs-adjacency-bar select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.cs-adjacency-summary {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cs-adjacency-summary-warning {
+  color: #dc2626;
+}
+
+.cs-adjacency-summary-good {
+  color: #16a34a;
+}
+
 .rc-floor-tabs {
   display: flex;
   align-items: center;

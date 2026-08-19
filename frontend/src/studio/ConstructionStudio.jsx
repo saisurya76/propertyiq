@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
+import { evaluateAdjacency, ARCHITECTURAL_STYLE_LABELS } from "./adjacencyEngine";
 
 const RoomCanvas = lazy(() => import("./RoomCanvas"));
 
@@ -150,6 +151,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     road_facing_side: "north",
     slope_direction: "north",
     master_plan_elements: [],
+    architectural_style: "modern_open_plan",
   });
 
   const [catalog, setCatalog] = useState(null);
@@ -185,6 +187,15 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const rooms = useMemo(() => floors[activeFloorIndex]?.rooms || [], [floors, activeFloorIndex]);
   const siteElements = layoutHistory.present.elements;
   const [selectedKeys, setSelectedKeys] = useState([]);
+
+  // Steady-state adjacency status (recomputed whenever rooms/style
+  // actually change and commit) — the room being actively dragged gets
+  // its own LIVE, per-frame update imperatively inside RoomCanvas, so
+  // this memo doesn't need to run on every drag frame.
+  const roomAdjacencyStatus = useMemo(
+    () => evaluateAdjacency(rooms, plot.architectural_style).roomStatus,
+    [rooms, plot.architectural_style]
+  );
 
   // Save/load/lock state
   const [propertyId, setPropertyId] = useState(null);
@@ -1233,6 +1244,29 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             )}
           </div>
 
+          <div className="cs-adjacency-bar">
+            <label>
+              Architectural style:{" "}
+              <select
+                value={plot.architectural_style}
+                onChange={(e) => updatePlotField("architectural_style", e.target.value)}
+              >
+                {Object.entries(ARCHITECTURAL_STYLE_LABELS).map(([id, label]) => (
+                  <option key={id} value={id}>{label}</option>
+                ))}
+              </select>
+            </label>
+            {Object.values(roomAdjacencyStatus).includes("warning") ? (
+              <span className="cs-adjacency-summary cs-adjacency-summary-warning">
+                ⚠ Some room placements don't follow good space-planning practice — see the red outlines below.
+              </span>
+            ) : rooms.filter((r) => r.name.trim()).length > 1 ? (
+              <span className="cs-adjacency-summary cs-adjacency-summary-good">
+                ✓ No adjacency issues found for this layout and style.
+              </span>
+            ) : null}
+          </div>
+
           <div className="rc-floor-tabs">
             {floors.map((floor, i) => (
               <div key={floor.floor_id || `new-${i}`} className={`rc-floor-tab ${i === activeFloorIndex ? "rc-floor-tab-active" : ""}`}>
@@ -1293,6 +1327,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
               selectedKeys={selectedKeys}
               onSelectionChange={setSelectedKeys}
               locked={locked}
+              roomAdjacencyStatus={roomAdjacencyStatus}
+              architecturalStyle={plot.architectural_style}
             />
           </Suspense>
 

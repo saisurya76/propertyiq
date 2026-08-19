@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Rect, Text, Line, Circle, RegularPolygon, Transformer, Group } from "react-konva";
 import Konva from "konva";
+import { evaluateAdjacency } from "./adjacencyEngine";
 
 const BASE_CANVAS_WIDTH = 640;
 const ROAD_SIDE_OFFSET = 14;
@@ -183,6 +184,8 @@ function RoomCanvas({
   selectedKeys,
   onSelectionChange,
   locked = false,
+  roomAdjacencyStatus = {},
+  architecturalStyle = "modern_open_plan",
 }) {
   const [zoom, setZoom] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -533,6 +536,26 @@ function RoomCanvas({
     e.target.y(snappedY);
     drawGuides(newGuides);
     applyMultiDragDelta(item._key, e);
+
+    // Live architectural-correctness feedback: only applies to rooms (not
+    // site elements, which have no room-type semantics). Computed and
+    // applied imperatively — not via React state — for the same reason
+    // alignment guides are imperative: a re-render on every drag frame is
+    // a known source of Konva drag-fighting bugs (documented and fixed
+    // earlier in this project). The steady-state color (from the
+    // roomAdjacencyStatus prop) takes back over automatically on React's
+    // next render once the drag commits, so no explicit "revert" is
+    // needed here.
+    const isRoom = rooms.some((r) => r._key === item._key);
+    if (isRoom) {
+      const liveFeet = canvasToFeet(snappedX, snappedY, width, height);
+      const liveRooms = rooms.map((r) =>
+        r._key === item._key ? { ...r, x: liveFeet.x, y: liveFeet.y } : r
+      );
+      const liveStatus = evaluateAdjacency(liveRooms, architecturalStyle).roomStatus[item._key];
+      const liveColor = liveStatus === "warning" ? "#dc2626" : liveStatus === "good" ? "#16a34a" : (item.border_color || "#374151");
+      e.target.stroke(liveColor);
+    }
   };
 
   const finishMultiDragAndCommit = (anchorKey) => {
@@ -770,6 +793,18 @@ function RoomCanvas({
           {placedRooms.map((room) => {
             const { x, y, width, height } = feetToCanvas(room);
             const isSelected = selectedKeys.includes(room._key);
+            const adjacencyStatus = roomAdjacencyStatus[room._key];
+            // Priority: an active selection always wins (interactive state
+            // matters most); then adjacency correctness (a real warning is
+            // more important information than a decorative color choice);
+            // then the user's own custom border color; then the default.
+            const roomStrokeColor = isSelected
+              ? "#4c1d95"
+              : adjacencyStatus === "warning"
+              ? "#dc2626"
+              : adjacencyStatus === "good"
+              ? "#16a34a"
+              : room.border_color || "#374151";
 
             return (
               <Fragment key={room._key}>
@@ -783,9 +818,9 @@ function RoomCanvas({
                     width={width}
                     height={height}
                     fill={room.color || "#ede9fe"}
-                    stroke={room.border_color || (isSelected ? "#4c1d95" : "#374151")}
+                    stroke={roomStrokeColor}
                     strokeWidth={
-                      (room.border_width || WALL_THICKNESS_FT * baseScale) + (isSelected ? 1.5 : 0)
+                      (room.border_width || WALL_THICKNESS_FT * baseScale) + (isSelected || adjacencyStatus ? 1.5 : 0)
                     }
                     dash={LINE_DASH_PATTERNS[room.border_style || "solid"]}
                     draggable={!panMode && !locked}

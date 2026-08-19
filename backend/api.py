@@ -51,6 +51,10 @@ from backend.vastu_engine import (
     check_vastu_full,
 )
 
+from backend.adjacency_engine import (
+    evaluate_adjacency,
+)
+
 from backend.construction_dxf import (
     generate_plot_dxf,
 )
@@ -1262,6 +1266,35 @@ def construction_boq(request: ConstructionEstimateRequest):
         region=request.region,
         currency=request.currency,
     )
+
+
+class AdjacencyCheckRequest(BaseModel):
+    rooms: list[RoomSpec]
+    style: str = "modern_open_plan"
+
+
+@app.post("/api/construction-studio/adjacency-check")
+def construction_adjacency_check(request: AdjacencyCheckRequest):
+    """Space-planning adjacency report for the Review step — a
+    server-side confirmation of the same rules the canvas already
+    evaluates live during drag (see the JS port in RoomCanvas.jsx).
+    Kept in sync deliberately so the two never silently drift apart."""
+    return evaluate_adjacency(
+        rooms=[r.model_dump() for r in request.rooms],
+        style=request.style,
+    )
+
+
+@app.get("/api/construction-studio/adjacency-styles")
+def construction_adjacency_styles():
+    """The selectable architectural styles for adjacency validation."""
+    return {
+        "styles": [
+            {"id": "modern_open_plan", "label": "Modern / Open-Plan"},
+            {"id": "minimalist", "label": "Minimalist"},
+            {"id": "traditional_zoned", "label": "Traditional / Zoned"},
+        ]
+    }
 
 
 @app.post("/api/construction-studio/design")
