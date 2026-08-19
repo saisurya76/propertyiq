@@ -903,17 +903,37 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const canProceedFromPlot = plot.plot_length_ft > 0 && plot.plot_width_ft > 0 && plot.city.trim();
   const canProceedFromMaterials = catalog && Object.keys(selections).length > 0;
 
+  // Jumping BACKWARD to an already-visited step is always allowed (no
+  // data is lost by going back). Jumping FORWARD is gated by the exact
+  // same conditions the "Next" button already uses below, so clicking a
+  // step pill directly and clicking Next behave consistently — no new,
+  // separate set of rules to keep in sync.
+  const canJumpToStep = (targetStep) => {
+    if (targetStep <= step) return true;
+    if (targetStep >= 1 && !canProceedFromPlot) return false;
+    if (targetStep >= 2 && !canProceedFromMaterials) return false;
+    return true;
+  };
+
   return (
     <div className="cs-wizard">
       <div className="cs-steps">
-        {STEPS.map((label, i) => (
-          <span
-            key={label}
-            className={`cs-step-pill ${i === step ? "cs-step-active" : i < step ? "cs-step-done" : ""}`}
-          >
-            {i + 1}. {label}
-          </span>
-        ))}
+        {STEPS.map((label, i) => {
+          const clickable = canJumpToStep(i);
+          return (
+            <span
+              key={label}
+              className={`cs-step-pill ${i === step ? "cs-step-active" : i < step ? "cs-step-done" : ""} ${clickable ? "cs-step-pill-clickable" : "cs-step-pill-disabled"}`}
+              onClick={() => clickable && setStep(i)}
+              role="button"
+              tabIndex={clickable ? 0 : -1}
+              aria-disabled={!clickable}
+              title={clickable ? `Go to ${label}` : "Complete the earlier steps first"}
+            >
+              {i + 1}. {label}
+            </span>
+          );
+        })}
       </div>
 
       {error && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{error}</div>}

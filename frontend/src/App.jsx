@@ -352,7 +352,14 @@ function App() {
     setCheckingSession(true);
     try {
       await studioApi.getStatus();
-      setStudioView("pricing");
+      // If the user was actively editing a specific saved design when they
+      // left (resumePropertyId still set — only true after explicitly
+      // opening a saved design, never for "start new"), take them straight
+      // back to it instead of routing through Pricing -> Designs -> click
+      // the same design again. That multi-click detour was the actual
+      // "no seamless experience" bug — the design was always reachable via
+      // the saved-designs list, just never in one click.
+      setStudioView(resumePropertyId ? "construction" : "pricing");
     } catch (err) {
       if (err.status === 401) {
         clearSession();
@@ -525,6 +532,40 @@ function App() {
         </button>
       </div>
 
+      </div>
+
+      <div className="mission-section">
+        <div className="mission-content">
+          <h2>Why PropertyIQ exists</h2>
+          <p>
+            Real estate in India runs on trust that's rarely earned. Builders routinely inflate carpet
+            area against sanctioned plans, quote per-square-foot rates with no defensible basis, and bury
+            change-of-plan or cost-escalation clauses deep in agreements few buyers ever read closely.
+            Pricing itself is often little more than "what the market will bear" — copied from a
+            neighboring project, adjusted for a broker's commission, with no grounding in actual
+            construction cost, land value, or comparable sales data.
+          </p>
+          <p>
+            The common loopholes are well known inside the industry and almost invisible outside it:
+            RERA registration numbers that don't match the actual project, occupancy certificates
+            obtained for a different building configuration than what's delivered, and "super built-up
+            area" quoted with a loading factor that can run anywhere from 20% to 40%+ over actual carpet
+            area with no consistent standard — meaning two builders can describe the exact same living
+            space with very different-sounding square footage. A buyer evaluating a single property has
+            no independent way to catch any of this before money changes hands.
+          </p>
+          <p>
+            PropertyIQ exists to close that information gap. Every assessment cross-references public
+            government records, fraud-pattern databases, and comparable transaction data — the same kind
+            of scrutiny a careful lawyer or engineer would apply, made accessible before you commit, not
+            after a dispute. Construction Studio goes a step further: instead of trusting a builder's
+            quoted rate, it prices your build from real material and labor costs, region by region, so
+            you have an independent number to compare against what you're being asked to pay.
+          </p>
+          <p className="mission-tagline">
+            Independent. Evidence-based. Built for the buyer, not the builder.
+          </p>
+        </div>
       </div>
 
       <PropertyForm
