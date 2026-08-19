@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 from typing import Any, Optional
 
@@ -272,3 +273,201 @@ def identify_construction_risks(
     )
 
     return risks
+
+
+def generate_bill_of_materials(
+    *,
+    plot_size_sqft: float,
+    selections: dict[str, str],
+    region: str = "global",
+) -> dict[str, Any]:
+    """A Bill of Materials — a procurement list: WHAT to buy and HOW MUCH,
+    for the selected material options only (no labor, no cost totals —
+    that's what a BOQ is for; see generate_bill_of_quantities below). This
+    is the genuine distinction between the two documents in real
+    construction/procurement practice: a BOM answers "what do I order,"
+    a BOQ answers "what does the whole job cost, trade by trade."
+
+    Categories without a real per-sqft physical consumption rate on file
+    (structure, roofing, electrical, plumbing, kitchen_work,
+    sanitary_fittings — whole-system items that don't reduce to a clean
+    per-sqft physical unit the way cement/bricks/sand do) are listed with
+    quantity "1 (project-scope)" rather than a fabricated precise number.
+    """
+
+    region = (region or "global").strip().lower()
+    items = []
+
+    for category, option_id in selections.items():
+        opt = _find_option(category, option_id, _CATALOG["categories"])
+        if not opt:
+            continue
+
+        quantity_per_sqft = opt.get("quantity_per_sqft")
+        quantity_unit = opt.get("quantity_unit")
+
+        if quantity_per_sqft is not None:
+            raw_quantity = quantity_per_sqft * plot_size_sqft
+            # Physical materials are bought in whole units with a standard
+            # wastage allowance — round up, not to the nearest whole
+            # number, so the list never under-orders.
+            quantity = math.ceil(raw_quantity)
+            unit = quantity_unit
+        else:
+            quantity = 1
+            unit = "project-scope"
+
+        items.append({
+            "category": category,
+            "option_id": option_id,
+            "name": opt["name"],
+            "quantity": quantity,
+            "unit": unit,
+            "suppliers": [s["name"] for s in opt["suppliers"] if s["region"] == region or s["region"] == "global"]
+            or [s["name"] for s in opt["suppliers"]],
+        })
+
+    return {
+        "plot_size_sqft": plot_size_sqft,
+        "region": region,
+        "items": items,
+    }
+
+
+# Trade groupings for the BOQ's work-package structure — matches how a
+# real Indian residential BOQ is conventionally organized (civil work
+# first, then finishes, then services), not just an arbitrary alphabetical
+# dump of categories.
+BOQ_TRADE_GROUPS = [
+    ("Civil & Structural", ["structure", "cement", "steel", "bricks", "aggregate", "sand", "rcc_work", "brickwork", "plasterwork"]),
+    ("Roofing & Waterproofing", ["roofing", "waterproofing"]),
+    ("Finishes", ["flooring", "painting", "doors", "windows"]),
+    ("Kitchen & Sanitary", ["kitchen_work", "sanitary_fittings"]),
+    ("Electrical & Plumbing", ["electrical", "plumbing"]),
+]
+
+
+def generate_bill_of_quantities(
+    *,
+    plot_size_sqft: float,
+    selections: dict[str, str],
+    labor_selections: Optional[dict[str, str]] = None,
+    region: str = "global",
+    currency: str = "USD",
+) -> dict[str, Any]:
+    """A Bill of Quantities — the broader, contract/tender-grade document:
+    every work item (materials AND labor together), grouped by trade,
+    with quantity, unit rate, and line total for each — matching the
+    real-world distinction from a BOM (materials-only procurement list).
+    Reuses the same per-item cost math as estimate_cost() so the BOQ's
+    totals always reconcile exactly with the live running estimate shown
+    elsewhere in the Studio, rather than risking two independently-
+    maintained pricing paths drifting apart."""
+
+    cost = estimate_cost(
+        plot_size_sqft=plot_size_sqft,
+        selections=selections,
+        labor_selections=labor_selections or {},
+        region=region,
+        currency=currency,
+    )
+    line_items_by_category = {li["category"]: li for li in cost["line_items"]}
+    quantity_lookup = {
+        f"{li['category']}:{li['option_id']}": li for li in cost["line_items"]
+    }
+
+    catalog_options = {}
+    for cat_id, cat in _CATALOG["categories"].items():
+        for opt in cat["options"]:
+            catalog_options[(cat_id, opt["id"])] = opt
+
+    grouped = []
+    categorized = set()
+
+    for trade_label, category_ids in BOQ_TRADE_GROUPS:
+        trade_items = []
+        for category in category_ids:
+            li = line_items_by_category.get(category)
+            if not li:
+                continue
+            categorized.add(category)
+
+            opt = catalog_options.get((category, li["option_id"]))
+            quantity_per_sqft = opt.get("quantity_per_sqft") if opt else None
+            if quantity_per_sqft is not None:
+                # Use the SAME priced area estimate_cost() actually used for
+                # this line (e.g. doors/windows price against a fraction of
+                # plot area, not the full plot — see Phase 4 of the
+                # materials catalog work) so quantity and cost stay
+                # consistent with each other, not silently drifting apart.
+                priced_area = li.get("priced_area_sqft", plot_size_sqft)
+                quantity = round(quantity_per_sqft * priced_area, 1)
+                unit = opt.get("quantity_unit")
+            else:
+                quantity = 1
+                unit = "lot"
+
+            trade_items.append({
+                "category": category,
+                "description": li["name"],
+                "kind": li["kind"],
+                "quantity": quantity,
+                "unit": unit,
+                "unit_rate_converted": li["line_total_converted"] / quantity if quantity else li["line_total_converted"],
+                "line_total_converted": li["line_total_converted"],
+            })
+
+        if trade_items:
+            grouped.append({
+                "trade": trade_label,
+                "items": trade_items,
+                "subtotal_converted": round(sum(i["line_total_converted"] for i in trade_items), 2),
+            })
+
+    # Anything not covered by the fixed trade groupings above (e.g. a
+    # future category that hasn't been slotted into one yet) still shows
+    # up, rather than silently vanishing from the document.
+    leftover = [li for cat, li in line_items_by_category.items() if cat not in categorized]
+
+    # The blanket "residual" labor (electrical/plumbing/painting labor and
+    # supervision overhead — the part of labor_cost_index NOT covered by
+    # itemized RCC/Brickwork/Plasterwork selections, see Phase 2 of the
+    # materials catalog work) is a real cost but was never represented as
+    # its own line item anywhere — without it, the BOQ's trade subtotals
+    # would silently NOT sum to the true grand total, which is a real
+    # correctness bug for a document whose entire purpose is trustworthy
+    # itemized accounting. Confirmed by direct test: trade subtotals came
+    # up short of material+labor by exactly this residual amount.
+    residual_labor_converted = round(cost["labor_cost_converted"] - sum(
+        li["line_total_converted"] for li in cost["line_items"] if li["kind"] == "labor"
+    ), 2)
+
+    other_items = [{
+        "category": li["category"], "description": li["name"], "kind": li["kind"],
+        "quantity": 1, "unit": "lot",
+        "unit_rate_converted": li["line_total_converted"], "line_total_converted": li["line_total_converted"],
+    } for li in leftover]
+
+    if residual_labor_converted > 0.01:
+        other_items.append({
+            "category": "_overhead_labor", "description": "General Labor & Supervision (electrical, plumbing, painting labor, site overhead)",
+            "kind": "labor", "quantity": 1, "unit": "lot",
+            "unit_rate_converted": residual_labor_converted, "line_total_converted": residual_labor_converted,
+        })
+
+    if other_items:
+        grouped.append({
+            "trade": "Other",
+            "items": other_items,
+            "subtotal_converted": round(sum(i["line_total_converted"] for i in other_items), 2),
+        })
+
+    return {
+        "plot_size_sqft": plot_size_sqft,
+        "region": region,
+        "currency": cost["currency"],
+        "trades": grouped,
+        "material_subtotal_converted": cost["material_subtotal_converted"],
+        "labor_cost_converted": cost["labor_cost_converted"],
+        "grand_total_converted": cost["grand_total_converted"],
+    }

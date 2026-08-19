@@ -43,6 +43,8 @@ from backend.construction_studio import (
     estimate_cost,
     check_vastu_basics,
     identify_construction_risks,
+    generate_bill_of_materials,
+    generate_bill_of_quantities,
 )
 
 from backend.vastu_engine import (
@@ -1154,9 +1156,6 @@ class RoomSpec(BaseModel):
     length: float
     width: float
     color: Optional[str] = None  # "#rrggbb" — carried through to the real DXF export
-    border_style: Optional[str] = None  # solid | dotted | dash | dash-dot
-    border_color: Optional[str] = None  # "#rrggbb" — None keeps the standard wall look
-    border_width: Optional[float] = None  # px — None uses the real wall-thickness-based width
 
 
 # Site elements are landscaping/hardscape/site furnishings — distinct from
@@ -1178,9 +1177,6 @@ class SiteElementSpec(BaseModel):
     # (Vastu zone math + DXF room export both assume axis-aligned rectangles).
     dash_style: Optional[str] = None  # solid | dotted | dash | dash-dot — lines only
     stroke_width: Optional[float] = None  # line thickness in ft — lines only
-    border_style: Optional[str] = None  # solid | dotted | dash | dash-dot — area elements only (pool/car/tree/etc, not lines)
-    border_color: Optional[str] = None  # "#rrggbb" — None keeps the standard look
-    border_width: Optional[float] = None  # px — None uses the default 1px outline
 
 
 class MasterPlanElementSpec(BaseModel):
@@ -1226,6 +1222,40 @@ def construction_estimate(request: ConstructionEstimateRequest):
         raise HTTPException(status_code=400, detail="plot_size_sqft must be greater than 0")
 
     return estimate_cost(
+        plot_size_sqft=request.plot_size_sqft,
+        selections=request.selections,
+        labor_selections=request.labor_selections,
+        region=request.region,
+        currency=request.currency,
+    )
+
+
+@app.post("/api/construction-studio/bill-of-materials")
+def construction_bom(request: ConstructionEstimateRequest):
+    """A Bill of Materials — a procurement list (what to order, and how
+    much), materials only, no labor or cost totals. Distinct from a Bill
+    of Quantities (see below), matching the real-world distinction
+    between the two document types."""
+    if request.plot_size_sqft <= 0:
+        raise HTTPException(status_code=400, detail="plot_size_sqft must be greater than 0")
+
+    return generate_bill_of_materials(
+        plot_size_sqft=request.plot_size_sqft,
+        selections=request.selections,
+        region=request.region,
+    )
+
+
+@app.post("/api/construction-studio/bill-of-quantities")
+def construction_boq(request: ConstructionEstimateRequest):
+    """A Bill of Quantities — the tender/contract-grade document: every
+    work item, materials AND labor together, grouped by trade, with
+    quantity, unit rate, and line total for each. Totals reconcile
+    exactly with /estimate's numbers (same underlying calculation)."""
+    if request.plot_size_sqft <= 0:
+        raise HTTPException(status_code=400, detail="plot_size_sqft must be greater than 0")
+
+    return generate_bill_of_quantities(
         plot_size_sqft=request.plot_size_sqft,
         selections=request.selections,
         labor_selections=request.labor_selections,
