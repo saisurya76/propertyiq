@@ -72,8 +72,14 @@ function normalizeLanguage(code) {
 // since the widget's <select> isn't guaranteed to exist in the DOM yet
 // the moment this runs (it's injected asynchronously by Google's script).
 function triggerGoogleTranslation(languageCode) {
-  if (languageCode === "en") return;
-
+  // No early-return for "en" here — that was the actual bug: switching
+  // BACK to English after the page had already been translated needs
+  // Google Translate's widget to be told explicitly to revert. Google
+  // Translate doesn't undo itself just because no new (non-English)
+  // language was requested — it only reverts when its own <select> is
+  // driven to "en" and a real "change" event fires, same as any other
+  // language switch. Skipping that call for "en" left the page stuck on
+  // whatever language it was last translated to.
   const apply = () => {
     const select = document.querySelector(".goog-te-combo");
     if (!select) return false;
