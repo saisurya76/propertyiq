@@ -72,7 +72,7 @@
   background: white;
   border-radius: 20px;
   padding: 34px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08);
   text-align: left;
 }
 
@@ -244,13 +244,14 @@
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  background: #2c1f47;
+  background: linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%);
   color: white;
-  transition: 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.studio-tier-btn:hover {
-  opacity: 0.9;
+.studio-tier-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35);
 }
 
 .studio-tier-btn:disabled {
@@ -573,7 +574,7 @@
 
 .cs-step-pill-clickable:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.14);
 }
 
 .cs-step-pill-disabled {
@@ -595,7 +596,7 @@
   background: white;
   border-radius: 20px;
   padding: 32px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08);
   margin-bottom: 24px;
 }
 
@@ -807,7 +808,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 12px 30px rgba(76, 29, 149, 0.25);
   margin-top: 10px;
 }
 
@@ -916,6 +917,11 @@
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
+  transition: transform 0.12s ease;
+}
+
+.cs-room-color-swatch:hover {
+  transform: scale(1.15);
 }
 
 .cs-room-color-swatch-active {
@@ -944,7 +950,7 @@
   height: 56px;
   z-index: 5;
   pointer-events: none;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 1px 3px rgba(76, 29, 149, 0.15));
 }
 
 .room-canvas-toolbar {
@@ -1046,6 +1052,11 @@
   padding: 8px 12px;
   cursor: pointer;
   font-size: 13px;
+  transition: background 0.15s ease;
+}
+
+.cs-remove-room:hover {
+  background: #fecaca;
 }
 
 .cs-list-heading {
@@ -1099,6 +1110,16 @@
   font-weight: 600;
   cursor: pointer;
   margin-top: 6px;
+  transition: background 0.15s ease;
+}
+
+.cs-add-room-btn:hover:not(:disabled) {
+  background: #ede4fc;
+}
+
+.cs-add-room-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .cs-wizard-nav {
@@ -1114,16 +1135,26 @@
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
 }
 
 .cs-nav-btn.cs-nav-primary {
-  background: #2c1f47;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
   color: white;
+}
+
+.cs-nav-btn.cs-nav-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35);
 }
 
 .cs-nav-btn.cs-nav-secondary {
   background: #f3ecff;
   color: #2c1f47;
+}
+
+.cs-nav-btn.cs-nav-secondary:hover:not(:disabled) {
+  background: #ede4fc;
 }
 
 .cs-nav-btn:disabled {
@@ -1251,6 +1282,13 @@
   font-weight: 700;
   cursor: pointer;
   margin-top: 10px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.cs-download-btn:hover {
+  background: #d8b4fe;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(192, 132, 252, 0.4);
 }
 
 .cs-quota-note {
@@ -1320,7 +1358,7 @@
   border-radius: 16px;
   padding: 20px 22px;
   border-left: 5px solid #d9c9f5;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08);
 }
 
 .admin-stat-value {
@@ -1340,13 +1378,13 @@
 .admin-stat-purple { border-left-color: #7c3aed; }
 .admin-stat-blue { border-left-color: #3b82f6; }
 .admin-stat-green { border-left-color: #059669; }
-.admin-stat-slate { border-left-color: #64748b; }
+.admin-stat-slate { border-left-color: #a78bda; }
 
 .admin-section {
   background: white;
   border-radius: 18px;
   padding: 26px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.1);
   margin-bottom: 24px;
   border-top: 4px solid #d9c9f5;
 }
@@ -1430,7 +1468,7 @@
 }
 
 .admin-table tbody tr:nth-child(even) {
-  background: #fafafa;
+  background: #faf7ff;
 }
 
 .admin-table tbody tr:nth-child(even):hover {
