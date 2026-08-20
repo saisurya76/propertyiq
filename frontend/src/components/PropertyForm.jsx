@@ -7,8 +7,6 @@ function PropertyForm({
   return (
     <div className="card">
 
-      <h2>Property Assessment</h2>
-
       <p className="required-note">
        Only fields marked <strong>*</strong> are required. All other fields improve assessment accuracy.
       </p>

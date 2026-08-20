@@ -3,6 +3,7 @@ import "./App.css";
 import "./studio/studio.css";
 
 import PropertyForm from "./components/PropertyForm";
+import CollapsiblePanel from "./components/CollapsiblePanel";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
@@ -522,16 +523,14 @@ function App() {
         independent, explainable and evidence-based intelligence.
       </p>
 
-      <div className="hero-studio-cta">
-        <div className="hero-studio-cta-text">
-          <span className="hero-studio-cta-badge">Construction Studio</span>
-          <p>Design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF — no property report needed.</p>
-        </div>
-        <button type="button" className="hero-studio-cta-btn" onClick={launchStudio}>
-          Open Construction Studio →
-        </button>
       </div>
 
+      <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
+        <span className="feature-strip-icon">🏗</span>
+        <span className="feature-strip-text">
+          <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
+        </span>
+        <span className="feature-strip-arrow">→</span>
       </div>
 
       <div className="mission-section">
@@ -568,12 +567,16 @@ function App() {
         </div>
       </div>
 
-      <PropertyForm
-        formData={formData}
-        handleChange={handleChange}
-        generateAssessment={generateAssessment}
-        loading={loading}
-      />
+      <div className="property-assessment-wrap">
+        <CollapsiblePanel title="Property Assessment" defaultOpen={true} color="violet">
+          <PropertyForm
+            formData={formData}
+            handleChange={handleChange}
+            generateAssessment={generateAssessment}
+            loading={loading}
+          />
+        </CollapsiblePanel>
+      </div>
 
       <AssessmentResult
         result={result}
