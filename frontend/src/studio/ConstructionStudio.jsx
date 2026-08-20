@@ -192,10 +192,11 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   // actually change and commit) — the room being actively dragged gets
   // its own LIVE, per-frame update imperatively inside RoomCanvas, so
   // this memo doesn't need to run on every drag frame.
-  const roomAdjacencyStatus = useMemo(
-    () => evaluateAdjacency(rooms, plot.architectural_style).roomStatus,
+  const adjacencyResult = useMemo(
+    () => evaluateAdjacency(rooms, plot.architectural_style),
     [rooms, plot.architectural_style]
   );
+  const roomAdjacencyStatus = adjacencyResult.roomStatus;
 
   // Save/load/lock state
   const [propertyId, setPropertyId] = useState(null);
@@ -1276,10 +1277,23 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                 ))}
               </select>
             </label>
-            {Object.values(roomAdjacencyStatus).includes("warning") ? (
-              <span className="cs-adjacency-summary cs-adjacency-summary-warning">
-                ⚠ Some room placements don't follow good space-planning practice — see the red outlines below.
-              </span>
+            {adjacencyResult.findings.filter((f) => f.severity === "warning").length > 0 ? (
+              <div className="cs-adjacency-summary cs-adjacency-summary-warning">
+                <strong>⚠ Space-planning concerns found:</strong>
+                <ul>
+                  {adjacencyResult.findings
+                    .filter((f) => f.severity === "warning")
+                    .map((f, i) => (
+                      <li key={i}>
+                        <strong>{f.rooms.join(" + ")}</strong> — {f.note}
+                      </li>
+                    ))}
+                </ul>
+                <span className="cs-adjacency-hint">
+                  The room outlined in red below is one of these — try moving it away from the other, or
+                  put a hallway/wall between them.
+                </span>
+              </div>
             ) : rooms.filter((r) => r.name.trim()).length > 1 ? (
               <span className="cs-adjacency-summary cs-adjacency-summary-good">
                 ✓ No adjacency issues found for this layout and style.
@@ -1355,6 +1369,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
           {siteElements.length > 0 && (
             <>
               <h4 className="cs-list-heading">Site Elements</h4>
+              <div className="cs-room-table-scroll">
               <div className="cs-room-row cs-room-row-header">
                 <span>Element</span><span>Length (ft) / Style</span><span>Width (ft) / Thickness</span><span>Fill / Line color</span><span>Border style</span><span>Border color</span><span>Border thickness</span><span></span>
               </div>
@@ -1457,10 +1472,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                   );
                 })}
               </div>
+              </div>
             </>
           )}
 
           <h4 className="cs-list-heading">Rooms</h4>
+          <div className="cs-room-table-scroll">
           <div className="cs-room-row cs-room-row-header">
             <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Fill</span><span>Border style</span><span>Border color</span><span>Thickness</span><span></span>
           </div>
@@ -1517,6 +1534,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                 <button className="cs-remove-room" onClick={() => removeRoom(room._key)}>Remove</button>
               </div>
             ))}
+          </div>
           </div>
           <button className="cs-add-room-btn" onClick={addRoom} disabled={locked}>+ Add room</button>
         </div>

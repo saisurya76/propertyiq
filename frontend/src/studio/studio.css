@@ -324,7 +324,7 @@
 
 .cs-adjacency-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
   margin: 10px 0;
@@ -351,6 +351,28 @@
 
 .cs-adjacency-summary-warning {
   color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 14px;
+  width: 100%;
+}
+
+.cs-adjacency-summary-warning ul {
+  margin: 6px 0 8px;
+  padding-left: 20px;
+  font-weight: 500;
+}
+
+.cs-adjacency-summary-warning li {
+  margin-bottom: 4px;
+}
+
+.cs-adjacency-hint {
+  display: block;
+  font-weight: 500;
+  color: #991b1b;
+  font-size: 12px;
 }
 
 .cs-adjacency-summary-good {
@@ -1039,6 +1061,16 @@
   overflow-y: auto;
   padding-right: 4px;
   margin-bottom: 10px;
+}
+
+/* Wraps a header row + its scrollable body together so horizontal
+   scrolling (needed on narrow screens where the 8-column room/element
+   table would otherwise get squeezed unusably small) moves BOTH in sync
+   — the header lives outside .cs-scrollable-list (so it doesn't scroll
+   away vertically), so without this shared wrapper the header would
+   stay put while the body scrolled sideways underneath it. */
+.cs-room-table-scroll {
+  overflow-x: auto;
 }
 
 .cs-add-room-btn {
@@ -1842,5 +1874,16 @@
 
   .plot-preview-svg {
     height: 240px;
+  }
+
+  /* The room/element edit table has 8 columns (name, dimensions, fill,
+     border style/color/thickness, remove) — squeezed into a narrow
+     phone width, every control becomes too small to actually use. Give
+     the row a real minimum width instead, and let the SCROLLABLE
+     container (already overflow-y:auto for vertical scroll) also scroll
+     horizontally, matching the same swipe-to-see-more pattern already
+     used for the Bill of Materials/Quantities tables. */
+  .cs-room-row {
+    min-width: 720px;
   }
 }
