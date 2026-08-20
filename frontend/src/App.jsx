@@ -62,6 +62,32 @@ function normalizeLanguage(code) {
   return LANGUAGE_OPTIONS.some(([value]) => value.toLowerCase() === base) ? base : "en";
 }
 
+// Drives Google Translate's hidden injected <select class="goog-te-combo">
+// directly (setting its value + dispatching "change" is how that widget's
+// own API expects to be driven programmatically). Module-level, not a
+// component method, since it needs no component state — just the target
+// language code — which is what let it live in two separate, drifting
+// copies before (one inline inside the auto-detect effect, one inside
+// the manual language-selector handler). Retries after a short delay
+// since the widget's <select> isn't guaranteed to exist in the DOM yet
+// the moment this runs (it's injected asynchronously by Google's script).
+function triggerGoogleTranslation(languageCode) {
+  if (languageCode === "en") return;
+
+  const apply = () => {
+    const select = document.querySelector(".goog-te-combo");
+    if (!select) return false;
+    select.value = languageCode;
+    select.dispatchEvent(new Event("change"));
+    return true;
+  };
+
+  if (!apply()) {
+    window.setTimeout(apply, 500);
+    window.setTimeout(apply, 1500);
+  }
+}
+
 function App() {
   const [formData, setFormData] = useState({
     country: "India",
@@ -125,6 +151,20 @@ function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // Google Translate's own mutation observer doesn't reliably catch the
+  // large, SPA-style full-view DOM swaps this app does when navigating
+  // between Studio pages (auth -> pricing -> designs -> construction,
+  // etc) — a real reported bug where the selected language only applied
+  // to whichever view was on screen at the moment it was picked, and
+  // silently reverted to English (or just didn't translate at all) on
+  // every subsequent navigation. Re-triggering translation explicitly
+  // whenever the view changes closes that gap.
+  useEffect(() => {
+    if (language !== "en" && window.location.pathname !== "/admin") {
+      triggerGoogleTranslation(language);
+    }
+  }, [studioView, language]);
+
   useEffect(() => {
     // Admin dashboard stays English-only — no auto-detection, no Google
     // Translate widget triggering, regardless of visitor IP/browser locale.
@@ -143,20 +183,7 @@ function App() {
       setLanguage(normalized);
       document.documentElement.lang = normalized;
       setLanguageReady(true);
-
-      if (normalized !== "en") {
-        const applyGoogleTranslation = () => {
-          const select = document.querySelector(".goog-te-combo");
-          if (!select) return false;
-          select.value = normalized;
-          select.dispatchEvent(new Event("change"));
-          return true;
-        };
-        if (!applyGoogleTranslation()) {
-          window.setTimeout(applyGoogleTranslation, 500);
-          window.setTimeout(applyGoogleTranslation, 1500);
-        }
-      }
+      triggerGoogleTranslation(normalized);
     };
 
     const detect = async () => {
@@ -190,15 +217,7 @@ function App() {
     const selected = event.target.value;
     setLanguage(selected);
     document.documentElement.lang = selected;
-
-    const applyGoogleTranslation = () => {
-      const select = document.querySelector(".goog-te-combo");
-      if (!select) return;
-      select.value = selected;
-      select.dispatchEvent(new Event("change"));
-    };
-    applyGoogleTranslation();
-    window.setTimeout(applyGoogleTranslation, 300);
+    triggerGoogleTranslation(selected);
   };
 
 
