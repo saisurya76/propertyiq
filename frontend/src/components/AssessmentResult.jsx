@@ -158,7 +158,7 @@ function AssessmentResult({
 
         <div
           style={{
-            maxWidth: "700px",
+            maxWidth: "1000px",
             margin: "0 auto 25px",
             padding: "28px",
             background: "#ffffff",
@@ -752,12 +752,9 @@ function AssessmentResult({
 
 
 
-      <div className="findings-card">
+      <div className="report-sections-grid">
 
-        <div className="findings-title">
-          SCORE BREAKDOWN
-        </div>
-
+      <CollapsiblePanel title="Score Breakdown" defaultOpen={true} color="neutral">
         <div className="finding-item">
           <strong>
             Valuation Analysis
@@ -809,14 +806,9 @@ function AssessmentResult({
       Below 60 → High Risk
     </div>
 
-      </div>
+      </CollapsiblePanel>
 
-      <div className="findings-card">
-
-        <div className="findings-title">
-          WHY THIS RECOMMENDATION
-        </div>
-
+      <CollapsiblePanel title="Why This Recommendation" defaultOpen={true} color="neutral">
         {result.recommendationReasons?.map(
           (reason, index) => (
             <div
@@ -830,14 +822,9 @@ function AssessmentResult({
           )
         )}
 
-      </div>
+      </CollapsiblePanel>
 
-<div className="findings-card">
-
-  <div className="findings-title">
-    CITY COMPARABLE BENCHMARKS
-  </div>
-
+<CollapsiblePanel title="City Comparable Benchmarks" defaultOpen={false} color="neutral">
   <div className="finding-item">
 
     <strong>
@@ -929,14 +916,9 @@ function AssessmentResult({
 
   </div>
 
-</div>
+</CollapsiblePanel>
 
-<div className="findings-card">
-
-  <div className="findings-title">
-    HOW PROPERTYIQ WORKS
-  </div>
-
+<CollapsiblePanel title="How PropertyIQ Works" defaultOpen={false} color="neutral">
   <div className="finding-item">
 
     <strong>
@@ -1049,13 +1031,9 @@ function AssessmentResult({
     become available.
   </div>
 
-</div>
+</CollapsiblePanel>
 
-      <div className="findings-card">
-
-        <div className="findings-title">
-          KEY FINDINGS
-        </div>
+      <CollapsiblePanel title="Key Findings" defaultOpen={true} color="neutral">
 
         <div className="finding-item">
           <strong>
@@ -1083,6 +1061,8 @@ function AssessmentResult({
             {result.findings?.developer}
           </p>
         </div>
+
+      </CollapsiblePanel>
 
       </div>
 
@@ -1117,6 +1097,8 @@ function AssessmentResult({
       </div>
 
 
+      <div className="report-sections-grid">
+
       <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
         <SimilarPropertiesWidget
           reportId={reportId}
@@ -1134,6 +1116,8 @@ function AssessmentResult({
       <CollapsiblePanel title="Fraud Intelligence" defaultOpen={false} color="red">
         <FraudIntelligenceStatic />
       </CollapsiblePanel>
+
+      </div>
 
     </div>
   );

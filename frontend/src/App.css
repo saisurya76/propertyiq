@@ -303,46 +303,6 @@ h1, h2, h3, h4,
 
 }
 
-.mission-section {
-  max-width: 900px;
-  margin: 8px auto 32px;
-  padding: 0 20px;
-}
-
-.mission-content h2 {
-  text-align: center;
-  font-size: clamp(22px, 3vw, 30px);
-  font-weight: 800;
-  color: #111827;
-  margin: 0 0 18px;
-}
-
-.mission-content p {
-  color: #374151;
-  font-size: 15px;
-  line-height: 1.75;
-  margin: 0 0 16px;
-}
-
-.mission-tagline {
-  text-align: center;
-  font-weight: 700;
-  color: #4c1d95;
-  font-size: 16px;
-  margin-top: 22px;
-}
-
-@media (max-width: 640px) {
-  .mission-section {
-    margin: 4px auto 24px;
-    padding: 0 16px;
-  }
-
-  .mission-content p {
-    font-size: 14px;
-  }
-}
-
 .card {
   background: white;
   border-radius: 20px;
@@ -890,6 +850,23 @@ body {
   margin: 20px auto;
   border-radius: 16px;
   overflow: hidden;
+}
+
+.report-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  align-items: start;
+  max-width: 1100px;
+  margin: 20px auto;
+}
+
+/* Panels placed inside the grid must stretch to their grid cell instead
+   of self-centering at their own 1100px cap — otherwise each one would
+   just claim a full row regardless of the grid, defeating the point. */
+.report-sections-grid .collapsible-panel {
+  max-width: none;
+  margin: 0;
 }
 
 .collapsible-panel-header {
