@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { studioApi, getSession } from "./studioApi";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
@@ -37,16 +37,31 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [insightUnlocked, setInsightUnlocked] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const session = getSession();
 
-  useEffect(() => {
+  const fetchPricingData = useCallback(() => {
     studioApi.getTiers().then(setTiers).catch((e) => setError(e.message));
     studioApi.getFxRates().then(setFxRates).catch(() => {}); // silent — formatPrice falls back to USD
-    studioApi.getStatus().then(setStatus).catch((e) => {
+    return studioApi.getStatus().then(setStatus).catch((e) => {
       if (e.status === 401 && onSignOut) onSignOut();
     });
   }, [onSignOut]);
+
+  // Plain direct calls on initial mount (no synchronous setState inside
+  // the effect body) — the refresh button's click handler below does the
+  // synchronous "clear error / show refreshing" resets, which is safe
+  // there since it's a user event, not an effect.
+  useEffect(() => {
+    fetchPricingData();
+  }, [fetchPricingData]);
+
+  const handleRefreshClick = () => {
+    setRefreshing(true);
+    setError("");
+    fetchPricingData().finally(() => setRefreshing(false));
+  };
 
   const handleSubscribe = async (tierId) => {
     setError("");
@@ -107,7 +122,18 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
   return (
     <div>
       <div className="studio-pricing-header">
-        <h2>PropertyIQ Studio Plans</h2>
+        <div className="studio-designs-header-row">
+          <h2>PropertyIQ Studio Plans</h2>
+          <button
+            type="button"
+            className="page-refresh-btn"
+            onClick={handleRefreshClick}
+            disabled={refreshing}
+            title="Refresh plans and pricing without leaving the page"
+          >
+            {refreshing ? "Refreshing..." : "↻ Refresh"}
+          </button>
+        </div>
         <p>
           Signed in as <strong>{session?.email}</strong>. Pick what fits — unlock insights
           for this one report, or subscribe for ongoing access to Construction Studio.

@@ -166,6 +166,9 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const [boq, setBoq] = useState(null);
   const [bomBoqLoading, setBomBoqLoading] = useState(null); // "bom" | "boq" | null
   const [bomBoqError, setBomBoqError] = useState("");
+  const [adjacencyReport, setAdjacencyReport] = useState(null);
+  const [adjacencyReportLoading, setAdjacencyReportLoading] = useState(false);
+  const [adjacencyReportError, setAdjacencyReportError] = useState("");
   const estimateRequestIdRef = useRef(0); // guards against a slower, older request overwriting a faster, newer one
 
   // Site elements (trees, pool, etc.) and material/labor selections are
@@ -296,18 +299,35 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     return warnings;
   }, [rooms, siteElements, plot.plot_length_ft, plot.plot_width_ft]);
 
-  // Load material + labor/contractor catalog whenever region changes
+  const [catalogRefreshing, setCatalogRefreshing] = useState(false);
+
+  const fetchCatalog = useCallback(
+    () =>
+      studioApi.getMaterials(plot.region)
+        .then((res) => {
+          setCatalog(res.categories);
+          setLaborCatalog(res.labor_categories || {});
+        })
+        .catch(() => {
+          setCatalog(null);
+          setLaborCatalog(null);
+        }),
+    [plot.region]
+  );
+
+  // Load material + labor/contractor catalog whenever region changes.
+  // Plain direct call on mount/region-change (no synchronous setState
+  // inside the effect body itself) — the refresh button's click handler
+  // below does the synchronous "show refreshing" state, safe there since
+  // it's a user event, not an effect.
   useEffect(() => {
-    studioApi.getMaterials(plot.region)
-      .then((res) => {
-        setCatalog(res.categories);
-        setLaborCatalog(res.labor_categories || {});
-      })
-      .catch(() => {
-        setCatalog(null);
-        setLaborCatalog(null);
-      });
-  }, [plot.region]);
+    fetchCatalog();
+  }, [fetchCatalog]);
+
+  const handleCatalogRefreshClick = () => {
+    setCatalogRefreshing(true);
+    fetchCatalog().finally(() => setCatalogRefreshing(false));
+  };
 
   useEffect(() => {
     studioApi.getFxRates().then(setFxRates).catch(() => {}); // silent — falls back to USD display
@@ -912,6 +932,28 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     }
   };
 
+  const fetchAdjacencyReport = async () => {
+    setAdjacencyReportLoading(true);
+    setAdjacencyReportError("");
+    try {
+      // Deliberately calls the backend endpoint fresh rather than just
+      // reusing the already-computed client-side `adjacencyResult` from
+      // the Room Layout step — the whole point of the backend and JS
+      // engines sharing identical logic is so a written report can
+      // genuinely cross-check the live canvas result, not just echo it
+      // back from local state.
+      const data = await studioApi.checkAdjacency({
+        rooms: rooms.filter((r) => r.name.trim()).map(stripKey),
+        style: plot.architectural_style,
+      });
+      setAdjacencyReport(data);
+    } catch (e) {
+      setAdjacencyReportError(e.message || "Couldn't load the space-planning report.");
+    } finally {
+      setAdjacencyReportLoading(false);
+    }
+  };
+
   const downloadBomCsv = () => {
     if (!bom) return;
     downloadCsv(
@@ -1106,7 +1148,18 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
 
       {step === 1 && (
         <div className="cs-card">
-          <h3>Materials & Suppliers</h3>
+          <div className="studio-designs-header-row">
+            <h3>Materials & Suppliers</h3>
+            <button
+              type="button"
+              className="page-refresh-btn"
+              onClick={handleCatalogRefreshClick}
+              disabled={catalogRefreshing}
+              title="Refresh material prices and availability without leaving the page"
+            >
+              {catalogRefreshing ? "Refreshing..." : "↻ Refresh"}
+            </button>
+          </div>
           <p className="studio-subtext">
             Pick one material per category — check off your preferred supplier(s) for reference,
             and see exactly what each option adds to your {plotSizeSqft} sqft plot's total.
@@ -1687,6 +1740,63 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                   <div className="cs-boq-grand-total">
                     Grand total: {boq.currency} {boq.grand_total_converted.toLocaleString()}
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {rooms.filter((r) => r.name.trim()).length > 0 && (
+            <div className="cs-bom-boq-section">
+              <h4>Space-Planning Report</h4>
+              <p className="studio-subtext">
+                A written, independently-verified check of your room layout against the selected
+                architectural style — the same rules shown live on the Room Layout page, confirmed
+                fresh here for the record.
+              </p>
+              <button type="button" className="rc-tool-btn" onClick={fetchAdjacencyReport} disabled={adjacencyReportLoading}>
+                {adjacencyReportLoading ? "Loading..." : "View Space-Planning Report"}
+              </button>
+
+              {adjacencyReportError && (
+                <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>
+                  {adjacencyReportError}
+                </div>
+              )}
+
+              {adjacencyReport && (
+                <div className="cs-bom-boq-table-wrap">
+                  {adjacencyReport.compliant ? (
+                    <div className="cs-adjacency-summary cs-adjacency-summary-good">
+                      ✓ No space-planning issues found for this layout and style.
+                    </div>
+                  ) : (
+                    <div className="cs-adjacency-summary cs-adjacency-summary-warning">
+                      <strong>⚠ Space-planning concerns found:</strong>
+                      <ul>
+                        {adjacencyReport.findings
+                          .filter((f) => f.severity === "warning")
+                          .map((f, i) => (
+                            <li key={i}>
+                              <strong>{f.rooms.join(" + ")}</strong> — {f.note}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
+                  {adjacencyReport.findings.filter((f) => f.severity === "good").length > 0 && (
+                    <div className="cs-adjacency-summary cs-adjacency-summary-good" style={{ marginTop: 10 }}>
+                      <strong>✓ Positive placements:</strong>
+                      <ul>
+                        {adjacencyReport.findings
+                          .filter((f) => f.severity === "good")
+                          .map((f, i) => (
+                            <li key={i}>
+                              <strong>{f.rooms.join(" + ")}</strong> — {f.note}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -90,6 +90,9 @@ export const studioApi = {
   checkVastu: (payload) =>
     apiFetch("/api/construction-studio/vastu-check", { method: "POST", body: JSON.stringify(payload) }),
 
+  checkAdjacency: (payload) =>
+    apiFetch("/api/construction-studio/adjacency-check", { method: "POST", body: JSON.stringify(payload) }),
+
   getBillOfQuantities: (payload) =>
     apiFetch("/api/construction-studio/bill-of-quantities", { method: "POST", body: JSON.stringify(payload) }),
 
