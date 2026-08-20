@@ -1203,8 +1203,6 @@ class ConstructionDesignRequest(BaseModel):
     rooms: list[RoomSpec] = []
     site_elements: list[SiteElementSpec] = []
     has_imported_materials: bool = False
-    city: Optional[str] = None
-    country: Optional[str] = None
 
 
 @app.get("/api/construction-studio/materials")
@@ -1318,7 +1316,10 @@ def construction_vastu_check(request: VastuCheckRequest):
     after a room was removed or rearranged). Does not consume design
     quota, generate a DXF, or save anything — purely a read of the
     current layout, meant to be called reactively as the user edits,
-    the same role adjacency-check plays for space-planning correctness."""
+    the same role adjacency-check plays for space-planning correctness.
+    India-only for now (Vastu specifically) — country-specific
+    validation (e.g. a Thai traditional-architecture equivalent) is
+    planned as a separate, larger piece of work, not yet built."""
     if request.rooms:
         return check_vastu_full(
             plot_length_ft=request.plot_length_ft,
@@ -1424,8 +1425,6 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "site_elements": [e.model_dump() for e in request.site_elements],
         "selections": request.selections,
         "labor_selections": request.labor_selections,
-        "city": request.city,
-        "country": request.country,
     }
 
     save_design(
@@ -1483,8 +1482,6 @@ class PropertyPlotSpec(BaseModel):
     road_facing_side: str
     slope_direction: Optional[str] = None
     master_plan_elements: list[MasterPlanElementSpec] = []
-    city: Optional[str] = None
-    country: Optional[str] = None
 
 
 class FloorInput(BaseModel):

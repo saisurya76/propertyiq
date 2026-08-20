@@ -88,8 +88,6 @@ def test_vastu_check_endpoint_is_live_and_quota_free():
 
     client = TestClient(app)
 
-    # A layout with a room, then the SAME request with that room removed —
-    # confirms the endpoint reflects whatever is passed, not any cached state.
     with_bedroom = client.post("/api/construction-studio/vastu-check", json={
         "plot_length_ft": 40, "plot_width_ft": 30,
         "rooms": [{"name": "Master Bedroom", "x": 0, "y": 0, "length": 10, "width": 10}],
@@ -104,4 +102,4 @@ def test_vastu_check_endpoint_is_live_and_quota_free():
         "entrance_direction": "north", "road_facing_side": "north",
     })
     assert without_bedroom.status_code == 200
-    assert without_bedroom.json()["scope"] != "full_multi_rule_check"  # falls back to basics-only, no rooms to check
+    assert without_bedroom.json()["scope"] != "full_multi_rule_check"
