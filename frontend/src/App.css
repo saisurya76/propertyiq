@@ -15,13 +15,9 @@ body{
 
 body {
   margin: 0;
-  background: #f7f8fa;
-  color: #111827;
-  font-family:
-    "Inter",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
+  background: var(--surface-page);
+  color: var(--text-strong);
+  font-family: var(--font-body);
 }
 
 h1, h2, h3, h4,
@@ -161,7 +157,7 @@ h1, h2, h3, h4,
 
     background:#fbbf24;
 
-    color:#111827;
+    color:#2c1f47;
 
     font-size:11px;
 
@@ -190,77 +186,111 @@ h1, h2, h3, h4,
 
 }
 
-.hero-studio-cta{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:20px;
-    flex-wrap:wrap;
-    max-width:900px;
-    margin:28px auto 0;
-    padding:18px 24px;
-    background:rgba(255,255,255,.1);
-    border:1.5px solid rgba(255,255,255,.25);
-    border-radius:16px;
-    backdrop-filter:blur(6px);
+/* ============================================================
+   PropertyIQ design system — violet pastel, light shades.
+   Single source of truth for color/type tokens used across the
+   whole app (App.css and studio/studio.css both reference these).
+   ============================================================ */
+:root {
+  /* Violet scale — light pastels for surfaces, the established
+     #7c3aed/#4c1d95 brand violets kept as the action/accent tier
+     so existing recognition isn't lost, just given a lighter,
+     more cohesive stage to sit on. */
+  --violet-25: #fdfcff;
+  --violet-50: #faf7ff;
+  --violet-100: #f3ecff;
+  --violet-150: #ede4fc;
+  --violet-200: #e3d6fa;
+  --violet-300: #cbb3f2;
+  --violet-400: #a684e8;
+  --violet-500: #8b5cf6;
+  --violet-600: #7c3aed;
+  --violet-700: #6d28d9;
+  --violet-800: #5b21b6;
+  --violet-900: #4c1d95;
+
+  --text-strong: #2c1f47;
+  --text-body: #4b3f66;
+  --text-muted: #7a6f92;
+
+  --surface-page: var(--violet-25);
+  --surface-card: #ffffff;
+  --surface-pastel: var(--violet-50);
+  --surface-pastel-strong: var(--violet-100);
+  --border-soft: var(--violet-150);
+
+  --font-heading: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --shadow-soft: 0 4px 16px rgba(124, 58, 237, 0.08);
+  --shadow-lift: 0 10px 28px rgba(124, 58, 237, 0.14);
 }
 
-.hero-studio-cta-text{
-    text-align:left;
-    flex:1;
-    min-width:240px;
+/* --- Homepage feature strip (Construction Studio) — a secondary
+   feature callout, not a competing primary CTA, so it sits below the
+   hero rather than inside/overlapping it. --- */
+.feature-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 900px;
+  margin: 24px auto 0;
+  padding: 14px 20px;
+  background: var(--surface-pastel);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-.hero-studio-cta-badge{
-    display:inline-block;
-    font-size:11px;
-    font-weight:800;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:#c4b5fd;
-    margin-bottom:4px;
+.feature-strip:hover {
+  background: var(--surface-pastel-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
 }
 
-.hero-studio-cta-text p{
-    margin:0;
-    color:#ffffff;
-    opacity:.92;
-    font-size:14px;
-    line-height:1.5;
+.feature-strip:focus-visible {
+  outline: 2px solid var(--violet-500);
+  outline-offset: 2px;
 }
 
-.hero-studio-cta-btn{
-    flex-shrink:0;
-    background:#ffffff;
-    color:#4c1d95;
-    border:none;
-    border-radius:10px;
-    padding:12px 22px;
-    font-size:15px;
-    font-weight:700;
-    cursor:pointer;
-    white-space:nowrap;
-    transition:transform .12s, box-shadow .12s;
+.feature-strip-icon {
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
-.hero-studio-cta-btn:hover{
-    transform:translateY(-1px);
-    box-shadow:0 4px 14px rgba(0,0,0,.2);
+.feature-strip-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-body);
 }
 
-@media (max-width:640px){
-    .hero-studio-cta{
-        flex-direction:column;
-        align-items:stretch;
-        text-align:center;
-        margin:20px 16px 0;
-    }
-    .hero-studio-cta-text{
-        text-align:center;
-    }
-    .hero-studio-cta-btn{
-        width:100%;
-    }
+.feature-strip-text strong {
+  color: var(--violet-700);
+  font-weight: 700;
+}
+
+.feature-strip-arrow {
+  flex-shrink: 0;
+  color: var(--violet-600);
+  font-weight: 700;
+  transition: transform 0.15s ease;
+}
+
+.feature-strip:hover .feature-strip-arrow {
+  transform: translateX(3px);
+}
+
+@media (max-width: 640px) {
+  .feature-strip {
+    margin: 20px 16px 0;
+    padding: 12px 16px;
+  }
+  .feature-strip-text {
+    font-size: 13px;
+  }
 }
 
 .hero h1{
@@ -295,7 +325,7 @@ h1, h2, h3, h4,
 
     margin:0 auto;
 
-    color:#f3f4f6;
+    color:#f3ecff;
 
     font-size:clamp(16px,1.6vw,21px);
 
@@ -303,13 +333,68 @@ h1, h2, h3, h4,
 
 }
 
+.mission-section {
+  max-width: 1000px;
+  margin: 8px auto 32px;
+  padding: 0 20px;
+}
+
+.mission-content {
+  background: linear-gradient(155deg, var(--surface-pastel) 0%, var(--violet-100) 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 36px 40px;
+}
+
+.mission-content h2 {
+  text-align: left;
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 800;
+  color: var(--text-strong);
+  margin: 0 0 18px;
+}
+
+.mission-content p {
+  text-align: left;
+  color: var(--text-body);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0 0 16px;
+}
+
+.mission-tagline {
+  text-align: left;
+  font-weight: 700;
+  color: var(--violet-800);
+  font-size: 16px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-soft);
+}
+
+@media (max-width: 640px) {
+  .mission-section {
+    margin: 4px auto 24px;
+    padding: 0 16px;
+  }
+
+  .mission-content {
+    padding: 24px 22px;
+    border-radius: 18px;
+  }
+
+  .mission-content p {
+    font-size: 14px;
+  }
+}
+
 .card {
-  background: white;
+  background: var(--surface-card);
+  border: 1px solid var(--border-soft);
   border-radius: 20px;
   padding: 30px;
   margin-bottom: 25px;
-  box-shadow:
-    0 8px 24px rgba(15,23,42,.08);
+  box-shadow: var(--shadow-soft);
 }
 
 .form-grid {
@@ -331,8 +416,8 @@ textarea {
 
   box-sizing: border-box;
 
-  color: #0f172a;
-  background: #f8fafc;
+  color: #2c1f47;
+  background: #faf7ff;
 
   font-family: inherit;
   font-size: 15px;
@@ -345,14 +430,14 @@ textarea {
 
 input:hover:not(:disabled),
 select:hover:not(:disabled) {
-  border-color: #cbd5e1;
+  border-color: #d9c9f5;
   background: #ffffff;
 }
 
 input:disabled,
 select:disabled {
   background: #f1f5f9;
-  color: #64748b;
+  color: #7a6f92;
   cursor: not-allowed;
 }
 
@@ -379,7 +464,7 @@ textarea {
   border-radius: 14px;
   padding: 16px;
 
-  background: #111827;
+  background: linear-gradient(135deg, var(--violet-600) 0%, var(--violet-700) 100%);
   color: white;
 
   font-size: 16px;
@@ -392,15 +477,20 @@ textarea {
   justify-content: center;
   gap: 10px;
 
-  transition: all 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
-.primary-btn:hover {
-  opacity: 0.92;
+.primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .primary-btn:disabled {
-  opacity: 0.75;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -416,7 +506,7 @@ textarea {
 }
 
 .score-label {
-  color: #6b7280;
+  color: #7a6f92;
   margin-top: 10px;
   margin-bottom: 35px;
 }
@@ -430,7 +520,7 @@ textarea {
 
 .disclaimer {
   font-size: 14px;
-  color: #6b7280;
+  color: #7a6f92;
   line-height: 1.7;
 }
 
@@ -476,7 +566,7 @@ textarea {
 }
 
 .recommendation-text {
-  color: #6b7280;
+  color: #7a6f92;
   font-size: 18px;
   line-height: 1.6;
 }
@@ -494,7 +584,7 @@ textarea {
 .metric-card {
   background: white;
 
-  border: 1px solid #e5e7eb;
+  border: 1px solid #ede4fc;
 
   border-radius: 18px;
 
@@ -505,7 +595,7 @@ textarea {
 
 .metric-card h4 {
   margin-top: 0;
-  color: #6b7280;
+  color: #7a6f92;
   font-size: 18px;
 }
 
@@ -531,7 +621,7 @@ textarea {
 
   cursor: pointer;
 
-  background: #111827;
+  background: #2c1f47;
 
   color: white;
 
@@ -557,7 +647,7 @@ textarea {
 
   background: #ffffff;
 
-  border: 1px solid #e5e7eb;
+  border: 1px solid #ede4fc;
 
   border-radius: 18px;
 
@@ -585,7 +675,7 @@ textarea {
 
   padding-bottom: 18px;
 
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3ecff;
 }
 
 .finding-item:last-child {
@@ -601,13 +691,13 @@ textarea {
 
   font-size: 15px;
 
-  color: #111827;
+  color: #2c1f47;
 }
 
 .finding-item p {
   margin: 0;
 
-  color: #4b5563;
+  color: #5c4f78;
 
   line-height: 1.7;
 }
@@ -622,7 +712,7 @@ textarea {
 }
 
 .methodology-card {
-  background: #f9fafb;
+  background: #faf7ff;
 
   border-radius: 14px;
 
@@ -634,7 +724,7 @@ textarea {
 
   margin-bottom: 10px;
 
-  color: #111827;
+  color: #2c1f47;
 }
 
 .methodology-card p {
@@ -642,7 +732,7 @@ textarea {
 
   line-height: 1.8;
 
-  color: #4b5563;
+  color: #5c4f78;
 }
 
 .spinner {
@@ -676,7 +766,7 @@ textarea {
   margin-bottom: 28px;
 
   font-size:13px;
-  color:#9ca3af;
+  color:#9285ab;
 
   text-align: center;
 }
@@ -695,12 +785,12 @@ textarea {
 
   padding-bottom: 10px;
 
-  border-bottom:1px solid #e5e7eb;
+  border-bottom:1px solid #ede4fc;
 
   font-size: 22px;
   font-weight: 700;
 
-  color: #111827;
+  color: #2c1f47;
 }
 
 .form-field {
@@ -717,12 +807,12 @@ textarea {
 
   font-weight: 700;
 
-  color: #64748b;
+  color: #7a6f92;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af;
+  color: #9285ab;
 }
 
 input:focus,
@@ -735,12 +825,6 @@ textarea:focus {
 
   box-shadow:
     0 0 0 4px rgba(124, 58, 237, 0.12);
-}
-
-.primary-btn:disabled {
-  opacity: 0.75;
-
-  cursor: not-allowed;
 }
 
 /* mobile responsiveness */
@@ -803,7 +887,7 @@ textarea:focus {
 .language-bar label {
   font-size: 13px;
   font-weight: 600;
-  color: #4b5563;
+  color: #5c4f78;
 }
 
 .language-bar select {
@@ -876,19 +960,19 @@ body {
   align-items: center;
   padding: 18px 24px;
   background: white;
-  border: 1px solid #e5e7eb;
-  border-left: 6px solid #cbd5e1;
+  border: 1px solid #ede4fc;
+  border-left: 6px solid #d9c9f5;
   border-radius: 16px;
   font-size: 19px;
   font-weight: 700;
-  color: #0f172a;
+  color: #2c1f47;
   cursor: pointer;
   text-align: left;
   transition: background 0.15s ease;
 }
 
 .collapsible-panel-header:hover {
-  background: #f8fafc;
+  background: #faf7ff;
 }
 
 /* Distinct accent per section, same tinted-background + left-border idiom
@@ -917,9 +1001,17 @@ body {
   background: #fee2e2;
 }
 
+.collapsible-panel-violet .collapsible-panel-header {
+  background: var(--surface-pastel);
+  border-left-color: var(--violet-600);
+}
+.collapsible-panel-violet .collapsible-panel-header:hover {
+  background: var(--surface-pastel-strong);
+}
+
 .collapsible-panel-chevron {
   font-size: 16px;
-  color: #9ca3af;
+  color: #9285ab;
   transition: transform 0.2s ease;
   flex-shrink: 0;
   margin-left: 12px;
