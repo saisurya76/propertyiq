@@ -267,3 +267,25 @@ def test_unhandled_exception_still_returns_cors_headers():
         assert r.json()["detail"]  # clean JSON body, not a raw crash
     finally:
         api_module.get_active_tier = original
+
+
+def test_city_and_country_persist_through_save_load():
+    """Real reported bug: city was never part of PropertyPlotSpec at all,
+    so it was silently discarded on every save — not a display bug, a
+    genuine data-loss bug. Verifies city AND the newly-added country
+    field both round-trip correctly now."""
+    headers = _signin_with_tier("pytest_city_country@example.com")
+
+    payload = _base_payload("City Country Test")
+    payload["plot_spec"]["city"] = "Hyderabad"
+    payload["plot_spec"]["country"] = "India"
+
+    r = client.post("/api/properties", headers=headers, json=payload)
+    assert r.status_code == 200
+    assert r.json()["plot_spec"]["city"] == "Hyderabad"
+    assert r.json()["plot_spec"]["country"] == "India"
+
+    property_id = r.json()["property_id"]
+    r2 = client.get(f"/api/properties/{property_id}", headers=headers)
+    assert r2.json()["plot_spec"]["city"] == "Hyderabad"
+    assert r2.json()["plot_spec"]["country"] == "India"

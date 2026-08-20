@@ -147,6 +147,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     region: "india",
     currency: "INR",
     city: "",
+    country: "India",
     entrance_direction: "north-east",
     road_facing_side: "north",
     slope_direction: "north",
@@ -162,6 +163,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
   const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
   const [estimate, setEstimate] = useState(null);
+  const [liveVastuResult, setLiveVastuResult] = useState(null);
   const [bom, setBom] = useState(null);
   const [boq, setBoq] = useState(null);
   const [bomBoqLoading, setBomBoqLoading] = useState(null); // "bom" | "boq" | null
@@ -197,6 +199,45 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     [rooms, plot.architectural_style]
   );
   const roomAdjacencyStatus = adjacencyResult.roomStatus;
+
+  // Strips the frontend-only `_key` field before sending rooms/elements to
+  // the backend, which doesn't know about it (it's purely for React keys
+  // and Konva node refs) — used by copy/paste when cloning items, the
+  // live Vastu-check effect below, and the save/autosave payload
+  // builders further down. Declared here, early, since the Vastu effect
+  // right below needs it.
+  const stripKey = (item) => {
+    // eslint-disable-next-line no-unused-vars -- intentionally destructured out
+    const { _key, ...rest } = item;
+    return rest;
+  };
+
+  // Live Vastu compliance — recomputes from the CURRENT room layout,
+  // debounced, via the lightweight quota-free /vastu-check endpoint.
+  // Fixes a real reported bug: Vastu compliance previously only came
+  // from `result.vastu_result`, a snapshot from whenever "Generate" was
+  // last clicked — it kept showing stale findings after a room was
+  // removed or rearranged, since nothing recomputed it. Mirrors the
+  // adjacency section's already-live pattern.
+  useEffect(() => {
+    if (!plot.plot_length_ft || !plot.plot_width_ft || !plot.entrance_direction || !plot.road_facing_side) return;
+
+    const timer = setTimeout(() => {
+      studioApi
+        .checkVastu({
+          plot_length_ft: plot.plot_length_ft,
+          plot_width_ft: plot.plot_width_ft,
+          rooms: rooms.filter((r) => r.name.trim()).map(stripKey),
+          entrance_direction: plot.entrance_direction,
+          road_facing_side: plot.road_facing_side,
+          slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
+        })
+        .then(setLiveVastuResult)
+        .catch(() => {}); // non-critical live check — a transient failure just leaves the last-known result showing
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [rooms, plot.plot_length_ft, plot.plot_width_ft, plot.entrance_direction, plot.road_facing_side, plot.slope_direction]);
 
   // Save/load/lock state
   const [propertyId, setPropertyId] = useState(null);
@@ -278,7 +319,13 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         setPropertyId(prop.property_id);
         setPropertyName(prop.name);
         setLocked(prop.locked);
-        setPlot((p) => ({ ...p, ...prop.plot_spec, city: p.city }));
+        // city/country were previously never sent to the backend at all
+        // (missing from PropertyPlotSpec), so they were silently lost on
+        // every save — a real reported bug ("city is not populating").
+        // Now that the backend actually persists them, restore them from
+        // the loaded data with a sensible fallback for older saved
+        // designs that predate this fix.
+        setPlot((p) => ({ ...p, ...prop.plot_spec, city: prop.plot_spec.city || p.city, country: prop.plot_spec.country || p.country }));
         setSelections(prop.selections || {});
         setLaborSelections(prop.labor_selections || {});
         setLayoutHistory({
@@ -392,16 +439,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
 
   const editBaselineRef = useRef(null);
 
-  // Strips the frontend-only `_key` field before sending rooms/elements to
-  // the backend, which doesn't know about it (it's purely for React keys
-  // and Konva node refs) — also used by copy/paste when cloning items,
-  // so a pasted copy gets a genuinely fresh key rather than inheriting
-  // the original's.
-  const stripKey = (item) => {
-    // eslint-disable-next-line no-unused-vars -- intentionally destructured out
-    const { _key, ...rest } = item;
-    return rest;
-  };
   const clipboardRef = useRef({ rooms: [], elements: [] });
   const [hasClipboard, setHasClipboard] = useState(false);
   const historyDebounceRef = useRef(null);
@@ -632,6 +669,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
       road_facing_side: plot.road_facing_side,
       slope_direction: plot.slope_direction,
       master_plan_elements: plot.master_plan_elements || [],
+      city: plot.city,
+      country: plot.country,
     },
     selections,
     labor_selections: laborSelections,
@@ -792,6 +831,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         road_facing_side: plot.road_facing_side,
         slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
         master_plan_elements: plot.master_plan_elements || [],
+        city: plot.city,
+        country: plot.country,
         rooms: rooms
           .filter((r) => r.name.trim())
           .map(({ name, x, y, length, width, color }) => ({ name, x, y, length, width, color })),
@@ -1002,6 +1043,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             <div className="cs-field">
               <label>City</label>
               <input value={plot.city} onChange={(e) => updatePlotField("city", e.target.value)} placeholder="e.g. Hyderabad" />
+            </div>
+            <div className="cs-field">
+              <label>Country</label>
+              <input value={plot.country} onChange={(e) => updatePlotField("country", e.target.value)} placeholder="e.g. India" />
             </div>
             <div className="cs-field">
               <label>Region</label>
@@ -1626,6 +1671,35 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
             </div>
           )}
 
+          {liveVastuResult && (
+            <div className="cs-vastu-live-section">
+              <h4>Vastu Compliance</h4>
+              <p className="studio-subtext" style={{ marginTop: -8, marginBottom: 10 }}>
+                Updates live as you edit the plot direction and room layout — always reflects the current design, not a snapshot from when you last clicked Generate.
+              </p>
+              {liveVastuResult.scope === "full_multi_rule_check" ? (
+                liveVastuResult.findings.map((f, i) => (
+                  <div
+                    key={i}
+                    className={`cs-vastu-finding ${
+                      f.note.includes("advises against") || f.note.includes("recommends keeping open")
+                        ? "cs-vastu-bad"
+                        : f.note.includes("aligns")
+                        ? "cs-vastu-good"
+                        : "cs-vastu-neutral"
+                    }`}
+                  >
+                    {f.note}
+                  </div>
+                ))
+              ) : (
+                liveVastuResult.notes.map((n, i) => (
+                  <div key={i} className="cs-vastu-finding cs-vastu-neutral">{n}</div>
+                ))
+              )}
+            </div>
+          )}
+
           {!result && (
             <>
               <p className="studio-subtext">
@@ -1647,28 +1721,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
                   {plot.currency} {result.cost_estimate.grand_total_converted.toLocaleString()}
                 </span>
               </div>
-
-              <h4>Vastu Compliance</h4>
-              {result.vastu_result.scope === "full_multi_rule_check" ? (
-                result.vastu_result.findings.map((f, i) => (
-                  <div
-                    key={i}
-                    className={`cs-vastu-finding ${
-                      f.note.includes("advises against") || f.note.includes("recommends keeping open")
-                        ? "cs-vastu-bad"
-                        : f.note.includes("aligns")
-                        ? "cs-vastu-good"
-                        : "cs-vastu-neutral"
-                    }`}
-                  >
-                    {f.note}
-                  </div>
-                ))
-              ) : (
-                result.vastu_result.notes.map((n, i) => (
-                  <div key={i} className="cs-vastu-finding cs-vastu-neutral">{n}</div>
-                ))
-              )}
 
               <h4 style={{ marginTop: 24 }}>Risks to Consider</h4>
               <ul className="cs-risk-list">

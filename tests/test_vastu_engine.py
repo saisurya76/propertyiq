@@ -74,3 +74,34 @@ def test_multiple_rooms_multiple_findings():
     )
     room_findings = [f for f in result["findings"] if f["category"] == "room_placement"]
     assert len(room_findings) == 3
+
+
+def test_vastu_check_endpoint_is_live_and_quota_free():
+    """The real bug this endpoint fixes: Vastu compliance shown in the
+    Studio kept displaying a stale result from whenever a design was last
+    generated, even after the user removed or rearranged a room
+    afterward. This endpoint recomputes fresh from whatever rooms are
+    passed, with no auth/quota required, so the frontend can call it
+    reactively on every edit instead of relying on a stale snapshot."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+
+    # A layout with a room, then the SAME request with that room removed —
+    # confirms the endpoint reflects whatever is passed, not any cached state.
+    with_bedroom = client.post("/api/construction-studio/vastu-check", json={
+        "plot_length_ft": 40, "plot_width_ft": 30,
+        "rooms": [{"name": "Master Bedroom", "x": 0, "y": 0, "length": 10, "width": 10}],
+        "entrance_direction": "north", "road_facing_side": "north",
+    })
+    assert with_bedroom.status_code == 200
+    assert with_bedroom.json()["scope"] == "full_multi_rule_check"
+
+    without_bedroom = client.post("/api/construction-studio/vastu-check", json={
+        "plot_length_ft": 40, "plot_width_ft": 30,
+        "rooms": [],
+        "entrance_direction": "north", "road_facing_side": "north",
+    })
+    assert without_bedroom.status_code == 200
+    assert without_bedroom.json()["scope"] != "full_multi_rule_check"  # falls back to basics-only, no rooms to check

@@ -152,6 +152,7 @@ function AssessmentResult({
   };
 
   return (
+    <CollapsiblePanel title="Your PropertyIQ Report" defaultOpen={true} color="violet">
     <div className="card result-card">
 
       <div className="score-section">
@@ -1097,8 +1098,6 @@ function AssessmentResult({
       </div>
 
 
-      <div className="report-sections-grid">
-
       <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
         <SimilarPropertiesWidget
           reportId={reportId}
@@ -1117,9 +1116,8 @@ function AssessmentResult({
         <FraudIntelligenceStatic />
       </CollapsiblePanel>
 
-      </div>
-
     </div>
+    </CollapsiblePanel>
   );
 }
 

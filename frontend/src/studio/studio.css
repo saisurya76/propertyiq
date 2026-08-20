@@ -464,6 +464,41 @@
   padding: 20px;
 }
 
+.studio-designs-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Reusable, page-level "refresh just the data" button — for pages whose
+   data can go stale (a saved design created elsewhere, a design deleted
+   in another tab) with no way to update short of a full browser reload,
+   which drops the user back to the homepage rather than staying on the
+   current page. */
+.page-refresh-btn {
+  background: #f3ecff;
+  color: #4c1d95;
+  border: 1px solid #ede4fc;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.page-refresh-btn:hover:not(:disabled) {
+  background: #ede4fc;
+}
+
+.page-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .studio-designs-new-btn {
   margin: 12px 0 24px;
 }

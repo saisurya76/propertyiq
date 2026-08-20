@@ -1203,6 +1203,8 @@ class ConstructionDesignRequest(BaseModel):
     rooms: list[RoomSpec] = []
     site_elements: list[SiteElementSpec] = []
     has_imported_materials: bool = False
+    city: Optional[str] = None
+    country: Optional[str] = None
 
 
 @app.get("/api/construction-studio/materials")
@@ -1297,6 +1299,42 @@ def construction_adjacency_styles():
     }
 
 
+class VastuCheckRequest(BaseModel):
+    plot_length_ft: float
+    plot_width_ft: float
+    rooms: list[RoomSpec] = []
+    entrance_direction: str
+    road_facing_side: str
+    slope_direction: Optional[str] = None
+
+
+@app.post("/api/construction-studio/vastu-check")
+def construction_vastu_check(request: VastuCheckRequest):
+    """A lightweight, quota-free Vastu compliance check — recomputes from
+    the CURRENT room layout, unlike the result embedded in a generated
+    design (which is a snapshot from whenever "Generate" was last
+    clicked and goes stale the moment the user edits a room afterward —
+    a real reported bug: Vastu compliance kept showing an old result
+    after a room was removed or rearranged). Does not consume design
+    quota, generate a DXF, or save anything — purely a read of the
+    current layout, meant to be called reactively as the user edits,
+    the same role adjacency-check plays for space-planning correctness."""
+    if request.rooms:
+        return check_vastu_full(
+            plot_length_ft=request.plot_length_ft,
+            plot_width_ft=request.plot_width_ft,
+            rooms=[r.model_dump() for r in request.rooms],
+            entrance_direction=request.entrance_direction,
+            road_facing_side=request.road_facing_side,
+            slope_direction=request.slope_direction,
+        )
+    return check_vastu_basics(
+        entrance_direction=request.entrance_direction,
+        road_facing_side=request.road_facing_side,
+        slope_direction=request.slope_direction,
+    )
+
+
 @app.post("/api/construction-studio/design")
 def construction_design(request: ConstructionDesignRequest, user_email: str = Depends(get_current_user_email)):
     """Finalize a Construction Studio design: computes final cost estimate,
@@ -1386,6 +1424,8 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "site_elements": [e.model_dump() for e in request.site_elements],
         "selections": request.selections,
         "labor_selections": request.labor_selections,
+        "city": request.city,
+        "country": request.country,
     }
 
     save_design(
@@ -1443,6 +1483,8 @@ class PropertyPlotSpec(BaseModel):
     road_facing_side: str
     slope_direction: Optional[str] = None
     master_plan_elements: list[MasterPlanElementSpec] = []
+    city: Optional[str] = None
+    country: Optional[str] = None
 
 
 class FloorInput(BaseModel):

@@ -347,7 +347,7 @@ h1, h2, h3, h4,
 }
 
 .mission-content h2 {
-  text-align: left;
+  text-align: center;
   font-size: clamp(22px, 3vw, 30px);
   font-weight: 800;
   color: var(--text-strong);

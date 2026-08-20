@@ -4,18 +4,46 @@ import { studioApi } from "./studioApi";
 function StudioDesigns({ onStartNew, onResume }) {
   const [properties, setProperties] = useState(null);
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  const fetchProperties = () =>
     studioApi
       .listProperties()
       .then((res) => setProperties(res.properties))
       .catch((e) => setError(e.message || "Couldn't load your saved designs."));
+
+  // The initial load stays a plain, direct fetch call (no synchronous
+  // setState calls inside the effect body itself) — the refresh button's
+  // click handler below is what needs the synchronous state resets
+  // (clearing the old error, showing the "Refreshing..." state), and
+  // that's safe there since it's triggered by a user event, not an effect.
+  useEffect(() => {
+    fetchProperties();
   }, []);
+
+  const handleRefreshClick = () => {
+    setRefreshing(true);
+    setError("");
+    fetchProperties().finally(() => setRefreshing(false));
+  };
 
   return (
     <div className="studio-designs">
-      <h2>Your Construction Studio</h2>
-      <p className="studio-subtext">Pick up a saved design, or start a fresh one.</p>
+      <div className="studio-designs-header-row">
+        <div>
+          <h2>Your Construction Studio</h2>
+          <p className="studio-subtext">Pick up a saved design, or start a fresh one.</p>
+        </div>
+        <button
+          type="button"
+          className="page-refresh-btn"
+          onClick={handleRefreshClick}
+          disabled={refreshing}
+          title="Refresh this list without leaving the page"
+        >
+          {refreshing ? "Refreshing..." : "↻ Refresh"}
+        </button>
+      </div>
 
       <button type="button" className="cs-nav-btn cs-nav-primary studio-designs-new-btn" onClick={onStartNew}>
         + Start New Design
