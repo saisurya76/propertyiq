@@ -51,6 +51,11 @@ from backend.vastu_engine import (
     check_vastu_full,
 )
 
+from backend.thai_traditional_engine import (
+    check_thai_traditional_full,
+    check_thai_orientation,
+)
+
 from backend.adjacency_engine import (
     evaluate_adjacency,
 )
@@ -1304,22 +1309,40 @@ class VastuCheckRequest(BaseModel):
     entrance_direction: str
     road_facing_side: str
     slope_direction: Optional[str] = None
+    country: Optional[str] = None  # routes to the Thai traditional engine when this is Thailand — see below
 
 
 @app.post("/api/construction-studio/vastu-check")
 def construction_vastu_check(request: VastuCheckRequest):
-    """A lightweight, quota-free Vastu compliance check — recomputes from
-    the CURRENT room layout, unlike the result embedded in a generated
-    design (which is a snapshot from whenever "Generate" was last
-    clicked and goes stale the moment the user edits a room afterward —
-    a real reported bug: Vastu compliance kept showing an old result
-    after a room was removed or rearranged). Does not consume design
-    quota, generate a DXF, or save anything — purely a read of the
-    current layout, meant to be called reactively as the user edits,
+    """A lightweight, quota-free traditional-building compliance check —
+    recomputes from the CURRENT room layout, unlike the result embedded
+    in a generated design (which is a snapshot from whenever "Generate"
+    was last clicked and goes stale the moment the user edits a room
+    afterward — a real reported bug: compliance kept showing an old
+    result after a room was removed or rearranged). Does not consume
+    design quota, generate a DXF, or save anything — purely a read of
+    the current layout, meant to be called reactively as the user edits,
     the same role adjacency-check plays for space-planning correctness.
-    India-only for now (Vastu specifically) — country-specific
-    validation (e.g. a Thai traditional-architecture equivalent) is
-    planned as a separate, larger piece of work, not yet built."""
+
+    Routes by country: Vastu for India (the original, still the
+    default), the Thai traditional-building engine when country is
+    Thailand. Kept as the same endpoint/URL the frontend already calls
+    (rather than a breaking rename) — country was already part of the
+    plot data being sent elsewhere, this just also reads it here."""
+    country = (request.country or "").strip().lower()
+
+    if country == "thailand":
+        if request.rooms:
+            return check_thai_traditional_full(
+                rooms=[r.model_dump() for r in request.rooms],
+                entrance_direction=request.entrance_direction,
+                road_facing_side=request.road_facing_side,
+            )
+        return check_thai_orientation(
+            entrance_direction=request.entrance_direction,
+            road_facing_side=request.road_facing_side,
+        )
+
     if request.rooms:
         return check_vastu_full(
             plot_length_ft=request.plot_length_ft,

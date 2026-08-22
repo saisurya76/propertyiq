@@ -225,9 +225,11 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
   // showing stale findings after a room was removed or rearranged,
   // since nothing recomputed it.
   //
-  // India-only (Vastu specifically) for now — country-specific
-  // validation (e.g. a Thai traditional-architecture equivalent) is
-  // planned as later, separate work, not built yet.
+  // Recomputes traditional-building compliance live from the CURRENT
+  // room layout — routes by plot.country on the backend: Vastu for
+  // India (unchanged), the Thai traditional-building engine for
+  // Thailand. Both share this same endpoint/effect; the backend decides
+  // which engine to use.
   useEffect(() => {
     if (!plot.plot_length_ft || !plot.plot_width_ft || !plot.entrance_direction || !plot.road_facing_side) return;
 
@@ -240,13 +242,14 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
           entrance_direction: plot.entrance_direction,
           road_facing_side: plot.road_facing_side,
           slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
+          country: plot.country,
         })
         .then(setLiveVastuResult)
         .catch(() => {}); // non-critical live check — a transient failure just leaves the last-known result showing
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [rooms, plot.plot_length_ft, plot.plot_width_ft, plot.entrance_direction, plot.road_facing_side, plot.slope_direction]);
+  }, [rooms, plot.plot_length_ft, plot.plot_width_ft, plot.entrance_direction, plot.road_facing_side, plot.slope_direction, plot.country]);
 
   // Save/load/lock state
   const [propertyId, setPropertyId] = useState(null);
@@ -1393,16 +1396,22 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
 
           {liveVastuResult && (
             <div className="cs-vastu-live-section">
-              <h4>Vastu Compliance</h4>
+              <h4>{liveVastuResult.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
               <p className="studio-subtext" style={{ marginTop: -8, marginBottom: 10 }}>
                 Updates live as you edit the plot direction and room layout — always reflects the current design, not a snapshot from when you last clicked Generate.
               </p>
-              {liveVastuResult.scope === "full_multi_rule_check" ? (
+              {liveVastuResult.scope === "full_multi_rule_check" || liveVastuResult.scope === "thai_traditional_full_check" ? (
                 liveVastuResult.findings.map((f, i) => (
                   <div
                     key={i}
                     className={`cs-vastu-finding ${
-                      f.note.includes("advises against") || f.note.includes("recommends keeping open")
+                      f.severity
+                        ? f.severity === "warning"
+                          ? "cs-vastu-bad"
+                          : f.severity === "good"
+                          ? "cs-vastu-good"
+                          : "cs-vastu-neutral"
+                        : f.note.includes("advises against") || f.note.includes("recommends keeping open")
                         ? "cs-vastu-bad"
                         : f.note.includes("aligns")
                         ? "cs-vastu-good"
