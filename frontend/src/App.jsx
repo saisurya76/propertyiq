@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import "./studio/studio.css";
 
@@ -62,6 +62,29 @@ function normalizeLanguage(code) {
   return LANGUAGE_OPTIONS.some(([value]) => value.toLowerCase() === base) ? base : "en";
 }
 
+// URL-based country context: visiting /th loads the whole app pre-set
+// for Thailand — the main property form defaults to Thailand/THB, and
+// starting a NEW Construction Studio design (not resuming an existing
+// one, which keeps its own saved country) is pre-seeded with Thailand's
+// region/currency/unit system. Deliberately a small, extensible map —
+// more country codes (/in, /us, etc, per the stated plan) get added
+// here later without restructuring anything.
+const COUNTRY_CODE_MAP = {
+  th: { name: "Thailand", currency: "THB", stateProvince: "", city: "" },
+};
+
+// Read once at initial load (a useState lazy initializer calls this
+// exactly once, before any view-switching effects run) — the country
+// code is a startup context, not something that needs to keep
+// rewriting the URL as the user navigates between views afterward.
+function detectCountryCodeFromUrl() {
+  if (typeof window === "undefined") return null;
+  const match = window.location.pathname.match(/^\/([a-z]{2})\/?$/i);
+  if (!match) return null;
+  const code = match[1].toLowerCase();
+  return COUNTRY_CODE_MAP[code] ? { code, ...COUNTRY_CODE_MAP[code] } : null;
+}
+
 // Drives Google Translate's hidden injected <select class="goog-te-combo">
 // directly (setting its value + dispatching "change" is how that widget's
 // own API expects to be driven programmatically). Module-level, not a
@@ -95,10 +118,17 @@ function triggerGoogleTranslation(languageCode) {
 }
 
 function App() {
+  // Memoized (not just a plain const) since it's referenced inside a
+  // useEffect dependency array below — without memoizing, a fresh object
+  // literal on every render would make that effect re-fire every render
+  // instead of the intended once-per-language-change, even though the
+  // underlying URL/pathname never actually changes during a session.
+  const urlCountryContext = useMemo(() => detectCountryCodeFromUrl(), []);
+
   const [formData, setFormData] = useState({
-    country: "India",
-    stateProvince: "Telangana",
-    city: "Hyderabad",
+    country: urlCountryContext ? urlCountryContext.name : "India",
+    stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
+    city: urlCountryContext ? urlCountryContext.city : "Hyderabad",
     location: "",
     governmentGuidance: "",
     marketAverage: "",
@@ -110,7 +140,7 @@ function App() {
     quotedPrice: "",
 
     areaValue: "",
-    areaUnit: "sqft",
+    areaUnit: urlCountryContext?.code === "th" ? "sq meter" : "sqft",
 
     monthlyRent: "",
 
@@ -138,7 +168,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(urlCountryContext ? urlCountryContext.currency : "USD");
 
   // Keep the URL bar in sync with the admin view, and support the browser
   // back/forward buttons.
@@ -197,7 +227,10 @@ function App() {
         const response = await fetch("https://ipapi.co/json/", { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
-          if (data.currency && !cancelled) setCurrency(data.currency);
+          // A URL country context (visiting /th) is an explicit, deliberate
+          // signal — it should win over IP-based geolocation, not get
+          // silently overridden by wherever the visitor actually is.
+          if (data.currency && !cancelled && !urlCountryContext) setCurrency(data.currency);
           const mapped = COUNTRY_LANGUAGE_MAP[data.country_code];
           const geoLanguage = (data.languages || "").split(",")[0]?.trim();
           if (mapped) {
@@ -217,7 +250,7 @@ function App() {
 
     detect();
     return () => { cancelled = true; };
-  }, []);
+  }, [urlCountryContext]);
 
   const changeLanguage = (event) => {
     const selected = event.target.value;
@@ -494,6 +527,7 @@ function App() {
           onBack={() => setStudioView("designs")}
           onQuotaExceeded={handleQuotaExceeded}
           resumePropertyId={resumePropertyId}
+          urlCountryContext={urlCountryContext}
           onStartNew={() => {
             setResumePropertyId(null);
             setStudioResetNonce((n) => n + 1);
