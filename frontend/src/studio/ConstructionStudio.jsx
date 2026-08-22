@@ -14,21 +14,6 @@ const REGIONS = [
   ["global", "Other / Global"],
 ];
 
-// Auto-syncs region + currency when the user types a recognized country
-// name — fixes a real, plain gap: country was a free-text field entirely
-// disconnected from region (which drives the materials catalog/pricing)
-// and currency, so a user could type "Thailand" as their country while
-// region stayed on "india" with no connection between the two, silently
-// showing Indian materials/pricing/Vastu validation for a Thai property.
-// Only fires when country CHANGES — region/currency stay freely editable
-// afterward for anyone who wants a different combination on purpose.
-const COUNTRY_TO_REGION_CURRENCY = {
-  "india": { region: "india", currency: "INR" },
-  "thailand": { region: "thailand", currency: "THB" },
-  "usa": { region: "usa", currency: "USD" },
-  "united states": { region: "usa", currency: "USD" },
-};
-
 const CURRENCIES = ["USD", "INR", "THB", "AED", "GBP", "EUR"];
 
 const DIRECTIONS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
@@ -162,7 +147,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
     region: "india",
     currency: "INR",
     city: "",
-    country: "India",
     entrance_direction: "north-east",
     road_facing_side: "north",
     slope_direction: "north",
@@ -426,19 +410,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
       .catch(() => {});
   }, [selections, laborSelections, plotSizeSqft, plot.region, plot.currency]);
 
-  const updatePlotField = (field, value) => {
-    setPlot((p) => {
-      const next = { ...p, [field]: value };
-      if (field === "country") {
-        const match = COUNTRY_TO_REGION_CURRENCY[value.trim().toLowerCase()];
-        if (match) {
-          next.region = match.region;
-          next.currency = match.currency;
-        }
-      }
-      return next;
-    });
-  };
+  const updatePlotField = (field, value) => setPlot((p) => ({ ...p, [field]: value }));
 
   const addMasterPlanElement = () => {
     const usedTypes = new Set((plot.master_plan_elements || []).map((el) => el.type));
@@ -1114,15 +1086,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
               <input value={plot.city} onChange={(e) => updatePlotField("city", e.target.value)} placeholder="e.g. Hyderabad" />
             </div>
             <div className="cs-field">
-              <label>Country</label>
-              <input
-                value={plot.country}
-                onChange={(e) => updatePlotField("country", e.target.value)}
-                placeholder="e.g. India"
-                title="Typing a recognized country (India, Thailand, USA) automatically sets the matching region and currency below"
-              />
-            </div>
-            <div className="cs-field">
               <label>Region</label>
               <select value={plot.region} onChange={(e) => updatePlotField("region", e.target.value)}>
                 {REGIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -1528,6 +1491,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
               locked={locked}
               roomAdjacencyStatus={roomAdjacencyStatus}
               architecturalStyle={plot.architectural_style}
+              country={plot.country}
+              entranceDirection={plot.entrance_direction}
             />
           </Suspense>
 
