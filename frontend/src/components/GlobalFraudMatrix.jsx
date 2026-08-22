@@ -54,11 +54,6 @@ export default function GlobalFraudMatrix({ data }) {
 
     const cells = matrix?.cells ?? [];
 
-    console.log(matrix);
-    console.log(countries);
-    console.log(fraudTypes);
-    console.log(cells);
-
     return (
 
         <>
