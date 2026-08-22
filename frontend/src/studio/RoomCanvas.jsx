@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Rect, Text, Line, Circle, RegularPolygon, Transformer, Group } from "react-konva";
 import Konva from "konva";
 import { evaluateAdjacency } from "./adjacencyEngine";
+import { evaluateThaiTraditional } from "./thaiTraditionalEngine";
 
 const BASE_CANVAS_WIDTH = 640;
 const ROAD_SIDE_OFFSET = 14;
@@ -186,6 +187,8 @@ function RoomCanvas({
   locked = false,
   roomAdjacencyStatus = {},
   architecturalStyle = "modern_open_plan",
+  country = "",
+  entranceDirection = "",
 }) {
   const [zoom, setZoom] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -546,13 +549,30 @@ function RoomCanvas({
     // roomAdjacencyStatus prop) takes back over automatically on React's
     // next render once the drag commits, so no explicit "revert" is
     // needed here.
+    //
+    // For Thailand properties specifically, ALSO checks the Thai
+    // traditional-building rules live during drag (same instant
+    // per-frame feedback adjacency already has) — additive, not a
+    // replacement: non-Thailand properties get exactly the same
+    // adjacency-only behavior as before, zero risk of regression there.
+    // A Thai warning takes priority over an adjacency "good" for the
+    // same room during the drag, since a real traditional-building
+    // concern is more important information than a stylistic bonus.
     const isRoom = rooms.some((r) => r._key === item._key);
     if (isRoom) {
       const liveFeet = canvasToFeet(snappedX, snappedY, width, height);
       const liveRooms = rooms.map((r) =>
         r._key === item._key ? { ...r, x: liveFeet.x, y: liveFeet.y } : r
       );
-      const liveStatus = evaluateAdjacency(liveRooms, architecturalStyle).roomStatus[item._key];
+      const adjacencyStatus = evaluateAdjacency(liveRooms, architecturalStyle).roomStatus[item._key];
+
+      let liveStatus = adjacencyStatus;
+      if (country && country.trim().toLowerCase() === "thailand") {
+        const thaiStatus = evaluateThaiTraditional(liveRooms, entranceDirection).roomStatus[item._key];
+        if (thaiStatus === "warning") liveStatus = "warning";
+        else if (!liveStatus && thaiStatus) liveStatus = thaiStatus;
+      }
+
       const liveColor = liveStatus === "warning" ? "#dc2626" : liveStatus === "good" ? "#16a34a" : (item.border_color || "#374151");
       e.target.stroke(liveColor);
     }
