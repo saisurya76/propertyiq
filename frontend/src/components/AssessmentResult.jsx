@@ -14,17 +14,50 @@ function AssessmentResult({
 
   if (!result) return null;
 
-  const formatIndianCurrency = (value) => {
-    if (value >= 10000000) {
-      return `₹${(value / 10000000).toFixed(2)} Cr`;
-    }
-
-    if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(2)} L`;
-    }
-
-    return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
+  // The report's currency should reflect the PROPERTY's country (what
+  // the assessment is actually about), not the visitor's own location —
+  // someone assessing an Indian property from the US should still see
+  // Indian Rupee pricing, not USD. Was previously 100% hardcoded to INR
+  // regardless of the property's actual country — a real gap for any
+  // non-Indian property (e.g. Thailand, seeded via /th).
+  const CURRENCY_BY_COUNTRY = {
+    "india": { code: "INR", symbol: "₹", locale: "en-IN" },
+    "thailand": { code: "THB", symbol: "฿", locale: "th-TH" },
+    "usa": { code: "USD", symbol: "$", locale: "en-US" },
+    "united states": { code: "USD", symbol: "$", locale: "en-US" },
   };
+  const currencyInfo = CURRENCY_BY_COUNTRY[(formData.country || "").trim().toLowerCase()]
+    || { code: "USD", symbol: "$", locale: "en-US" };
+
+  const formatCurrency = (value) => {
+    if (value === null || value === undefined || isNaN(value)) return `${currencyInfo.symbol}0`;
+
+    // India keeps its own genuinely standard crore/lakh convention —
+    // not applicable anywhere else, so only INR uses it. Every other
+    // currency uses the widely-understood M/K (million/thousand)
+    // abbreviation instead of inventing a India-specific one for them.
+    if (currencyInfo.code === "INR") {
+      if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)} Cr`;
+      if (value >= 100000) return `₹${(value / 100000).toFixed(2)} L`;
+      return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
+    }
+
+    if (value >= 1000000) return `${currencyInfo.symbol}${(value / 1000000).toFixed(2)}M`;
+    if (value >= 1000) return `${currencyInfo.symbol}${(value / 1000).toFixed(1)}K`;
+    return `${currencyInfo.symbol}${new Intl.NumberFormat(currencyInfo.locale).format(value)}`;
+  };
+
+  const formatPerSqft = (value) => {
+    if (value === null || value === undefined || isNaN(value)) return `${currencyInfo.symbol}0 / sqft`;
+    return `${currencyInfo.symbol}${value.toLocaleString(currencyInfo.locale)} / sqft`;
+  };
+
+  // Kept as an alias so any call site not yet updated below still works
+  // correctly rather than throwing — genuinely currency-aware now,
+  // despite the India-specific name staying for now to limit the size
+  // of this change (a rename sweep can happen separately, unrelated to
+  // the actual bug this fixes).
+  const formatIndianCurrency = formatCurrency;
 
   const downloadReport = async () => {
     if (reportLoading) return;
@@ -340,7 +373,7 @@ function AssessmentResult({
           <div className="finding-item">
             <strong>Quoted Price / sqft</strong>
             <p>
-              ₹{result.quotedPricePerSqft?.toLocaleString("en-IN")} / sqft
+              {formatPerSqft(result.quotedPricePerSqft)}
             </p>
           </div>
 
@@ -352,21 +385,21 @@ function AssessmentResult({
           <div className="finding-item">
             <strong>Fair Value / sqft</strong>
             <p>
-              ₹{result.fairValuePerSqft?.toLocaleString("en-IN")} / sqft
+              {formatPerSqft(result.fairValuePerSqft)}
             </p>
           </div>
 
           <div className="finding-item">
             <strong>City Comparable Benchmark</strong>
             <p>
-              ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
+              {formatPerSqft(result.marketAveragePricePerSqft)}
             </p>
           </div>
 
           <div className="finding-item">
             <strong>Government Guidance</strong>
             <p>
-              ₹{result.governmentRatePerUnit?.toLocaleString("en-IN")} / sqft
+              {formatPerSqft(result.governmentRatePerUnit)}
             </p>
           </div>
 
@@ -494,7 +527,7 @@ function AssessmentResult({
         <div className="finding-item">
           <strong>Government Guidance Rate</strong>
           <p>
-            ₹{result.governmentRatePerUnit?.toLocaleString("en-IN")} / sqft
+            {formatPerSqft(result.governmentRatePerUnit)}
           </p>
         </div>
 
@@ -834,7 +867,7 @@ function AssessmentResult({
 
     <p>
       {result.marketAveragePricePerSqft > 0
-        ? `₹${result.marketAveragePricePerSqft.toLocaleString("en-IN")} / sqft`
+        ? formatPerSqft(result.marketAveragePricePerSqft)
         : "Not Available"}
     </p>
 
@@ -888,7 +921,7 @@ function AssessmentResult({
         <p>
           {project.developer}
           <br />
-          ₹{project.pricePerSqft.toLocaleString("en-IN")} / sqft
+          {formatPerSqft(project.pricePerSqft)}
         </p>
 
       </div>
