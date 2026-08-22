@@ -15,10 +15,17 @@ def get_fx_rates() -> dict[str, float]:
     return dict(_CATALOG["fx_rates_usd_base"])
 
 
-def _build_catalog(source: dict[str, Any], region: str = "global") -> dict[str, Any]:
+def _build_catalog(source: dict[str, Any], region: str = "global", global_is_catchall: bool = True) -> dict[str, Any]:
     """Shared catalog-building logic for both materials (_CATALOG["categories"])
     and labor/contractor items (_CATALOG["labor_categories"]) — same option
-    shape, same region-filtering rules, just a different source section."""
+    shape, same region-filtering rules, just a different source section.
+
+    global_is_catchall controls whether requesting region="global" shows
+    EVERY region's options (appropriate for materials — a generic/other
+    user seeing a broad catalog is reasonable) or shows nothing beyond
+    options explicitly tagged "global" (appropriate for labor — India-
+    specific labor/contractor conventions genuinely don't generalize to
+    an arbitrary "global/other" user the way raw material options do)."""
 
     region = (region or "global").strip().lower()
     categories_out = {}
@@ -36,7 +43,7 @@ def _build_catalog(source: dict[str, Any], region: str = "global") -> dict[str, 
                 ] or [s["name"] for s in opt["suppliers"]],
             }
             for opt in cat["options"]
-            if region in opt["regions"] or "global" in opt["regions"]
+            if region in opt["regions"] or (region == "global" and global_is_catchall)
         ]
         if options:
             categories_out[cat_id] = {
@@ -60,8 +67,12 @@ def get_labor_catalog(region: str = "global") -> dict[str, Any]:
     are actually quoted in Indian residential construction (a distinct
     civil-contractor cost bucket, not a material line item). India-only
     for now — the researched rates and regional convention are India-
-    specific; other regions simply see no labor_categories entries."""
-    return _build_catalog(_CATALOG.get("labor_categories", {}), region)
+    specific; other regions simply see no labor_categories entries.
+    Deliberately global_is_catchall=False: unlike materials, a "global/
+    other" user shouldn't see India-specific labor/contractor conventions
+    as a default fallback — that's a real, meaningful distinction, not an
+    oversight (confirmed by an existing test asserting exactly this)."""
+    return _build_catalog(_CATALOG.get("labor_categories", {}), region, global_is_catchall=False)
 
 
 def _find_option(category: str, option_id: str, source: dict[str, Any] = None) -> Optional[dict[str, Any]]:

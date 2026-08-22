@@ -499,3 +499,52 @@ def test_room_without_border_fields_still_works(tmp_path):
     msp = doc.modelspace()
     room_poly = [e for e in msp if e.dxftype() == "LWPOLYLINE" and e.dxf.layer == "ROOMS"][0]
     assert room_poly.dxf.linetype in ("BYLAYER", "Continuous", "ByLayer")
+
+
+def test_region_filtering_actually_excludes_other_regions_materials():
+    """Real, significant pre-existing bug: the filter condition checked
+    `"global" in opt["regions"]` (the OPTION's own tags, which every
+    single option had) instead of `region == "global"` (whether the
+    REQUESTED region is the catch-all) — meaning region filtering never
+    actually excluded anything for ANY region, only becoming visible as a
+    real problem once Thailand-specific options existed alongside India's
+    (selecting Thailand showed India's materials too)."""
+    from backend.construction_studio import get_catalog
+
+    thailand = get_catalog(region="thailand")
+    india = get_catalog(region="india")
+
+    thailand_cement_ids = {o["id"] for o in thailand["cement"]["options"]}
+    india_cement_ids = {o["id"] for o in india["cement"]["options"]}
+
+    assert "opc_thailand_scg" in thailand_cement_ids
+    assert india_cement_ids.isdisjoint(thailand_cement_ids)  # no bleed-through either direction
+    assert "opc_thailand_scg" not in india_cement_ids
+
+
+def test_region_global_is_catchall_for_materials_but_not_labor():
+    """A deliberate, real distinction: "global/other" showing a broad
+    materials catalog is reasonable; showing India-specific labor/
+    contractor conventions to an arbitrary global user is not — confirmed
+    both directions explicitly, not just one."""
+    from backend.construction_studio import get_catalog, get_labor_catalog
+
+    materials_global = get_catalog(region="global")
+    assert "opc_thailand_scg" in {o["id"] for o in materials_global["cement"]["options"]}
+    assert "opc_43" in {o["id"] for o in materials_global["cement"]["options"]}
+
+    labor_global = get_labor_catalog(region="global")
+    assert labor_global == {}
+
+
+def test_thailand_material_options_have_real_data():
+    from backend.construction_studio import get_catalog
+
+    result = get_catalog(region="thailand")
+    cement = next(o for o in result["cement"]["options"] if o["id"] == "opc_thailand_scg")
+    assert cement["base_cost_usd"] > 0
+    assert "SCG" in cement["suppliers"][0]
+
+    bricks = next(o for o in result["bricks"]["options"] if o["id"] == "aac_block_thailand")
+    assert bricks["base_cost_usd"] > 0
+    assert any("Q-CON" in s for s in bricks["suppliers"])
