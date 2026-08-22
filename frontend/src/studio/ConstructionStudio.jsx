@@ -138,7 +138,7 @@ function formatLinePrice(usdPerUnit, plotSizeSqft, currency, fxRates, openingAre
   }
 }
 
-function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
+function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStartNew }) {
   const [step, setStep] = useState(0);
 
   const [plot, setPlot] = useState({
@@ -1033,6 +1033,20 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId }) {
         {locked && <span className="studio-design-lock-badge">🔒 Locked</span>}
         <div className="cs-save-bar-actions">
           {saveStatus && <span className="cs-save-status">{saveStatus}</span>}
+          {onStartNew && (
+            <button
+              type="button"
+              className="rc-tool-btn"
+              onClick={() => {
+                if (window.confirm("Start a new design? Any unsaved changes to this one will be lost.")) {
+                  onStartNew();
+                }
+              }}
+              title="Start a fresh design without going back to the designs list"
+            >
+              + New Design
+            </button>
+          )}
           {!locked && (
             <button type="button" className="rc-tool-btn" onClick={() => handleSaveDesign(false)} disabled={saving}>
               {saving ? "Saving..." : "Save"}

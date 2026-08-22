@@ -363,6 +363,13 @@ function App() {
 
   const [quotaMessage, setQuotaMessage] = useState("");
   const [resumePropertyId, setResumePropertyId] = useState(null);
+  // Bumped every time "start a new design" is triggered — used as
+  // ConstructionStudio's React key below so a fresh instance is always
+  // mounted with clean default state, even for two consecutive
+  // "start new" clicks in a row (resumePropertyId alone would stay null
+  // both times, which React's key comparison would treat as "no change,
+  // don't remount" — the nonce guarantees a real remount every time).
+  const [studioResetNonce, setStudioResetNonce] = useState(0);
   const [checkingSession, setCheckingSession] = useState(false);
 
   const launchStudio = async () => {
@@ -483,9 +490,14 @@ function App() {
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <ConstructionStudio
+          key={studioResetNonce}
           onBack={() => setStudioView("designs")}
           onQuotaExceeded={handleQuotaExceeded}
           resumePropertyId={resumePropertyId}
+          onStartNew={() => {
+            setResumePropertyId(null);
+            setStudioResetNonce((n) => n + 1);
+          }}
         />
         <ScrollToTopBottom />
       </div>
