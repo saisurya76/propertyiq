@@ -1208,6 +1208,9 @@ class ConstructionDesignRequest(BaseModel):
     rooms: list[RoomSpec] = []
     site_elements: list[SiteElementSpec] = []
     has_imported_materials: bool = False
+    city: Optional[str] = None
+    country: Optional[str] = None
+    unit_system: Optional[str] = None
 
 
 @app.get("/api/construction-studio/materials")
@@ -1310,6 +1313,7 @@ class VastuCheckRequest(BaseModel):
     road_facing_side: str
     slope_direction: Optional[str] = None
     country: Optional[str] = None  # routes to the Thai traditional engine when this is Thailand — see below
+    region: Optional[str] = None  # fallback signal if country is missing/stale (e.g. an older saved design)
 
 
 @app.post("/api/construction-studio/vastu-check")
@@ -1324,14 +1328,25 @@ def construction_vastu_check(request: VastuCheckRequest):
     the current layout, meant to be called reactively as the user edits,
     the same role adjacency-check plays for space-planning correctness.
 
-    Routes by country: Vastu for India (the original, still the
-    default), the Thai traditional-building engine when country is
-    Thailand. Kept as the same endpoint/URL the frontend already calls
-    (rather than a breaking rename) — country was already part of the
-    plot data being sent elsewhere, this just also reads it here."""
-    country = (request.country or "").strip().lower()
+    Routes by country OR region: Vastu for India (the original, still
+    the default), the Thai traditional-building engine when either
+    country or region is Thailand. Kept as the same endpoint/URL the
+    frontend already calls (rather than a breaking rename).
 
-    if country == "thailand":
+    Treats country and region as equally valid triggers rather than
+    having one override the other — a real bug this closes: an older
+    saved design (or one loaded before country was correctly restored
+    on the frontend) can have region="thailand" while country is stuck
+    at a stale default like "india". An earlier version of this fix
+    tried to let an explicit country="india" win over region, but that
+    exact stale-default state IS the bug being fixed, so that "override"
+    logic silently defeated the whole point of the fallback — caught by
+    testing the exact reported scenario directly rather than assuming
+    the fix worked."""
+    country = (request.country or "").strip().lower()
+    region = (request.region or "").strip().lower()
+
+    if country == "thailand" or region == "thailand":
         if request.rooms:
             return check_thai_traditional_full(
                 rooms=[r.model_dump() for r in request.rooms],
@@ -1448,6 +1463,9 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "site_elements": [e.model_dump() for e in request.site_elements],
         "selections": request.selections,
         "labor_selections": request.labor_selections,
+        "city": request.city,
+        "country": request.country,
+        "unit_system": request.unit_system,
     }
 
     save_design(
@@ -1505,6 +1523,9 @@ class PropertyPlotSpec(BaseModel):
     road_facing_side: str
     slope_direction: Optional[str] = None
     master_plan_elements: list[MasterPlanElementSpec] = []
+    city: Optional[str] = None
+    country: Optional[str] = None
+    unit_system: Optional[str] = None
 
 
 class FloorInput(BaseModel):

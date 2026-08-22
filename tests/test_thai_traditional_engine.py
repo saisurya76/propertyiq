@@ -103,3 +103,38 @@ def test_vastu_check_endpoint_routes_by_country():
     })
     assert no_country.status_code == 200
     assert no_country.json()["scope"] == "full_multi_rule_check"
+
+
+def test_vastu_check_routes_correctly_with_stale_or_missing_country():
+    """Real reported bug: resuming a saved Thailand property showed Vastu
+    Compliance instead of Traditional Building Compliance, because country
+    stayed at its default ("India") or was missing entirely on older saved
+    designs, even though region correctly said "thailand". Country and
+    region are treated as equally valid triggers (neither overrides the
+    other) so this class of stale/missing-country bug can't recur."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+
+    def check(country, region):
+        return client.post("/api/construction-studio/vastu-check", json={
+            "plot_length_ft": 40, "plot_width_ft": 30,
+            "rooms": [
+                {"name": "Kitchen", "x": 0, "y": 0, "length": 10, "width": 10},
+                {"name": "Bedroom", "x": 10, "y": 0, "length": 10, "width": 10},
+            ],
+            "entrance_direction": "east", "road_facing_side": "east",
+            "country": country, "region": region,
+        }).json()
+
+    # The exact reported bug: stale country="India" but region correctly thailand
+    assert check("India", "thailand")["scope"] == "thai_traditional_full_check"
+    # Country correctly says Thailand
+    assert check("Thailand", "thailand")["scope"] == "thai_traditional_full_check"
+    # Genuinely India, both agree
+    assert check("India", "india")["scope"] == "full_multi_rule_check"
+    # Country says Thailand even if region is inconsistent
+    assert check("Thailand", "india")["scope"] == "thai_traditional_full_check"
+    # Neither set at all (a very old design) -- falls back to Vastu, the original default
+    assert check("", "")["scope"] == "full_multi_rule_check"

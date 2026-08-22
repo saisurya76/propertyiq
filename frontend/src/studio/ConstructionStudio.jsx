@@ -14,61 +14,6 @@ const REGIONS = [
   ["global", "Other / Global"],
 ];
 
-const UNIT_SYSTEMS = [
-  ["imperial", "Feet / sqft"],
-  ["metric", "Meters / sqm"],
-];
-
-// Auto-syncs region + currency + unit system when the user types a
-// recognized country name — fixes a real, plain gap: country was
-// entirely disconnected from region (which drives the materials catalog
-// and validation engine) and currency, so a user could type "Thailand"
-// as their country while region stayed on "india" with no connection
-// between the two, silently showing Indian materials/pricing/Vastu
-// validation for a Thai property. Only fires when country CHANGES —
-// region, currency, and unit system all stay freely editable afterward
-// for anyone who wants a deliberately different combination.
-const COUNTRY_TO_REGION_CURRENCY = {
-  "india": { region: "india", currency: "INR", unit_system: "imperial" },
-  "thailand": { region: "thailand", currency: "THB", unit_system: "metric" },
-  "usa": { region: "usa", currency: "USD", unit_system: "imperial" },
-  "united states": { region: "usa", currency: "USD", unit_system: "imperial" },
-};
-
-// Unit conversion — a display/input layer ONLY. Internal storage stays
-// in feet everywhere (plot.plot_length_ft, room.length/width, the DXF
-// export, the Konva canvas's own math, Vastu/adjacency zone
-// calculations) — all of that assumes feet throughout the codebase, and
-// rewriting it to be unit-agnostic would be a far larger, much riskier
-// undertaking than this app actually needs. Converting at the boundary —
-// the exact input field and label the user sees — gets the same
-// practical result (genuinely seeing and entering meters when using the
-// metric system) without touching any of that internal math at all.
-const FT_TO_M = 0.3048;
-const SQFT_TO_SQM = 0.092903;
-
-function feetToDisplay(feetValue, unitSystem) {
-  if (feetValue === null || feetValue === undefined || feetValue === "") return feetValue;
-  return unitSystem === "metric" ? Math.round(feetValue * FT_TO_M * 100) / 100 : feetValue;
-}
-
-function displayToFeet(displayValue, unitSystem) {
-  if (displayValue === null || displayValue === undefined || displayValue === "") return displayValue;
-  return unitSystem === "metric" ? Math.round((displayValue / FT_TO_M) * 100) / 100 : displayValue;
-}
-
-function sqftToDisplayArea(sqft, unitSystem) {
-  return unitSystem === "metric" ? Math.round(sqft * SQFT_TO_SQM) : Math.round(sqft);
-}
-
-function lengthUnitLabel(unitSystem) {
-  return unitSystem === "metric" ? "m" : "ft";
-}
-
-function areaUnitLabel(unitSystem) {
-  return unitSystem === "metric" ? "sqm" : "sqft";
-}
-
 const CURRENCIES = ["USD", "INR", "THB", "AED", "GBP", "EUR"];
 
 const DIRECTIONS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
@@ -202,8 +147,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
     region: "india",
     currency: "INR",
     city: "",
-    country: "India",
-    unit_system: "imperial",
     entrance_direction: "north-east",
     road_facing_side: "north",
     slope_direction: "north",
@@ -300,13 +243,14 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           road_facing_side: plot.road_facing_side,
           slope_direction: plot.slope_direction === "not_available" ? null : plot.slope_direction,
           country: plot.country,
+          region: plot.region,
         })
         .then(setLiveVastuResult)
         .catch(() => {}); // non-critical live check — a transient failure just leaves the last-known result showing
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [rooms, plot.plot_length_ft, plot.plot_width_ft, plot.entrance_direction, plot.road_facing_side, plot.slope_direction, plot.country]);
+  }, [rooms, plot.plot_length_ft, plot.plot_width_ft, plot.entrance_direction, plot.road_facing_side, plot.slope_direction, plot.country, plot.region]);
 
   // Save/load/lock state
   const [propertyId, setPropertyId] = useState(null);
@@ -405,7 +349,25 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
         setPropertyId(prop.property_id);
         setPropertyName(prop.name);
         setLocked(prop.locked);
-        setPlot((p) => ({ ...p, ...prop.plot_spec, city: p.city }));
+        // city/country/unit_system were previously never sent to the
+        // backend at all (missing from PropertyPlotSpec), so they were
+        // silently lost on every save — a real reported bug ("city is
+        // not populating"). This directly caused a SECOND reported bug:
+        // resuming a saved Thailand property showed Vastu Compliance
+        // instead of Traditional Building Compliance, because country
+        // stayed stuck at its default "India" (never actually
+        // restored), even though region correctly said "thailand" — the
+        // live-check routing keys off country specifically. Now that
+        // the backend actually persists these fields, restore them from
+        // the loaded data with a sensible fallback for older saved
+        // designs that predate this fix.
+        setPlot((p) => ({
+          ...p,
+          ...prop.plot_spec,
+          city: prop.plot_spec.city || p.city,
+          country: prop.plot_spec.country || p.country,
+          unit_system: prop.plot_spec.unit_system || p.unit_system,
+        }));
         setSelections(prop.selections || {});
         setLaborSelections(prop.labor_selections || {});
         setLayoutHistory({
@@ -467,20 +429,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
       .catch(() => {});
   }, [selections, laborSelections, plotSizeSqft, plot.region, plot.currency]);
 
-  const updatePlotField = (field, value) => {
-    setPlot((p) => {
-      const next = { ...p, [field]: value };
-      if (field === "country") {
-        const match = COUNTRY_TO_REGION_CURRENCY[value.trim().toLowerCase()];
-        if (match) {
-          next.region = match.region;
-          next.currency = match.currency;
-          next.unit_system = match.unit_system;
-        }
-      }
-      return next;
-    });
-  };
+  const updatePlotField = (field, value) => setPlot((p) => ({ ...p, [field]: value }));
 
   const addMasterPlanElement = () => {
     const usedTypes = new Set((plot.master_plan_elements || []).map((el) => el.type));
@@ -1170,15 +1119,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
               <input value={plot.city} onChange={(e) => updatePlotField("city", e.target.value)} placeholder="e.g. Hyderabad" />
             </div>
             <div className="cs-field">
-              <label>Country</label>
-              <input
-                value={plot.country}
-                onChange={(e) => updatePlotField("country", e.target.value)}
-                placeholder="e.g. India"
-                title="Typing a recognized country (India, Thailand, USA) automatically sets the matching region, currency, and unit system below"
-              />
-            </div>
-            <div className="cs-field">
               <label>Region</label>
               <select value={plot.region} onChange={(e) => updatePlotField("region", e.target.value)}>
                 {REGIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -1191,30 +1131,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
               </select>
             </div>
             <div className="cs-field">
-              <label>Unit System</label>
-              <select value={plot.unit_system} onChange={(e) => updatePlotField("unit_system", e.target.value)}>
-                {UNIT_SYSTEMS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
+              <label>Plot Length (ft)</label>
+              <input type="number" min="1" value={plot.plot_length_ft} onChange={(e) => updatePlotField("plot_length_ft", Number(e.target.value))} />
             </div>
             <div className="cs-field">
-              <label>Plot Length ({lengthUnitLabel(plot.unit_system)})</label>
-              <input
-                type="number"
-                min="0.1"
-                step={plot.unit_system === "metric" ? "0.01" : "1"}
-                value={feetToDisplay(plot.plot_length_ft, plot.unit_system)}
-                onChange={(e) => updatePlotField("plot_length_ft", displayToFeet(Number(e.target.value), plot.unit_system))}
-              />
-            </div>
-            <div className="cs-field">
-              <label>Plot Width ({lengthUnitLabel(plot.unit_system)})</label>
-              <input
-                type="number"
-                min="0.1"
-                step={plot.unit_system === "metric" ? "0.01" : "1"}
-                value={feetToDisplay(plot.plot_width_ft, plot.unit_system)}
-                onChange={(e) => updatePlotField("plot_width_ft", displayToFeet(Number(e.target.value), plot.unit_system))}
-              />
+              <label>Plot Width (ft)</label>
+              <input type="number" min="1" value={plot.plot_width_ft} onChange={(e) => updatePlotField("plot_width_ft", Number(e.target.value))} />
             </div>
             <div className="cs-field">
               <label>Road-Facing Side</label>
@@ -1236,7 +1158,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
               </select>
             </div>
           </div>
-          <p className="studio-subtext">Plot area: <strong>{sqftToDisplayArea(plotSizeSqft, plot.unit_system)} {areaUnitLabel(plot.unit_system)}</strong></p>
+          <p className="studio-subtext">Plot area: <strong>{plotSizeSqft} sqft</strong></p>
 
           <h4 className="cs-list-heading">Surrounding Site Context</h4>
           <p className="studio-subtext">
@@ -1276,7 +1198,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           </div>
           <p className="studio-subtext">
             Pick one material per category — check off your preferred supplier(s) for reference,
-            and see exactly what each option adds to your {sqftToDisplayArea(plotSizeSqft, plot.unit_system)} {areaUnitLabel(plot.unit_system)} plot's total.
+            and see exactly what each option adds to your {plotSizeSqft} sqft plot's total.
           </p>
           {!catalog && <p className="studio-subtext">Loading catalog...</p>}
           {catalog && Object.entries(catalog).map(([catId, cat]) => {
@@ -1612,7 +1534,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
               <h4 className="cs-list-heading">Site Elements</h4>
               <div className="cs-room-table-scroll">
               <div className="cs-room-row cs-room-row-header">
-                <span>Element</span><span>Length ({lengthUnitLabel(plot.unit_system)}) / Style</span><span>Width ({lengthUnitLabel(plot.unit_system)}) / Thickness</span><span>Fill / Line color</span><span>Border style</span><span>Border color</span><span>Border thickness</span><span></span>
+                <span>Element</span><span>Length (ft) / Style</span><span>Width (ft) / Thickness</span><span>Fill / Line color</span><span>Border style</span><span>Border color</span><span>Border thickness</span><span></span>
               </div>
               <div className="cs-scrollable-list">
                 {siteElements.map((el) => {
@@ -1651,13 +1573,13 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                         <>
                           <input
                             type="number"
-                            value={feetToDisplay(el.length, plot.unit_system)}
-                            onChange={(e) => updateElement(el._key, "length", displayToFeet(Number(e.target.value), plot.unit_system))}
+                            value={el.length}
+                            onChange={(e) => updateElement(el._key, "length", Number(e.target.value))}
                           />
                           <input
                             type="number"
-                            value={feetToDisplay(el.width, plot.unit_system)}
-                            onChange={(e) => updateElement(el._key, "width", displayToFeet(Number(e.target.value), plot.unit_system))}
+                            value={el.width}
+                            onChange={(e) => updateElement(el._key, "width", Number(e.target.value))}
                           />
                         </>
                       )}
@@ -1720,7 +1642,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           <h4 className="cs-list-heading">Rooms</h4>
           <div className="cs-room-table-scroll">
           <div className="cs-room-row cs-room-row-header">
-            <span>Room name</span><span>Length ({lengthUnitLabel(plot.unit_system)})</span><span>Width ({lengthUnitLabel(plot.unit_system)})</span><span>Fill</span><span>Border style</span><span>Border color</span><span>Thickness</span><span></span>
+            <span>Room name</span><span>Length (ft)</span><span>Width (ft)</span><span>Fill</span><span>Border style</span><span>Border color</span><span>Thickness</span><span></span>
           </div>
           <div className="cs-scrollable-list">
             {rooms.map((room) => (
@@ -1730,18 +1652,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 onClick={() => setSelectedKeys([room._key])}
               >
                 <input placeholder="Kitchen" value={room.name} onChange={(e) => updateRoom(room._key, "name", e.target.value)} />
-                <input
-                  type="number"
-                  placeholder={`Length (${lengthUnitLabel(plot.unit_system)})`}
-                  value={feetToDisplay(room.length, plot.unit_system)}
-                  onChange={(e) => updateRoom(room._key, "length", displayToFeet(Number(e.target.value), plot.unit_system))}
-                />
-                <input
-                  type="number"
-                  placeholder={`Width (${lengthUnitLabel(plot.unit_system)})`}
-                  value={feetToDisplay(room.width, plot.unit_system)}
-                  onChange={(e) => updateRoom(room._key, "width", displayToFeet(Number(e.target.value), plot.unit_system))}
-                />
+                <input type="number" placeholder="Length (ft)" value={room.length} onChange={(e) => updateRoom(room._key, "length", Number(e.target.value))} />
+                <input type="number" placeholder="Width (ft)" value={room.width} onChange={(e) => updateRoom(room._key, "width", Number(e.target.value))} />
                 <div className="cs-room-color-swatches" onClick={(e) => e.stopPropagation()}>
                   {ROOM_COLOR_PALETTE.map((color) => (
                     <button
@@ -1937,7 +1849,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           {!result && (
             <>
               <p className="studio-subtext">
-                Plot: {feetToDisplay(plot.plot_length_ft, plot.unit_system)}{lengthUnitLabel(plot.unit_system)} × {feetToDisplay(plot.plot_width_ft, plot.unit_system)}{lengthUnitLabel(plot.unit_system)} in {plot.city || "your city"} ·{" "}
+                Plot: {plot.plot_length_ft}ft × {plot.plot_width_ft}ft in {plot.city || "your city"} ·{" "}
                 {Object.keys(selections).length} material{Object.keys(selections).length === 1 ? "" : "s"} selected ·{" "}
                 {rooms.filter((r) => r.name.trim()).length} room(s)
               </p>
