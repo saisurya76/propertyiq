@@ -171,13 +171,20 @@ function App() {
   const [currency, setCurrency] = useState(urlCountryContext ? urlCountryContext.currency : "USD");
 
   // Keep the URL bar in sync with the admin view, and support the browser
-  // back/forward buttons.
+  // back/forward buttons. A real reported bug: this previously always
+  // computed "/" as the target for any non-admin view, which rewrote
+  // /th back to / the instant the app mounted (studioView starts as
+  // "main"), silently stripping the country code from the address bar
+  // and losing it entirely if the page was then reloaded. Now preserves
+  // an active URL country context (e.g. /th) as the legitimate URL for
+  // the main view, instead of unconditionally forcing "/".
   useEffect(() => {
-    const targetPath = studioView === "admin" ? "/admin" : "/";
+    const mainPath = urlCountryContext ? `/${urlCountryContext.code}` : "/";
+    const targetPath = studioView === "admin" ? "/admin" : mainPath;
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, "", targetPath);
     }
-  }, [studioView]);
+  }, [studioView, urlCountryContext]);
 
   useEffect(() => {
     const onPopState = () => {

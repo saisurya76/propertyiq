@@ -3,6 +3,7 @@ import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
+import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
 
 function AssessmentResult({
   result,
@@ -28,6 +29,8 @@ function AssessmentResult({
   };
   const currencyInfo = CURRENCY_BY_COUNTRY[(formData.country || "").trim().toLowerCase()]
     || { code: "USD", symbol: "$", locale: "en-US" };
+
+  const governmentValueLabel = getGovernmentValueLabel(formData.country);
 
   const formatCurrency = (value) => {
     if (value === null || value === undefined || isNaN(value)) return `${currencyInfo.symbol}0`;
@@ -397,7 +400,7 @@ function AssessmentResult({
           </div>
 
           <div className="finding-item">
-            <strong>Government Guidance</strong>
+            <strong>{governmentValueLabel.shortLabel}</strong>
             <p>
               {formatPerSqft(result.governmentRatePerUnit)}
             </p>
@@ -525,7 +528,7 @@ function AssessmentResult({
         </div>
 
         <div className="finding-item">
-          <strong>Government Guidance Rate</strong>
+          <strong>{governmentValueLabel.label}</strong>
           <p>
             {formatPerSqft(result.governmentRatePerUnit)}
           </p>
@@ -939,7 +942,7 @@ function AssessmentResult({
 
     PropertyIQ Fair Value is derived using the user-provided market average together with 
     applicable valuation models such as rental yield when sufficient 
-    evidence is available. Government Guidance is reported separately as regulatory 
+    evidence is available. {governmentValueLabel.shortLabel} is reported separately as regulatory 
     reference information and is not used to determine Fair Value.
 
     <br /><br />

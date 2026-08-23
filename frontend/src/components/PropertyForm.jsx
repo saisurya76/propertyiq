@@ -1,9 +1,13 @@
+import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
+
 function PropertyForm({
   formData,
   handleChange,
   generateAssessment,
   loading
 }) {
+  const governmentValueLabel = getGovernmentValueLabel(formData.country);
+
   return (
     <div className="card">
 
@@ -115,13 +119,14 @@ function PropertyForm({
 
           <div className="form-field">
             <label>
-             Government Guidance *
+             {governmentValueLabel.label} *
             </label>
 
             <input
               type="number"
               name="governmentGuidance"
-              placeholder="Official guidance value per selected area unit"
+              placeholder={`${governmentValueLabel.shortLabel} per selected area unit`}
+              title={governmentValueLabel.helpText}
               value={formData.governmentGuidance}
               onChange={handleChange}
             />
