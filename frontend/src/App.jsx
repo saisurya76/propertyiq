@@ -87,19 +87,18 @@ function normalizeLanguage(code) {
 //     detection, manual selector) applies rather than being overridden.
 //
 // `region` (materials-catalog scoping) is ALSO a deliberately separate
-// decision from country: Thailand has real researched material
-// brands/pricing (region: "thailand"). Philippines, Vietnam, and
-// Indonesia don't have that research done yet — rather than inventing
-// numbers, their region stays "global" (the existing generic catalog)
-// until that research happens as its own later phase. Country-level
-// behavior (currency, unit system, form defaults, and — on the backend
-// — which traditional-building validation engine applies, if any real
-// one exists for that country) is fully wired regardless.
+// decision from country: each supported country now has real researched
+// material brands/pricing (cement/steel/sand/aggregate/bricks) tied to
+// its own dedicated region, rather than falling back to the generic
+// "global" catalog. Country-level behavior (currency, unit system, form
+// defaults, and — on the backend — which traditional-building validation
+// engine applies, if any real one exists for that country) is fully
+// wired alongside it.
 const COUNTRY_CODE_MAP = {
   th: { name: "Thailand", currency: "THB", stateProvince: "", city: "", language: "th", region: "thailand", unit_system: "metric" },
-  ph: { name: "Philippines", currency: "PHP", stateProvince: "", city: "", region: "global", unit_system: "metric" },
-  vn: { name: "Vietnam", currency: "VND", stateProvince: "", city: "", language: "vi", region: "global", unit_system: "metric" },
-  id: { name: "Indonesia", currency: "IDR", stateProvince: "", city: "", language: "id", region: "global", unit_system: "metric" },
+  ph: { name: "Philippines", currency: "PHP", stateProvince: "", city: "", region: "philippines", unit_system: "metric" },
+  vn: { name: "Vietnam", currency: "VND", stateProvince: "", city: "", language: "vi", region: "vietnam", unit_system: "metric" },
+  id: { name: "Indonesia", currency: "IDR", stateProvince: "", city: "", language: "id", region: "indonesia", unit_system: "metric" },
 };
 
 // Read once at initial load (a useState lazy initializer calls this

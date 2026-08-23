@@ -548,3 +548,68 @@ def test_thailand_material_options_have_real_data():
     bricks = next(o for o in result["bricks"]["options"] if o["id"] == "aac_block_thailand")
     assert bricks["base_cost_usd"] > 0
     assert any("Q-CON" in s for s in bricks["suppliers"])
+
+
+def test_vietnam_indonesia_philippines_materials_have_real_data():
+    from backend.construction_studio import get_catalog
+
+    vn = get_catalog(region="vietnam")
+    cement_vn = next(o for o in vn["cement"]["options"] if o["id"] == "opc_vietnam")
+    assert cement_vn["base_cost_usd"] > 0
+    aggregate_vn = next(o for o in vn["aggregate"]["options"] if o["id"] == "coarse_aggregate_vietnam")
+    # Regression guard for a real caught bug: an earlier draft used a
+    # misparsed/anomalous source figure that produced an aggregate cost
+    # wildly inconsistent with every other category and country (a >10x
+    # outlier) — this asserts it stays in a sane range going forward.
+    assert 0.1 < aggregate_vn["base_cost_usd"] < 1.0
+
+    idn = get_catalog(region="indonesia")
+    cement_id = next(o for o in idn["cement"]["options"] if o["id"] == "opc_indonesia")
+    assert cement_id["base_cost_usd"] > 0
+    assert "Semen Merah Putih" in cement_id["suppliers"][0]
+
+    ph = get_catalog(region="philippines")
+    cement_ph = next(o for o in ph["cement"]["options"] if o["id"] == "opc_philippines")
+    assert cement_ph["base_cost_usd"] > 0
+    hollow_block = next(o for o in ph["bricks"]["options"] if o["id"] == "hollow_block_philippines")
+    assert hollow_block["base_cost_usd"] > 0
+
+    # Each new region is properly scoped -- no cross-contamination with
+    # India/Thailand's dedicated options.
+    for region_name, opt_id in [("vietnam", "opc_vietnam"), ("indonesia", "opc_indonesia"), ("philippines", "opc_philippines")]:
+        result = get_catalog(region=region_name)
+        cement_ids = {o["id"] for o in result["cement"]["options"]}
+        assert cement_ids == {opt_id}
+
+
+def test_vnd_idr_php_fx_rates_are_not_missing():
+    """A real, critical bug caught while verifying the new countries' cost
+    estimates: VND/IDR/PHP were entirely absent from fx_rates_usd_base,
+    silently defaulting to a 1.0 fallback rate (treating 1 USD = 1 unit
+    of local currency) — this produced absurdly under-scaled cost
+    estimates (an entire house's cement+steel+bricks totaling under $1
+    equivalent). Caught by actually running a real estimate and noticing
+    the output was nonsensical, not by assuming the materials data alone
+    was sufficient."""
+    from backend.construction_studio import get_fx_rates
+
+    rates = get_fx_rates()
+    for currency in ("VND", "IDR", "PHP"):
+        assert currency in rates
+        assert rates[currency] > 10  # all three are genuinely high-denomination currencies vs USD
+
+
+def test_new_country_cost_estimates_are_realistic():
+    from backend.construction_studio import estimate_cost
+
+    # A 1200 sqft home's cement+steel+bricks alone should be in the
+    # thousands of USD-equivalent, not under $1 (the exact failure mode
+    # the missing fx-rate bug produced).
+    for region, currency, selections in [
+        ("vietnam", "VND", {"cement": "opc_vietnam", "steel": "rebar_vietnam", "bricks": "clay_brick_vietnam"}),
+        ("indonesia", "IDR", {"cement": "opc_indonesia", "steel": "rebar_indonesia", "bricks": "aac_block_indonesia"}),
+        ("philippines", "PHP", {"cement": "opc_philippines", "steel": "rebar_philippines", "bricks": "hollow_block_philippines"}),
+    ]:
+        result = estimate_cost(plot_size_sqft=1200, selections=selections, region=region, currency=currency)
+        usd_equivalent = result["grand_total_usd"]
+        assert 3000 < usd_equivalent < 30000, f"{region}: unrealistic total (${usd_equivalent:.2f} USD-equivalent)"

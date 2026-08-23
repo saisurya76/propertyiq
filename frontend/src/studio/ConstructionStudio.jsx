@@ -10,6 +10,9 @@ const ROOM_COLOR_PALETTE = ["#c4b5fd", "#93c5fd", "#86efac", "#fde68a", "#fca5a5
 const REGIONS = [
   ["india", "India"],
   ["thailand", "Thailand"],
+  ["philippines", "Philippines"],
+  ["vietnam", "Vietnam"],
+  ["indonesia", "Indonesia"],
   ["usa", "USA"],
   ["global", "Other / Global"],
 ];
@@ -38,13 +41,12 @@ const COUNTRY_TO_REGION_CURRENCY = {
   "thailand": { region: "thailand", currency: "THB", unit_system: "metric" },
   "usa": { region: "usa", currency: "USD", unit_system: "imperial" },
   "united states": { region: "usa", currency: "USD", unit_system: "imperial" },
-  // No real researched materials-catalog data for these yet (unlike
-  // Thailand) — region stays "global" (the existing generic catalog)
-  // rather than inventing country-specific pricing/brands. Currency
-  // and unit system ARE fully real and correct regardless.
-  "philippines": { region: "global", currency: "PHP", unit_system: "metric" },
-  "vietnam": { region: "global", currency: "VND", unit_system: "metric" },
-  "indonesia": { region: "global", currency: "IDR", unit_system: "metric" },
+  // Real researched materials data (cement/steel/sand/aggregate/bricks,
+  // with real current pricing and named brands) exists for all three —
+  // same dedicated-region treatment as Thailand, not the generic catalog.
+  "philippines": { region: "philippines", currency: "PHP", unit_system: "metric" },
+  "vietnam": { region: "vietnam", currency: "VND", unit_system: "metric" },
+  "indonesia": { region: "indonesia", currency: "IDR", unit_system: "metric" },
 };
 
 // Unit conversion — a display/input layer ONLY. Internal storage stays

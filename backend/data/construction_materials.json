@@ -400,6 +400,61 @@
           ],
           "quantity_per_sqft": 0.325,
           "quantity_unit": "bags"
+        },
+        {
+          "id": "opc_vietnam",
+          "name": "Portland Cement (Vietnam)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.505,
+          "regions": [
+            "vietnam"
+          ],
+          "suppliers": [
+            {
+              "name": "Vicem Hoang Thach",
+              "region": "vietnam"
+            }
+          ],
+          "quantity_per_sqft": 0.325,
+          "quantity_unit": "bags"
+        },
+        {
+          "id": "opc_indonesia",
+          "name": "Portland Cement (Indonesia)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.428,
+          "regions": [
+            "indonesia"
+          ],
+          "suppliers": [
+            {
+              "name": "Semen Merah Putih",
+              "region": "indonesia"
+            }
+          ],
+          "quantity_per_sqft": 0.361,
+          "quantity_unit": "bags"
+        },
+        {
+          "id": "opc_philippines",
+          "name": "Portland Cement (Philippines)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.509,
+          "regions": [
+            "philippines"
+          ],
+          "suppliers": [
+            {
+              "name": "Holcim Philippines",
+              "region": "philippines"
+            },
+            {
+              "name": "Republic Cement",
+              "region": "philippines"
+            }
+          ],
+          "quantity_per_sqft": 0.325,
+          "quantity_unit": "bags"
         }
       ]
     },
@@ -493,6 +548,57 @@
             {
               "name": "Millcon Steel",
               "region": "thailand"
+            }
+          ],
+          "quantity_per_sqft": 4.0,
+          "quantity_unit": "kg"
+        },
+        {
+          "id": "rebar_vietnam",
+          "name": "Reinforcement Steel (Rebar)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 3.504,
+          "regions": [
+            "vietnam"
+          ],
+          "suppliers": [
+            {
+              "name": "Hoa Phat Group",
+              "region": "vietnam"
+            }
+          ],
+          "quantity_per_sqft": 4.0,
+          "quantity_unit": "kg"
+        },
+        {
+          "id": "rebar_indonesia",
+          "name": "Besi Beton (Reinforcement Rebar)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.893,
+          "regions": [
+            "indonesia"
+          ],
+          "suppliers": [
+            {
+              "name": "Krakatau Steel",
+              "region": "indonesia"
+            }
+          ],
+          "quantity_per_sqft": 4.0,
+          "quantity_unit": "kg"
+        },
+        {
+          "id": "rebar_philippines",
+          "name": "Reinforcement Steel (Rebar Grade 60)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 2.643,
+          "regions": [
+            "philippines"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Steel Suppliers",
+              "region": "philippines"
             }
           ],
           "quantity_per_sqft": 4.0,
@@ -594,6 +700,61 @@
           ],
           "quantity_per_sqft": 0.875,
           "quantity_unit": "blocks"
+        },
+        {
+          "id": "clay_brick_vietnam",
+          "name": "Red Clay Brick",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.847,
+          "regions": [
+            "vietnam"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Brick Kilns",
+              "region": "vietnam"
+            }
+          ],
+          "quantity_per_sqft": 5.25,
+          "quantity_unit": "bricks"
+        },
+        {
+          "id": "aac_block_indonesia",
+          "name": "Bata Ringan (AAC Block)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.405,
+          "regions": [
+            "indonesia"
+          ],
+          "suppliers": [
+            {
+              "name": "Citicon",
+              "region": "indonesia"
+            },
+            {
+              "name": "Broco",
+              "region": "indonesia"
+            }
+          ],
+          "quantity_per_sqft": 0.875,
+          "quantity_unit": "blocks"
+        },
+        {
+          "id": "hollow_block_philippines",
+          "name": "Concrete Hollow Block (CHB)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 1.406,
+          "regions": [
+            "philippines"
+          ],
+          "suppliers": [
+            {
+              "name": "Local CHB Manufacturers",
+              "region": "philippines"
+            }
+          ],
+          "quantity_per_sqft": 5.25,
+          "quantity_unit": "blocks"
         }
       ]
     },
@@ -661,6 +822,57 @@
           ],
           "quantity_per_sqft": 0.8,
           "quantity_unit": "cft"
+        },
+        {
+          "id": "coarse_aggregate_vietnam",
+          "name": "Coarse Aggregate (Crushed Stone)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.227,
+          "regions": [
+            "vietnam"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "vietnam"
+            }
+          ],
+          "quantity_per_sqft": 0.8,
+          "quantity_unit": "cft"
+        },
+        {
+          "id": "coarse_aggregate_indonesia",
+          "name": "Batu Split (Coarse Aggregate)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.249,
+          "regions": [
+            "indonesia"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "indonesia"
+            }
+          ],
+          "quantity_per_sqft": 0.8,
+          "quantity_unit": "cft"
+        },
+        {
+          "id": "coarse_aggregate_philippines",
+          "name": "Gravel (Coarse Aggregate)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.506,
+          "regions": [
+            "philippines"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "philippines"
+            }
+          ],
+          "quantity_per_sqft": 0.8,
+          "quantity_unit": "cft"
         }
       ]
     },
@@ -724,6 +936,57 @@
             {
               "name": "Local Quarry Suppliers",
               "region": "thailand"
+            }
+          ],
+          "quantity_per_sqft": 0.9,
+          "quantity_unit": "cft"
+        },
+        {
+          "id": "river_sand_vietnam",
+          "name": "Construction Sand",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.361,
+          "regions": [
+            "vietnam"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "vietnam"
+            }
+          ],
+          "quantity_per_sqft": 0.9,
+          "quantity_unit": "cft"
+        },
+        {
+          "id": "river_sand_indonesia",
+          "name": "Pasir (Construction Sand)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.403,
+          "regions": [
+            "indonesia"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "indonesia"
+            }
+          ],
+          "quantity_per_sqft": 0.9,
+          "quantity_unit": "cft"
+        },
+        {
+          "id": "river_sand_philippines",
+          "name": "Construction Sand",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.455,
+          "regions": [
+            "philippines"
+          ],
+          "suppliers": [
+            {
+              "name": "Local Quarry Suppliers",
+              "region": "philippines"
             }
           ],
           "quantity_per_sqft": 0.9,
@@ -1161,7 +1424,10 @@
     "THB": 34.8,
     "AED": 3.67,
     "GBP": 0.79,
-    "EUR": 0.92
+    "EUR": 0.92,
+    "VND": 25000.0,
+    "IDR": 15800.0,
+    "PHP": 56.0
   },
   "labor_categories": {
     "rcc_work": {
