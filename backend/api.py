@@ -1124,7 +1124,17 @@ async def dodo_webhook(request: Request):
                 "webhook-timestamp": request.headers.get("webhook-timestamp", ""),
             },
         )
-    except Exception:
+    except Exception as exc:
+        # Logged with the actual exception, not a bare 401 — a real,
+        # important diagnostic gap: the specific reason this can fail
+        # (wrong/malformed webhook secret, missing headers, a genuinely
+        # invalid signature) all looked identical from the outside as
+        # "401 Unauthorized" with no way to tell them apart from Render's
+        # logs alone. This traces the real, installed dodopayments/
+        # standardwebhooks library source directly (not guessed) to
+        # confirm exactly what unwrap()/verify() can raise here, so this
+        # log line will show the genuine cause on the next attempt.
+        print(f"Dodo webhook signature verification failed: {type(exc).__name__}: {exc}")
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     event_type = getattr(event, "type", None) or event.get("type")
