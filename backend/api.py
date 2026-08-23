@@ -1094,7 +1094,23 @@ def insight_status(report_id: str, user_email: str = Depends(get_current_user_em
 async def dodo_webhook(request: Request):
     """Handles subscription lifecycle + one-time Insight add-on payments.
     Verifies the Standard Webhooks signature via Dodo's SDK before trusting
-    any payload, per https://docs.dodopayments.com/developer-resources/webhooks"""
+    any payload, per https://docs.dodopayments.com/developer-resources/webhooks
+
+    A real, confirmed gap this closes: checkout-session metadata
+    (tier_id/user_email, passed when the checkout was first created) is
+    not guaranteed to land directly on the subscription webhook's data
+    object — a real, working Dodo integration example (retrieving the
+    full subscription via the API inside the webhook handler, rather
+    than trusting the webhook payload alone) confirmed this is a real
+    risk, not a hypothetical one. This was the actual cause of a real
+    reported failure: a test subscription payment succeeded on Dodo's
+    side, but the tier never activated in PropertyIQ, because tier_id/
+    user_email came back empty from the webhook payload's metadata.
+    Falls back to fetching the full subscription object via the API and
+    deriving both values from it (customer email directly; tier_id via
+    a reverse lookup against TIER_DODO_PRODUCT_IDS using the
+    subscription's product_id, which is guaranteed to be present on any
+    subscription object regardless of whether metadata propagated)."""
 
     webhook_client = get_dodo_webhook_client()
     raw_body = await request.body()
@@ -1123,6 +1139,21 @@ async def dodo_webhook(request: Request):
     dodo_payment_id = getattr(data, "payment_id", None) or (
         data.get("payment_id") if isinstance(data, dict) else None
     )
+
+    if event_type in ("subscription.active", "subscription.renewed") and dodo_subscription_id and not (tier_id and user_email):
+        try:
+            subscription = webhook_client.subscriptions.retrieve(dodo_subscription_id)
+            sub_metadata = getattr(subscription, "metadata", None) or {}
+            if not tier_id:
+                sub_product_id = getattr(subscription, "product_id", None)
+                tier_id = sub_metadata.get("tier_id") or next(
+                    (t for t, pid in TIER_DODO_PRODUCT_IDS.items() if pid and pid == sub_product_id), None
+                )
+            if not user_email:
+                customer = getattr(subscription, "customer", None)
+                user_email = sub_metadata.get("user_email") or (getattr(customer, "email", None) if customer else None)
+        except Exception:
+            pass  # tier_id/user_email stay whatever they were; the condition below simply won't match
 
     if event_type in ("subscription.active", "subscription.renewed") and tier_id and user_email:
         upsert_subscription(

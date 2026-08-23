@@ -195,3 +195,57 @@ def test_admin_overview_returns_subscriptions_and_grants(monkeypatch):
     data = r.json()
     assert "tier_config" in data
     assert any(s["email"] == "adminoverviewsub@example.com" for s in data["subscriptions"])
+
+
+def test_webhook_falls_back_to_subscription_retrieval_when_metadata_missing():
+    """A real, confirmed root cause: checkout-session metadata (tier_id/
+    user_email) is not guaranteed to land directly on the subscription
+    webhook's data object — confirmed via a real, working Dodo
+    integration example that retrieves the full subscription via the
+    API inside the webhook handler rather than trusting the webhook
+    payload alone. This was the actual cause of a real reported failure:
+    a test subscription payment succeeded on Dodo's side, but the tier
+    never activated in PropertyIQ, because tier_id/user_email came back
+    empty from the webhook payload's own metadata."""
+    from unittest.mock import patch, MagicMock
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.subscription_store import get_subscription
+
+    client = TestClient(app)
+
+    # A webhook event with NO metadata on the data object at all --
+    # exactly the real failure mode -- only a bare subscription_id.
+    fake_event = MagicMock()
+    fake_event.type = "subscription.active"
+    fake_event.data = MagicMock()
+    fake_event.data.metadata = {}
+    fake_event.data.subscription_id = "sub_fallback_test_123"
+    fake_event.data.payment_id = None
+
+    # What retrieving the full subscription object returns -- customer
+    # email and product_id ARE reliably present here even when metadata
+    # wasn't on the webhook payload itself.
+    fake_subscription = MagicMock()
+    fake_subscription.metadata = {}
+    fake_subscription.product_id = "test_studio_starter_product_id"
+    fake_subscription.customer = MagicMock()
+    fake_subscription.customer.email = "webhook_fallback_test@example.com"
+
+    fake_webhook_client = MagicMock()
+    fake_webhook_client.webhooks.unwrap.return_value = fake_event
+    fake_webhook_client.subscriptions.retrieve.return_value = fake_subscription
+
+    with patch("backend.api.get_dodo_webhook_client", return_value=fake_webhook_client), \
+         patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_starter": "test_studio_starter_product_id"}):
+        response = client.post(
+            "/api/webhooks/dodo",
+            content=b"{}",
+            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+        )
+
+    assert response.status_code == 200
+    sub = get_subscription("webhook_fallback_test@example.com")
+    assert sub is not None
+    assert sub["tier_id"] == "studio_starter"
+    assert sub["status"] == "active"
