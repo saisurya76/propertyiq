@@ -305,6 +305,67 @@ function App() {
     return () => { cancelled = true; };
   }, [urlCountryContext]);
 
+  // Handles the redirect back from Dodo's hosted checkout for the
+  // one-time report-unlock payment — a real, confirmed gap this closes:
+  // there was no code at all handling ?payment=return before, so a user
+  // could pay and be redirected back to a page that gave no
+  // acknowledgment the payment happened at all. Polls the order-status
+  // endpoint a few times since the webhook that actually marks the
+  // order paid can take a moment to arrive after the redirect completes
+  // — genuinely still "processing" for a few seconds is a normal,
+  // expected state here, not a failure.
+  const [paymentReturnMessage, setPaymentReturnMessage] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentParam = params.get("payment");
+    const orderId = params.get("order_id");
+    if (!paymentParam || !orderId) return;
+
+    // Clean the query params from the URL immediately so a page reload
+    // doesn't re-trigger this same check against an already-resolved order.
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, "", cleanUrl);
+
+    if (paymentParam === "cancelled") {
+      setTimeout(() => setPaymentReturnMessage({ tone: "neutral", text: "Payment was cancelled — no charge was made." }), 0);
+      return;
+    }
+    if (paymentParam !== "return") return;
+
+    let cancelled = false;
+    const pollOrderStatus = async (attemptsLeft) => {
+      if (cancelled) return;
+      try {
+        const result = await studioApi.getOrderStatus(orderId);
+        if (cancelled) return;
+        if (result.status === "paid") {
+          setPaymentReturnMessage({ tone: "success", text: "Payment successful! Your report is unlocked." });
+          return;
+        }
+        if (result.status === "payment_failed") {
+          setPaymentReturnMessage({ tone: "error", text: "The payment didn't go through. Please try again." });
+          return;
+        }
+      } catch (error) {
+        console.warn("Couldn't check payment order status:", error);
+      }
+      if (attemptsLeft > 0) {
+        setTimeout(() => pollOrderStatus(attemptsLeft - 1), 1500);
+      } else {
+        setPaymentReturnMessage({
+          tone: "neutral",
+          text: "Still confirming your payment — this can take a few extra seconds. Refresh in a moment if this doesn't update.",
+        });
+      }
+    };
+
+    setTimeout(() => setPaymentReturnMessage({ tone: "neutral", text: "Confirming your payment..." }), 0);
+    pollOrderStatus(5);
+
+    return () => { cancelled = true; };
+  }, []);
+
   const changeLanguage = (event) => {
     const selected = event.target.value;
     setLanguage(selected);
@@ -649,6 +710,15 @@ function App() {
     <div className="app">
 
       <SessionBar onSignOut={() => handleSignOut("main")} />
+
+      {paymentReturnMessage && (
+        <div
+          className={`payment-return-banner payment-return-banner-${paymentReturnMessage.tone}`}
+          role="status"
+        >
+          {paymentReturnMessage.text}
+        </div>
+      )}
 
       <div className="language-bar" aria-label="Language selection">
         <label htmlFor="propertyiq-language">Language</label>

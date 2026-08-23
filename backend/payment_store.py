@@ -74,6 +74,37 @@ def attach_checkout_session(order_id: str, session_id: str) -> None:
         connection.commit()
 
 
+def mark_order_paid(order_id: str, dodo_payment_id: Optional[str] = None) -> None:
+    """Called from the Dodo webhook once payment.succeeded actually
+    fires for this order — a real, confirmed gap this closes: nothing
+    ever called this before, so a real successful payment left the
+    order stuck at "pending_payment" forever, with no way for the
+    frontend to know the payment went through."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE report_orders
+                SET status = 'paid', dodo_payment_id = %s, updated_at = %s
+                WHERE order_id = %s
+                """,
+                (dodo_payment_id, now, order_id),
+            )
+        connection.commit()
+
+
+def mark_order_failed(order_id: str) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE report_orders SET status = 'payment_failed', updated_at = %s WHERE order_id = %s",
+                (now, order_id),
+            )
+        connection.commit()
+
+
 def get_order(order_id: str) -> Optional[dict[str, Any]]:
     with get_connection() as connection:
         with connection.cursor() as cursor:

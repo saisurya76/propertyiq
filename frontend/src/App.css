@@ -1111,3 +1111,30 @@ body {
     font-size: 16px;
   }
 }
+
+.payment-return-banner {
+  max-width: 900px;
+  margin: 0 auto 16px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.payment-return-banner-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.payment-return-banner-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.payment-return-banner-neutral {
+  background: #faf7ff;
+  border: 1px solid #ede4fc;
+  color: #5c4f78;
+}

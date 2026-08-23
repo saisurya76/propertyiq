@@ -132,4 +132,7 @@ export const studioApi = {
 
   deleteProperty: (propertyId) =>
     apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
+
+  getOrderStatus: (orderId) =>
+    apiFetch(`/api/orders/${encodeURIComponent(orderId)}/status`),
 };

@@ -13,6 +13,9 @@ from backend.payment_store import (
     initialize_payment_store,
     create_order,
     attach_checkout_session,
+    get_order,
+    mark_order_paid,
+    mark_order_failed,
 )
 
 from backend.construction_store import (
@@ -811,6 +814,29 @@ def create_checkout(data: ReportCheckoutRequest):
     }
 
 
+@app.get("/api/orders/{order_id}/status")
+def get_order_status(order_id: str):
+    """Lets the frontend confirm what happened to a report-unlock
+    payment after the user is redirected back from Dodo's checkout — a
+    real, confirmed gap this closes: the frontend had no way at all to
+    check this before (no code even handled the ?payment=return
+    redirect), and the webhook alone isn't something a browser can wait
+    on synchronously, so a poll-able status endpoint is the correct
+    complement to it, not a replacement. Deliberately unauthenticated —
+    the order_id itself is the capability (a random UUID a
+    non-logged-in visitor's checkout redirect carries), matching how
+    this entire one-time-report flow was designed to not require an
+    account."""
+    order = get_order(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {
+        "order_id": order["order_id"],
+        "status": order["status"],
+        "updated_at": order["updated_at"],
+    }
+
+
 @app.post("/generate-report")
 def generate_report(data: PropertyRequest):
     
@@ -1081,6 +1107,9 @@ async def dodo_webhook(request: Request):
     dodo_subscription_id = getattr(data, "subscription_id", None) or (
         data.get("subscription_id") if isinstance(data, dict) else None
     )
+    dodo_payment_id = getattr(data, "payment_id", None) or (
+        data.get("payment_id") if isinstance(data, dict) else None
+    )
 
     if event_type in ("subscription.active", "subscription.renewed") and tier_id and user_email:
         upsert_subscription(
@@ -1095,6 +1124,15 @@ async def dodo_webhook(request: Request):
         set_status_by_dodo_id(dodo_subscription_id, "payment_failed")
     elif event_type == "payment.succeeded" and tier_id == "insight_addon" and metadata.get("report_id") and user_email:
         grant_insight_access(metadata["report_id"], user_email)
+    elif event_type == "payment.succeeded" and metadata.get("product") == "propertyiq_report" and metadata.get("order_id"):
+        # The one-time report-unlock payment — a real, confirmed gap this
+        # closes: this branch never existed at all before, so a
+        # successful payment for this specific product triggered zero
+        # backend action (the order stayed "pending_payment" forever,
+        # and nothing ever told the user their payment went through).
+        mark_order_paid(metadata["order_id"], dodo_payment_id=dodo_payment_id)
+    elif event_type == "payment.failed" and metadata.get("product") == "propertyiq_report" and metadata.get("order_id"):
+        mark_order_failed(metadata["order_id"])
 
     return {"received": True}
 
