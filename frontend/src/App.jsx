@@ -594,6 +594,49 @@ function App() {
     );
   }
 
+  // Deliberately separate from the language dropdown above (per an
+  // explicit earlier clarification: switching site/country is NOT the
+  // same axis as picking a display language) — this is the one and
+  // only place a user can move between country sites (/th, /vn, etc)
+  // WITHIN the app itself. Switching requires a real page reload
+  // (window.location.href, not client-side state) so the whole app
+  // restarts cleanly with the new country's currency/region/unit-system
+  // — the same safe, full-reset mechanism that already protects
+  // existing saved designs from being mislabeled by whatever site the
+  // browser happens to be on (see the ConstructionStudio hydration fix).
+  const SITE_OPTIONS = [
+    ["", "Global (no specific country)"],
+    ...Object.entries(COUNTRY_CODE_MAP).map(([code, info]) => [code, info.name]),
+  ];
+
+  const switchSite = (event) => {
+    const newCode = event.target.value;
+    const currentCode = urlCountryContext?.code || "";
+    if (newCode === currentCode) return;
+
+    const currentInfo = urlCountryContext || { name: "Global (no specific country)", currency: "USD (or your detected local currency)", region: "the general catalog", unit_system: "imperial (feet/sqft)" };
+    const newInfo = newCode ? COUNTRY_CODE_MAP[newCode] : { name: "Global (no specific country)", currency: "USD (or your detected local currency)", region: "the general catalog", unit_system: "imperial (feet/sqft)" };
+
+    const changes = [
+      `• Currency: ${currentInfo.currency} → ${newInfo.currency}`,
+      `• Materials & pricing catalog: ${currentInfo.region === "global" || !currentInfo.region ? "the general catalog" : currentInfo.name} → ${newInfo.region === "global" || !newInfo.region ? "the general catalog" : newInfo.name}`,
+      `• Measurement units: ${currentInfo.unit_system === "metric" ? "meters/sqm" : "feet/sqft"} → ${newInfo.unit_system === "metric" ? "meters/sqm" : "feet/sqft"}`,
+    ];
+    if (newInfo.language) {
+      changes.push(`• Page language will switch to ${LANGUAGE_OPTIONS.find(([v]) => v === newInfo.language)?.[1] || newInfo.language}`);
+    } else if (currentInfo.language) {
+      changes.push(`• Page language will no longer be forced — normal detection applies`);
+    }
+
+    const message =
+      `Switching to ${newInfo.name} will change:\n\n${changes.join("\n")}\n\n` +
+      `This starts a fresh session for ${newInfo.name} — it will NOT affect any of your existing saved designs from other countries, which keep their own saved settings regardless of what site you're on. Continue?`;
+
+    if (window.confirm(message)) {
+      window.location.href = newCode ? `/${newCode}` : "/";
+    }
+  };
+
   return (
     <div className="app">
 
@@ -609,6 +652,19 @@ function App() {
         >
           {LANGUAGE_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="site-switch-bar" aria-label="Country site selection" title="Switching sites changes currency, materials catalog, and units for THIS session going forward — it does not affect your existing saved designs from other countries">
+        <label htmlFor="propertyiq-site">Site</label>
+        <select
+          id="propertyiq-site"
+          value={urlCountryContext?.code || ""}
+          onChange={switchSite}
+        >
+          {SITE_OPTIONS.map(([code, label]) => (
+            <option key={code || "global"} value={code}>{label}</option>
           ))}
         </select>
       </div>

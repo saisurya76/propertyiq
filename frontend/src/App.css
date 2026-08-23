@@ -899,6 +899,35 @@ textarea:focus {
   font-size: 14px;
 }
 
+/* Deliberately styled distinctly from .language-bar (a slightly
+   different border tone) — these are two genuinely separate controls,
+   not visual twins, matching how they behave differently: switching
+   language only translates the page, switching site reloads the whole
+   app into a different country's currency/materials/units. */
+.site-switch-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.site-switch-bar label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5c4f78;
+}
+
+.site-switch-bar select {
+  width: auto;
+  min-width: 150px;
+  padding: 9px 34px 9px 12px;
+  border-radius: 10px;
+  background: #faf7ff;
+  border: 1px solid var(--violet-300, #cbb3f2);
+  font-size: 14px;
+}
+
 #google_translate_element {
   position: absolute;
   width: 1px;
