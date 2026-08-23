@@ -4,7 +4,7 @@ pydantic==2.13.4
 reportlab==5.0.0
 pillow==11.3.0
 
-dodopayments==1.108.1
+dodopayments[webhooks]==1.108.1
 ezdxf==1.4.2
 requests==2.32.3
 psycopg2-binary==2.9.10

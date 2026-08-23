@@ -333,3 +333,34 @@ def test_webhook_subscription_updated_with_non_active_status_does_not_activate()
     # never created via a real checkout in this test) -- the key
     # assertion is that it was NOT marked "active".
     assert sub is None or sub["status"] != "active"
+
+
+def test_standardwebhooks_dependency_is_actually_installed():
+    """A real, confirmed production bug this guards against: every one
+    of the webhook-handling tests above mocks get_dodo_webhook_client
+    entirely, so the REAL unwrap() call (and its internal
+    `from standardwebhooks import Webhook` import) never actually ran
+    in this test suite — completely invisible to it. requirements.txt
+    only listed `dodopayments`, not the `dodopayments[webhooks]` extra
+    that actually installs the standardwebhooks package unwrap()
+    depends on, so every real webhook in production failed at import
+    time with a 401, regardless of how correct the webhook secret was.
+    This test doesn't mock anything — it exercises the real,
+    unmocked import path directly, matching what actually broke."""
+    from dodopayments import DodoPayments
+
+    client = DodoPayments(bearer_token="fake", environment="test_mode", webhook_key="whsec_ZmFrZV9zZWNyZXRfZm9yX3Rlc3Rpbmc=")
+    try:
+        client.webhooks.unwrap(
+            "{}",
+            headers={"webhook-id": "wh_test", "webhook-signature": "v1,fake", "webhook-timestamp": "0"},
+        )
+    except Exception as exc:
+        # ANY exception other than the specific "you need to install
+        # dodopayments[webhooks]" import error is fine here — a stale
+        # timestamp or bad signature (which is exactly what this fake
+        # test data should produce) proves the real verification logic
+        # ran at all, which is the only thing this test needs to prove.
+        assert "install" not in str(exc).lower() and "webhooks]" not in str(exc), (
+            f"standardwebhooks dependency appears to be missing again: {type(exc).__name__}: {exc}"
+        )
