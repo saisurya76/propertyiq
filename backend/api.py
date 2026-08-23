@@ -1027,7 +1027,7 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": request.tier_id, "user_email": user_email},
-        return_url=f"{FRONTEND_URL}/studio?subscribed=1",
+        return_url=f"{FRONTEND_URL}/?subscribed=1",
     )
 
     upsert_subscription(
@@ -1071,10 +1071,23 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": "insight_addon", "report_id": request.report_id, "user_email": user_email},
-        return_url=f"{FRONTEND_URL}/report/{request.report_id}?insight=1",
+        return_url=f"{FRONTEND_URL}/?insight=1&report_id={request.report_id}",
     )
 
     return {"checkout_url": session.checkout_url if hasattr(session, "checkout_url") else session}
+
+
+@app.get("/api/insight/status/{report_id}")
+def insight_status(report_id: str, user_email: str = Depends(get_current_user_email)):
+    """Lets the frontend confirm the Insight Add-on payment actually went
+    through after returning from Dodo's checkout — a real, confirmed gap
+    this closes alongside the subscription and report-unlock flows: the
+    return_url previously pointed at /report/{report_id}?insight=1, a
+    path this SPA has no route for at all, and nothing on the frontend
+    read the insight=1 query param either. Authenticated (unlike the
+    report-unlock order-status endpoint) since insight access is tied to
+    a specific logged-in account, not a bare capability token."""
+    return {"report_id": report_id, "unlocked": has_insight_access(report_id, user_email)}
 
 
 @app.post("/api/webhooks/dodo")

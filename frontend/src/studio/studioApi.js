@@ -135,4 +135,7 @@ export const studioApi = {
 
   getOrderStatus: (orderId) =>
     apiFetch(`/api/orders/${encodeURIComponent(orderId)}/status`),
+
+  getInsightStatus: (reportId) =>
+    apiFetch(`/api/insight/status/${encodeURIComponent(reportId)}`),
 };

@@ -89,3 +89,35 @@ def test_insight_grant_is_per_user_not_global():
     r = client.get("/api/similar-properties/rep_shared", headers=other_headers,
                     params={"city": "Hyderabad", "property_type": "Apartment"})
     assert r.status_code == 403
+
+
+def test_insight_status_endpoint_reflects_grant():
+    """Real, confirmed gap this closes: the Insight Add-on's checkout
+    return_url previously pointed at /report/{report_id}?insight=1, a
+    path this SPA has no route for, with zero frontend code reading the
+    insight=1 param either — a user could pay and see no acknowledgment
+    at all. This status endpoint lets the frontend poll for the result."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.insight_store import grant_insight_access
+
+    client = TestClient(app)
+    email = "insight_status_test@example.com"
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+
+    before = client.get("/api/insight/status/rep_status_test", headers=headers)
+    assert before.status_code == 200
+    assert before.json()["unlocked"] is False
+
+    grant_insight_access("rep_status_test", email)
+
+    after = client.get("/api/insight/status/rep_status_test", headers=headers)
+    assert after.status_code == 200
+    assert after.json()["unlocked"] is True
+
+    # Requires auth
+    no_auth = client.get("/api/insight/status/rep_status_test")
+    assert no_auth.status_code == 401

@@ -366,6 +366,84 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
+  // Same gap, same fix, for the subscription and Insight Add-on
+  // checkout flows — both previously redirected to a path this SPA has
+  // no route for at all (/studio and /report/{id}), with zero frontend
+  // code reading either return query param, so a real, successful
+  // payment for either one gave the user no acknowledgment whatsoever.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("subscribed") === "1") {
+      window.history.replaceState({}, "", window.location.pathname);
+      let cancelled = false;
+      const pollSubscription = async (attemptsLeft) => {
+        if (cancelled) return;
+        try {
+          const result = await studioApi.getStatus();
+          if (cancelled) return;
+          if (result.tier_id) {
+            setPaymentReturnMessage({ tone: "success", text: `Subscribed! Your ${result.tier_id.replace(/_/g, " ")} plan is now active.` });
+            return;
+          }
+        } catch (error) {
+          console.warn("Couldn't check subscription status:", error);
+        }
+        if (attemptsLeft > 0) {
+          setTimeout(() => pollSubscription(attemptsLeft - 1), 1500);
+        } else {
+          setPaymentReturnMessage({
+            tone: "neutral",
+            text: "Still confirming your subscription — this can take a few extra seconds. Refresh in a moment if this doesn't update.",
+          });
+        }
+      };
+      setTimeout(() => setPaymentReturnMessage({ tone: "neutral", text: "Confirming your subscription..." }), 0);
+      pollSubscription(5);
+      return () => { cancelled = true; };
+    }
+
+    if (params.get("insight") === "1") {
+      const reportId = params.get("report_id");
+      window.history.replaceState({}, "", window.location.pathname);
+      if (!reportId) return;
+      let cancelled = false;
+      const pollInsight = async (attemptsLeft) => {
+        if (cancelled) return;
+        try {
+          const result = await studioApi.getInsightStatus(reportId);
+          if (cancelled) return;
+          if (result.unlocked) {
+            // A known, honest limitation, not fully solved here: the
+            // original computed report lived only in React state and
+            // doesn't survive the full page reload checkout requires,
+            // so there's no way to redisplay it automatically —
+            // re-submitting the same property form will show it again,
+            // now correctly unlocked.
+            setPaymentReturnMessage({
+              tone: "success",
+              text: "Payment successful! Similar-property insights are unlocked — re-run your property assessment to see them.",
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn("Couldn't check insight status:", error);
+        }
+        if (attemptsLeft > 0) {
+          setTimeout(() => pollInsight(attemptsLeft - 1), 1500);
+        } else {
+          setPaymentReturnMessage({
+            tone: "neutral",
+            text: "Still confirming your payment — this can take a few extra seconds.",
+          });
+        }
+      };
+      setTimeout(() => setPaymentReturnMessage({ tone: "neutral", text: "Confirming your payment..." }), 0);
+      pollInsight(5);
+      return () => { cancelled = true; };
+    }
+  }, []);
+
   const changeLanguage = (event) => {
     const selected = event.target.value;
     setLanguage(selected);
