@@ -271,6 +271,13 @@
   text-align: center;
 }
 
+.cs-cross-site-lock-banner {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+  text-align: left;
+}
+
 /* --- Construction Studio wizard --- */
 
 .cs-wizard {

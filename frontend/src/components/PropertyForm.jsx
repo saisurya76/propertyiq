@@ -1,4 +1,5 @@
 import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
+import { getCitiesForCountry } from "../utils/citiesByCountry";
 
 function PropertyForm({
   formData,
@@ -6,6 +7,7 @@ function PropertyForm({
   generateAssessment,
   loading
 }) {
+  const availableCities = getCitiesForCountry(formData.country, formData.city);
   const governmentValueLabel = getGovernmentValueLabel(formData.country);
 
   return (
@@ -47,13 +49,15 @@ function PropertyForm({
           <div className="form-field">
             <label>City *</label>
 
-            <input
+            <select
               name="city"
-               value={formData.city}
+              value={formData.city}
               onChange={handleChange}
-              placeholder="Hyderabad"
-              disabled
-            />
+            >
+              {availableCities.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="form-field">

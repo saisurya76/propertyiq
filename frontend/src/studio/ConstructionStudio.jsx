@@ -337,6 +337,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   const [propertyId, setPropertyId] = useState(null);
   const [propertyName, setPropertyName] = useState("Untitled Property");
   const [locked, setLocked] = useState(false);
+  const [crossSiteLockInfo, setCrossSiteLockInfo] = useState(null); // { designCountry, siteCountry } when locked due to a country mismatch, not an explicit save-time lock
   const [saveStatus, setSaveStatus] = useState(""); // transient "Saved" / error message
   const [saving, setSaving] = useState(false);
   const lastSavedSignatureRef = useRef(null); // used by autosave to detect genuine changes vs. no-op re-renders
@@ -429,7 +430,6 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
       .then((prop) => {
         setPropertyId(prop.property_id);
         setPropertyName(prop.name);
-        setLocked(prop.locked);
         // city/country/unit_system were previously never sent to the
         // backend at all (missing from PropertyPlotSpec), so they were
         // silently lost on every save — a real reported bug ("city is
@@ -469,6 +469,26 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           country: prop.plot_spec.country || "India",
           unit_system: prop.plot_spec.unit_system || "imperial",
         }));
+
+        // Cross-site lock: a design belonging to one country must not be
+        // editable from a mismatched site (an India design opened while
+        // on /vn, or vice versa) — the design itself, its currency, and
+        // its saved measurements only make sense in its own country's
+        // context, so editing it from elsewhere risks exactly the kind
+        // of unrelated-design corruption already fixed once before (see
+        // the country/unit_system fallback above). This is a SESSION-
+        // LEVEL, in-memory lock only — never written back to the
+        // database — so the same design becomes editable again normally
+        // the moment it's opened from its own matching site, regardless
+        // of this check. The design's own explicitly-saved `locked` flag
+        // (a real, permanent lock set via the Lock button) is combined
+        // with this, not replaced by it — either one locks the design.
+        const designCountry = prop.plot_spec.country || "India";
+        const siteCountry = urlCountryContext ? urlCountryContext.name : "India";
+        const crossSiteMismatch = designCountry !== siteCountry;
+        setLocked(prop.locked || crossSiteMismatch);
+        setCrossSiteLockInfo(crossSiteMismatch ? { designCountry, siteCountry } : null);
+
         setSelections(prop.selections || {});
         setLaborSelections(prop.labor_selections || {});
         setLayoutHistory({
@@ -507,7 +527,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
         });
       })
       .catch(() => setSaveStatus("Couldn't load that saved design."));
-  }, [resumePropertyId]);
+  }, [resumePropertyId, urlCountryContext]);
 
   // Live running total whenever selections/plot size/currency change
   useEffect(() => {
@@ -1190,7 +1210,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
               🔒 Lock
             </button>
           )}
-          {propertyId && locked && unlockStep === null && (
+          {/* The Unlock flow only applies to a design's own explicit,
+              saved lock — never shown for a cross-site mismatch, since
+              that protection isn't something an OTP unlock should be
+              able to bypass. It resolves itself automatically the
+              moment this design is opened from its own matching site. */}
+          {propertyId && locked && !crossSiteLockInfo && unlockStep === null && (
             <button type="button" className="rc-tool-btn" onClick={handleRequestUnlock}>
               Unlock...
             </button>
@@ -1214,6 +1239,14 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
         </div>
         {unlockError && <div className="cs-unlock-error">{unlockError}</div>}
       </div>
+
+      {crossSiteLockInfo && (
+        <div className="studio-status-banner cs-cross-site-lock-banner">
+          🔒 This design was created for <strong>{crossSiteLockInfo.designCountry}</strong> and can't be edited
+          from the {crossSiteLockInfo.siteCountry} site — open it from the {crossSiteLockInfo.designCountry} site
+          to make changes. Viewing is fine; nothing here has been changed.
+        </div>
+      )}
 
       {overflowWarnings.length > 0 && (
         <div className="cs-overflow-banner">

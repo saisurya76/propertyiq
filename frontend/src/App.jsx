@@ -196,7 +196,14 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
-  const [currency, setCurrency] = useState(urlCountryContext ? urlCountryContext.currency : "USD");
+  // "/" (no specific country code) is the main site and defaults to
+  // India in every aspect, not a generic global default — currency
+  // included. IP-based geolocation can still adjust this afterward for
+  // the general "/" visitor (a separate, already-established mechanism,
+  // unlike /th etc which deliberately skip geo-detection entirely since
+  // visiting a specific country code is itself an explicit signal) —
+  // this only fixes the STARTING value before that runs.
+  const [currency, setCurrency] = useState(urlCountryContext ? urlCountryContext.currency : "INR");
 
   // Keep the URL bar in sync with the admin view, and support the browser
   // back/forward buttons. A real reported bug: this previously always
