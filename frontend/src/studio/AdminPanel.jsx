@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { studioApi } from "./studioApi";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
@@ -13,6 +13,7 @@ function AdminPanel({ onBack }) {
   const [subscriptions, setSubscriptions] = useState([]);
   const [grants, setGrants] = useState([]);
   const [saveMessage, setSaveMessage] = useState("");
+  const [allFeatures, setAllFeatures] = useState([]);
 
   const login = async (e) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ function AdminPanel({ onBack }) {
       setTierConfig(data.tier_config);
       setSubscriptions(data.subscriptions);
       setGrants(data.insight_grants);
+      setAllFeatures(data.all_features || []);
       setAuthed(true);
     } catch (err) {
       setError(err.message || "Incorrect password.");
@@ -36,6 +38,19 @@ function AdminPanel({ onBack }) {
       ...cfg,
       [tierId]: { ...cfg[tierId], [field]: value },
     }));
+  };
+
+  // Toggling here only changes in-memory state — nothing takes effect
+  // system-wide until "Save Changes" below actually persists it via
+  // adminUpdateTiers, same as every other tier field on this page.
+  const toggleTierFeature = (tierId, feature) => {
+    setTierConfig((cfg) => {
+      const current = cfg[tierId].features || [];
+      const next = current.includes(feature)
+        ? current.filter((f) => f !== feature)
+        : [...current, feature];
+      return { ...cfg, [tierId]: { ...cfg[tierId], features: next } };
+    });
   };
 
   const saveTiers = async () => {
@@ -209,37 +224,52 @@ function AdminPanel({ onBack }) {
         {TIER_ORDER.filter((id) => tierConfig?.[id]).map((tierId) => {
           const tier = tierConfig[tierId];
           return (
-            <div className="admin-tier-row" key={tierId}>
-              <span className="admin-tier-row-name">{tierId}</span>
-              <input
-                type="number"
-                placeholder="Price (USD)"
-                value={tier.price_usd}
-                onChange={(e) => updateTierField(tierId, "price_usd", Number(e.target.value))}
-              />
-              <input
-                type="number"
-                value={tier.design_quota_per_month ?? ""}
-                placeholder="unlimited"
-                onChange={(e) =>
-                  updateTierField(tierId, "design_quota_per_month", e.target.value === "" ? null : Number(e.target.value))
-                }
-              />
-              <input
-                type="number"
-                value={tier.saved_designs_limit ?? ""}
-                placeholder="unlimited"
-                onChange={(e) =>
-                  updateTierField(tierId, "saved_designs_limit", e.target.value === "" ? null : Number(e.target.value))
-                }
-              />
-              <input
-                type="text"
-                placeholder="Label"
-                value={tier.label}
-                onChange={(e) => updateTierField(tierId, "label", e.target.value)}
-              />
-            </div>
+            <Fragment key={tierId}>
+              <div className="admin-tier-row">
+                <span className="admin-tier-row-name">{tierId}</span>
+                <input
+                  type="number"
+                  placeholder="Price (USD)"
+                  value={tier.price_usd}
+                  onChange={(e) => updateTierField(tierId, "price_usd", Number(e.target.value))}
+                />
+                <input
+                  type="number"
+                  value={tier.design_quota_per_month ?? ""}
+                  placeholder="unlimited"
+                  onChange={(e) =>
+                    updateTierField(tierId, "design_quota_per_month", e.target.value === "" ? null : Number(e.target.value))
+                  }
+                />
+                <input
+                  type="number"
+                  value={tier.saved_designs_limit ?? ""}
+                  placeholder="unlimited"
+                  onChange={(e) =>
+                    updateTierField(tierId, "saved_designs_limit", e.target.value === "" ? null : Number(e.target.value))
+                  }
+                />
+                <input
+                  type="text"
+                  placeholder="Label"
+                  value={tier.label}
+                  onChange={(e) => updateTierField(tierId, "label", e.target.value)}
+                />
+              </div>
+              <div className="admin-tier-features-row">
+                <span className="admin-tier-features-label">Features:</span>
+                {allFeatures.map((feature) => (
+                  <label key={feature} className="admin-feature-checkbox" title={`Toggle ${feature} for this tier — takes effect immediately everywhere once saved`}>
+                    <input
+                      type="checkbox"
+                      checked={(tier.features || []).includes(feature)}
+                      onChange={() => toggleTierFeature(tierId, feature)}
+                    />
+                    {feature}
+                  </label>
+                ))}
+              </div>
+            </Fragment>
           );
         })}
         <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveTiers} disabled={loading}>

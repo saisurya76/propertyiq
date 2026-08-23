@@ -34,6 +34,20 @@ def initialize_property_store() -> None:
                 )
                 """
             )
+            # Backs the team_seats tier feature: a JSON array of emails
+            # (as text — same convention as plot_spec/selections/etc in
+            # this table) the owner has explicitly given shared access
+            # to. A genuine schema migration (the first one this
+            # codebase has needed) rather than folding it into
+            # plot_spec — this is access-control metadata, not part
+            # of the plot specification, so it deserves its own
+            # column. "ADD COLUMN IF NOT EXISTS" is safe to run on
+            # every startup, matching how CREATE TABLE IF NOT EXISTS
+            # already behaves for a table that already exists in
+            # production.
+            cursor.execute(
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS shared_with_emails TEXT NOT NULL DEFAULT '[]'"
+            )
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS property_floors (
@@ -70,6 +84,7 @@ def _row_to_property(row: dict[str, Any], floors: list[dict[str, Any]]) -> dict[
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "floors": floors,
+        "shared_with_emails": json.loads(row["shared_with_emails"]) if row.get("shared_with_emails") else [],
     }
 
 
@@ -192,6 +207,73 @@ def get_property(property_id: str) -> Optional[dict[str, Any]]:
             )
             floors = [_row_to_floor(r) for r in cursor.fetchall()]
             return _row_to_property(row, floors)
+
+
+MAX_SHARED_EMAILS_PER_PROPERTY = 3  # a real, deliberate cap — team_seats is meant for a small collaborating group, not unlimited redistribution of a paid seat
+
+
+def set_shared_with_emails(property_id: str, owner_email: str, shared_emails: list[str]) -> dict[str, Any]:
+    """Owner-only: sets the full list of emails with shared access to
+    this property. Replaces the whole list (not additive) — the caller
+    (the admin/owner-facing endpoint) sends the complete intended list
+    each time, same convention as update_property's other fields."""
+    owner_email = owner_email.strip().lower()
+    cleaned = sorted({e.strip().lower() for e in shared_emails if e.strip()} - {owner_email})
+    if len(cleaned) > MAX_SHARED_EMAILS_PER_PROPERTY:
+        raise ValueError(f"A design can be shared with at most {MAX_SHARED_EMAILS_PER_PROPERTY} people.")
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            now = datetime.now(timezone.utc).isoformat()
+            cursor.execute(
+                "UPDATE properties SET shared_with_emails = %s, updated_at = %s "
+                "WHERE property_id = %s AND user_email = %s",
+                (json.dumps(cleaned), now, property_id, owner_email),
+            )
+            if cursor.rowcount == 0:
+                raise PermissionError("Only the owner can change who this design is shared with.")
+
+    return get_property(property_id)
+
+
+def list_properties_shared_with_user(user_email: str) -> list[dict[str, Any]]:
+    """Summary list of properties someone ELSE owns but has shared with
+    this user — same shape as list_properties_for_user's summaries, plus
+    the actual owner's email so the UI can show whose design it is."""
+    user_email = user_email.strip().lower()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            # shared_with_emails is stored as a JSON array string; a
+            # simple LIKE match is sufficient here since emails don't
+            # contain characters that would create a false-positive
+            # substring match against a JSON-quoted, comma-separated list.
+            cursor.execute(
+                "SELECT * FROM properties WHERE shared_with_emails LIKE %s ORDER BY updated_at DESC",
+                (f'%"{user_email}"%',),
+            )
+            rows = cursor.fetchall()
+            summaries = []
+            for row in rows:
+                shared_list = json.loads(row["shared_with_emails"]) if row["shared_with_emails"] else []
+                if user_email not in shared_list:
+                    continue  # guards against a LIKE false-positive substring match
+                cursor.execute(
+                    "SELECT COUNT(*) AS n FROM property_floors WHERE property_id = %s",
+                    (row["property_id"],),
+                )
+                floor_count = cursor.fetchone()["n"]
+                plot_spec = json.loads(row["plot_spec"])
+                summaries.append({
+                    "property_id": row["property_id"],
+                    "name": row["name"],
+                    "plot_size_sqft": plot_spec.get("plot_size_sqft"),
+                    "floor_count": floor_count,
+                    "locked": bool(row["locked"]),
+                    "updated_at": row["updated_at"],
+                    "country": plot_spec.get("country"),
+                    "owner_email": row["user_email"],
+                })
+            return summaries
 
 
 def update_property(

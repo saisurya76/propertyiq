@@ -311,3 +311,85 @@ def test_list_properties_includes_country_for_cross_site_locking():
     summaries = list_properties_for_user("pytest_list_country@example.com")
     match = next(s for s in summaries if s["property_id"] == prop["property_id"])
     assert match["country"] == "Thailand"
+
+
+def test_team_seats_sharing_full_http_flow():
+    """Backs the team_seats tier feature end-to-end: sharing requires
+    the owner's tier to include it, a shared collaborator gets full
+    view/edit access without needing their own subscription, and
+    account-level actions (deleting, changing who it's shared with)
+    stay owner-only even for a shared collaborator."""
+    from backend.api import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    def authed_headers(email):
+        code = create_otp(email)
+        r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+        return {"Authorization": f"Bearer {r.json()['session_token']}"}
+
+    owner_email = "team_seats_owner@example.com"
+    owner_headers = authed_headers(owner_email)
+
+    create_resp = client.post("/api/properties", json={
+        "name": "Team Test House",
+        "plot_spec": {
+            "plot_size_sqft": 1200, "plot_length_ft": 40, "plot_width_ft": 30,
+            "region": "india", "currency": "INR",
+            "entrance_direction": "north", "road_facing_side": "north",
+        },
+        "selections": {}, "labor_selections": {}, "site_elements": [], "floors": [],
+    }, headers=owner_headers)
+    assert create_resp.status_code == 403  # no active subscription yet
+
+    upsert_subscription(email=owner_email, tier_id="studio_starter", dodo_subscription_id="sub_team_owner_starter", status="active")
+    create_resp = client.post("/api/properties", json={
+        "name": "Team Test House",
+        "plot_spec": {
+            "plot_size_sqft": 1200, "plot_length_ft": 40, "plot_width_ft": 30,
+            "region": "india", "currency": "INR",
+            "entrance_direction": "north", "road_facing_side": "north",
+        },
+        "selections": {}, "labor_selections": {}, "site_elements": [],
+        "floors": [{"floor_number": 0, "floor_label": "Ground Floor", "rooms": []}],
+    }, headers=owner_headers)
+    assert create_resp.status_code == 200
+    property_id = create_resp.json()["property_id"]
+
+    # Starter tier does NOT include team_seats -- sharing should be blocked
+    share_blocked = client.post(f"/api/properties/{property_id}/share", json={"emails": ["teammate@example.com"]}, headers=owner_headers)
+    assert share_blocked.status_code == 403
+
+    # Upgrade to Unlimited, which DOES include team_seats
+    upsert_subscription(email=owner_email, tier_id="studio_unlimited", dodo_subscription_id="sub_team_owner_unlimited", status="active")
+    share_resp = client.post(f"/api/properties/{property_id}/share", json={"emails": ["teammate@example.com"]}, headers=owner_headers)
+    assert share_resp.status_code == 200
+    assert share_resp.json()["shared_with_emails"] == ["teammate@example.com"]
+
+    # The teammate (no subscription of their own at all) can now view and edit it
+    teammate_headers = authed_headers("teammate@example.com")
+    view_resp = client.get(f"/api/properties/{property_id}", headers=teammate_headers)
+    assert view_resp.status_code == 200
+
+    update_resp = client.put(f"/api/properties/{property_id}", json={"name": "Renamed by Teammate"}, headers=teammate_headers)
+    assert update_resp.status_code == 200
+    assert update_resp.json()["name"] == "Renamed by Teammate"
+
+    # But the teammate cannot delete it or change sharing
+    delete_blocked = client.delete(f"/api/properties/{property_id}", headers=teammate_headers)
+    assert delete_blocked.status_code == 403
+
+    reshare_blocked = client.post(f"/api/properties/{property_id}/share", json={"emails": []}, headers=teammate_headers)
+    assert reshare_blocked.status_code == 403
+
+    # The teammate sees it in their "shared with me" list, correctly attributed to the owner
+    shared_list = client.get("/api/properties/shared-with-me", headers=teammate_headers)
+    assert shared_list.status_code == 200
+    assert len(shared_list.json()["properties"]) == 1
+    assert shared_list.json()["properties"][0]["owner_email"] == owner_email
+
+    # A genuinely unrelated third party still cannot access it at all
+    stranger_headers = authed_headers("random_stranger@example.com")
+    stranger_resp = client.get(f"/api/properties/{property_id}", headers=stranger_headers)
+    assert stranger_resp.status_code == 403

@@ -143,3 +143,37 @@ def get_all_tiers_merged() -> dict[str, Any]:
         tier_id: {**default_tier, **persisted.get(tier_id, {})}
         for tier_id, default_tier in DEFAULT_TIER_CONFIG.items()
     }
+
+
+# The canonical set of every feature flag the system knows how to
+# actually enforce — used by the admin panel to render a checkbox for
+# EVERY feature against EVERY tier, not just whatever happens to already
+# be in that tier's features list. A feature only belongs here once
+# something in the code genuinely checks for it via has_feature() below;
+# a feature string that exists only as pricing-page copy with nothing
+# behind it doesn't belong in this list, since toggling it in the admin
+# panel would do nothing.
+ALL_FEATURES = [
+    "similar_property_suggestions",
+    "construction_studio_lite",
+    "vastu_compliance",
+    "standard_suppliers",
+    "premium_global_suppliers",
+    "priority_cad_formats",
+    "team_seats",
+]
+
+
+def has_feature(tier_id: str | None, feature: str) -> bool:
+    """The one place feature-gating logic lives — every endpoint that
+    gates on a tier's feature list should call this, not read
+    tier["features"] directly, so admin-toggled changes take effect
+    everywhere consistently and immediately (no separate code path to
+    keep in sync). Returns False for no tier / an unknown tier / a
+    tier whose features list doesn't include it — never raises."""
+    if not tier_id:
+        return False
+    tier = get_tier(tier_id)
+    if not tier:
+        return False
+    return feature in tier.get("features", [])

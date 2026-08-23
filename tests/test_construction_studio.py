@@ -156,6 +156,38 @@ def test_generated_dxf_contains_real_dimension_entities(tmp_path):
     assert any("20" in t for t in dim_texts)
 
 
+def test_dxf_include_dimensions_false_omits_dimensions_but_stays_usable(tmp_path):
+    """Backs the priority_cad_formats tier feature: a genuine functional
+    difference, not cosmetic. Standard-tier users still get a completely
+    real, usable DXF (rooms, labels, colors, site elements all present
+    and correct) — just without the dimension annotation layer."""
+    from backend.construction_dxf import generate_plot_dxf
+    import ezdxf
+
+    rooms = [
+        {"name": "Living Room", "x": 0, "y": 20, "length": 20, "width": 10, "color": None},
+        {"name": "Bedroom", "x": 20, "y": 20, "length": 10, "width": 10, "color": None},
+    ]
+    path = generate_plot_dxf(
+        design_id="dim_omitted_pytest",
+        plot_length_ft=40,
+        plot_width_ft=30,
+        rooms=rooms,
+        road_facing_side="north",
+        output_dir=tmp_path,
+        include_dimensions=False,
+    )
+
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    dim_entities = [e for e in msp if e.dxf.layer == "DIMENSIONS"]
+    room_labels = [e.dxf.text for e in msp if e.dxftype() == "TEXT" and e.dxf.layer != "DIMENSIONS"]
+
+    assert dim_entities == []  # no dimension layer entities at all
+    assert "Living Room" in room_labels  # but the actual layout is still fully real and present
+    assert "Bedroom" in room_labels
+
+
 def test_site_elements_produce_distinct_dxf_entities(tmp_path):
     from backend.construction_dxf import generate_plot_dxf
     import ezdxf
@@ -613,3 +645,47 @@ def test_new_country_cost_estimates_are_realistic():
         result = estimate_cost(plot_size_sqft=1200, selections=selections, region=region, currency=currency)
         usd_equivalent = result["grand_total_usd"]
         assert 3000 < usd_equivalent < 30000, f"{region}: unrealistic total (${usd_equivalent:.2f} USD-equivalent)"
+
+
+def test_materials_endpoint_requires_auth_and_gates_supplier_tier():
+    """Real, confirmed gaps this closes: the materials catalog endpoint
+    had no auth requirement at all, and standard_suppliers vs
+    premium_global_suppliers were pure pricing-page labels with nothing
+    behind them. Premium tier now genuinely sees every country's
+    suppliers (effective_region forced to "global"), not just their
+    own region's — a real, meaningful distinction, not cosmetic."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
+
+    client = TestClient(app)
+
+    no_auth = client.get("/api/construction-studio/materials?region=india")
+    assert no_auth.status_code == 401
+
+    def authed_headers(email):
+        code = create_otp(email)
+        r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+        return {"Authorization": f"Bearer {r.json()['session_token']}"}
+
+    starter_email = "materials_starter_test@example.com"
+    starter_headers = authed_headers(starter_email)
+    upsert_subscription(email=starter_email, tier_id="studio_starter", dodo_subscription_id="sub_mat_starter", status="active")
+
+    starter_result = client.get("/api/construction-studio/materials?region=india", headers=starter_headers)
+    assert starter_result.status_code == 200
+    assert starter_result.json()["region"] == "india"
+    starter_cement_ids = {o["id"] for o in starter_result.json()["categories"]["cement"]["options"]}
+    assert "opc_thailand_scg" not in starter_cement_ids  # standard tier: India region only, not Thailand's
+
+    pro_email = "materials_pro_test@example.com"
+    pro_headers = authed_headers(pro_email)
+    upsert_subscription(email=pro_email, tier_id="studio_pro", dodo_subscription_id="sub_mat_pro", status="active")
+
+    pro_result = client.get("/api/construction-studio/materials?region=india", headers=pro_headers)
+    assert pro_result.status_code == 200
+    assert pro_result.json()["region"] == "global"  # premium tier: forced to global regardless of requested region
+    pro_cement_ids = {o["id"] for o in pro_result.json()["categories"]["cement"]["options"]}
+    assert "opc_thailand_scg" in pro_cement_ids  # premium tier genuinely sees Thailand's suppliers too
+    assert "opc_43" in pro_cement_ids  # and still sees India's own

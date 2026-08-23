@@ -80,8 +80,15 @@ def test_vastu_check_endpoint_routes_by_country():
     is omitted entirely — no breaking change for existing callers."""
     from fastapi.testclient import TestClient
     from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
 
     client = TestClient(app)
+    email = "vastu_routing_test@example.com"
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_vastu_routing", status="active")
 
     thailand = client.post("/api/construction-studio/vastu-check", json={
         "plot_length_ft": 40, "plot_width_ft": 30,
@@ -91,7 +98,7 @@ def test_vastu_check_endpoint_routes_by_country():
         ],
         "entrance_direction": "east", "road_facing_side": "east",
         "country": "Thailand",
-    })
+    }, headers=headers)
     assert thailand.status_code == 200
     assert thailand.json()["scope"] == "thai_traditional_full_check"
     assert thailand.json()["compliant"] is False
@@ -100,7 +107,7 @@ def test_vastu_check_endpoint_routes_by_country():
         "plot_length_ft": 40, "plot_width_ft": 30,
         "rooms": [{"name": "Kitchen", "x": 0, "y": 0, "length": 10, "width": 10}],
         "entrance_direction": "north", "road_facing_side": "north",
-    })
+    }, headers=headers)
     assert no_country.status_code == 200
     assert no_country.json()["scope"] == "full_multi_rule_check"
 
@@ -114,8 +121,15 @@ def test_vastu_check_routes_correctly_with_stale_or_missing_country():
     other) so this class of stale/missing-country bug can't recur."""
     from fastapi.testclient import TestClient
     from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
 
     client = TestClient(app)
+    email = "vastu_stale_country_test@example.com"
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_vastu_stale_country", status="active")
 
     def check(country, region):
         return client.post("/api/construction-studio/vastu-check", json={
@@ -126,7 +140,7 @@ def test_vastu_check_routes_correctly_with_stale_or_missing_country():
             ],
             "entrance_direction": "east", "road_facing_side": "east",
             "country": country, "region": region,
-        }).json()
+        }, headers=headers).json()
 
     # The exact reported bug: stale country="India" but region correctly thailand
     assert check("India", "thailand")["scope"] == "thai_traditional_full_check"
@@ -151,8 +165,15 @@ def test_vastu_check_no_specific_tradition_for_unresearched_countries():
     country/region still defaults to Vastu, unchanged)."""
     from fastapi.testclient import TestClient
     from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
 
     client = TestClient(app)
+    email = "vastu_no_tradition_test@example.com"
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_vastu_no_tradition", status="active")
 
     def check(country, region):
         return client.post("/api/construction-studio/vastu-check", json={
@@ -160,7 +181,7 @@ def test_vastu_check_no_specific_tradition_for_unresearched_countries():
             "rooms": [{"name": "Kitchen", "x": 0, "y": 0, "length": 10, "width": 10}],
             "entrance_direction": "east", "road_facing_side": "east",
             "country": country, "region": region,
-        }).json()
+        }, headers=headers).json()
 
     for country in ("Philippines", "Vietnam", "Indonesia"):
         result = check(country, "global")

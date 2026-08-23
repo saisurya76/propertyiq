@@ -34,6 +34,8 @@ from backend.property_store import (
     set_locked,
     delete_property,
     count_saved_properties,
+    set_shared_with_emails,
+    list_properties_shared_with_user,
 )
 
 from backend.construction_studio import (
@@ -82,6 +84,8 @@ from backend.config_store import (
     set_tier_config,
     get_tier,
     get_all_tiers_merged,
+    has_feature,
+    ALL_FEATURES,
 )
 
 from backend.subscription_store import (
@@ -934,13 +938,21 @@ def update_tiers(request: AdminTierConfigRequest):
 def admin_overview(request: AdminAuthRequest):
     """Admin-only: current tier config plus all subscriptions and Insight
     Add-on grants, for the admin panel's overview view. Password-gated via
-    ADMIN_DASHBOARD_PASSWORD — same check as /api/admin/tiers."""
+    ADMIN_DASHBOARD_PASSWORD — same check as /api/admin/tiers.
+
+    Includes all_features (the canonical list of every feature the
+    system actually enforces) so the admin panel can render a checkbox
+    for each one against every tier, not just whatever happens to
+    already be in that tier's saved features list — otherwise a newly
+    added feature would have no way to ever get toggled on for a tier
+    that doesn't already include it."""
     _require_admin_password(request.password)
 
     return {
         "tier_config": get_all_tiers_merged(),
         "subscriptions": list_all_subscriptions(),
         "insight_grants": list_all_grants(),
+        "all_features": ALL_FEATURES,
     }
 
 
@@ -1214,15 +1226,37 @@ class ConstructionDesignRequest(BaseModel):
 
 
 @app.get("/api/construction-studio/materials")
-def construction_materials(region: str = "global"):
+def construction_materials(region: str = "global", user_email: str = Depends(get_current_user_email)):
     """Available material/supplier options for a region, plus separate
     contractor/labor options (RCC work, brickwork, plasterwork — India
     only for now). Base costs are in USD; convert client-side or via
-    /estimate for a specific currency."""
+    /estimate for a specific currency.
+
+    Requires an active subscription — a real, confirmed gap this closes
+    (this endpoint had no auth requirement at all before). The
+    standard_suppliers vs premium_global_suppliers distinction is real,
+    not cosmetic: standard-tier users see only their own region's real,
+    researched catalog (as today); premium-tier users get every
+    country's suppliers regardless of the region they're actually
+    building in — e.g. an India-region user on Studio Pro can also see
+    and select Thai, Vietnamese, Indonesian, or Philippine suppliers for
+    an imported/alternative material, not just India's own options."""
+    tier_id = get_active_tier(user_email)
+    if has_feature(tier_id, "premium_global_suppliers"):
+        effective_region = "global"
+    elif has_feature(tier_id, "standard_suppliers"):
+        effective_region = region
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="The materials catalog requires an active Studio subscription. "
+                   "Subscribe via POST /api/subscribe/checkout first."
+        )
+
     return {
-        "region": region,
-        "categories": get_catalog(region),
-        "labor_categories": get_labor_catalog(region),
+        "region": effective_region,
+        "categories": get_catalog(effective_region),
+        "labor_categories": get_labor_catalog(effective_region),
     }
 
 
@@ -1317,7 +1351,7 @@ class VastuCheckRequest(BaseModel):
 
 
 @app.post("/api/construction-studio/vastu-check")
-def construction_vastu_check(request: VastuCheckRequest):
+def construction_vastu_check(request: VastuCheckRequest, user_email: str = Depends(get_current_user_email)):
     """A lightweight, quota-free traditional-building compliance check —
     recomputes from the CURRENT room layout, unlike the result embedded
     in a generated design (which is a snapshot from whenever "Generate"
@@ -1327,6 +1361,12 @@ def construction_vastu_check(request: VastuCheckRequest):
     design quota, generate a DXF, or save anything — purely a read of
     the current layout, meant to be called reactively as the user edits,
     the same role adjacency-check plays for space-planning correctness.
+
+    Requires an active subscription with the vastu_compliance feature —
+    a real, confirmed gap this closes: this endpoint had NO auth
+    requirement at all before, meaning every subscription tier listed
+    "Vastu Compliance" as a paid feature while it was actually available
+    to anyone, logged in or not, on any tier or none.
 
     Routes by country OR region: Vastu for India (the original, still
     the default — including when country/region are unset entirely, for
@@ -1358,6 +1398,13 @@ def construction_vastu_check(request: VastuCheckRequest):
     The universal, country-agnostic adjacency (space-planning) check is
     unaffected either way — it's a separate endpoint/section that
     already works for any country."""
+    tier_id = get_active_tier(user_email)
+    if not has_feature(tier_id, "vastu_compliance"):
+        raise HTTPException(
+            status_code=403,
+            detail="Vastu/traditional-building compliance checking requires an active Studio "
+                   "subscription that includes this feature. Subscribe via POST /api/subscribe/checkout first."
+        )
     country = (request.country or "").strip().lower()
     region = (request.region or "").strip().lower()
 
@@ -1466,6 +1513,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
             rooms=[r.model_dump() for r in request.rooms],
             site_elements=[e.model_dump() for e in request.site_elements],
             road_facing_side=request.road_facing_side,
+            include_dimensions=has_feature(tier_id, "priority_cad_formats"),
         )
         dxf_path = str(generated_path)
 
@@ -1569,6 +1617,10 @@ class UpdatePropertyRequest(BaseModel):
     site_elements: Optional[list[SiteElementSpec]] = None
 
 
+class ShareRequest(BaseModel):
+    emails: list[str]
+
+
 class UpsertFloorRequest(BaseModel):
     floor_id: Optional[str] = None
     floor_number: int
@@ -1596,11 +1648,33 @@ class ConfirmUnlockRequest(BaseModel):
 
 
 def _require_own_property(property_id: str, user_email: str) -> dict[str, Any]:
+    """Allows access to the owner AND anyone the owner has explicitly
+    shared this property with (the team_seats feature) — most
+    operations (view, edit, sync, lock/unlock) are genuinely
+    collaborative. Deleting the property or changing who it's shared
+    with stays owner-only (see _require_property_owner below), since
+    those are account-level decisions, not collaborative editing."""
+    prop = get_property(property_id)
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    requester = user_email.strip().lower()
+    if prop["user_email"] == requester:
+        return prop
+    if requester in prop.get("shared_with_emails", []):
+        return prop
+    raise HTTPException(status_code=403, detail="This property belongs to a different account")
+
+
+def _require_property_owner(property_id: str, user_email: str) -> dict[str, Any]:
+    """Stricter than _require_own_property — only the actual owner, never
+    a shared/team_seats collaborator. Used for deleting a property and
+    for managing who it's shared with, since those are account-level
+    decisions a collaborator shouldn't be able to make."""
     prop = get_property(property_id)
     if prop is None:
         raise HTTPException(status_code=404, detail="Property not found")
     if prop["user_email"] != user_email.strip().lower():
-        raise HTTPException(status_code=403, detail="This property belongs to a different account")
+        raise HTTPException(status_code=403, detail="Only the property's owner can do this")
     return prop
 
 
@@ -1645,6 +1719,18 @@ def api_create_property(request: CreatePropertyRequest, user_email: str = Depend
 def api_list_properties(user_email: str = Depends(get_current_user_email)):
     """Summary list for the Studio landing page's saved-designs picker."""
     return {"properties": list_properties_for_user(user_email)}
+
+
+@app.get("/api/properties/shared-with-me")
+def api_list_shared_properties(user_email: str = Depends(get_current_user_email)):
+    """Designs someone else owns but has shared with this account —
+    shown as a separate section from the user's own saved designs list,
+    same summary shape plus which account actually owns each one.
+    Registered BEFORE /api/properties/{property_id} deliberately —
+    FastAPI matches routes in registration order, and the generic
+    {property_id} route would otherwise swallow this literal path,
+    treating "shared-with-me" as a property ID and returning 404."""
+    return {"properties": list_properties_shared_with_user(user_email)}
 
 
 @app.get("/api/properties/{property_id}")
@@ -1751,11 +1837,38 @@ def api_confirm_unlock(property_id: str, request: ConfirmUnlockRequest, user_ema
 
 @app.delete("/api/properties/{property_id}")
 def api_delete_property(property_id: str, user_email: str = Depends(get_current_user_email)):
-    prop = _require_own_property(property_id, user_email)
+    prop = _require_property_owner(property_id, user_email)
     if prop["locked"]:
         raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to delete it.")
     delete_property(property_id)
     return {"deleted": True}
+
+
+@app.post("/api/properties/{property_id}/share")
+def api_share_property(property_id: str, request: ShareRequest, user_email: str = Depends(get_current_user_email)):
+    """Backs the team_seats tier feature: the owner can give up to
+    MAX_SHARED_EMAILS_PER_PROPERTY teammates full collaborative access
+    (view/edit/sync/lock) to this one property — not full account
+    access, and not transferable to other properties on its own; each
+    property is shared individually. Owner-only, and requires the
+    owner's active subscription to include team_seats — a shared
+    collaborator doesn't need their own subscription to use a design
+    shared with them, matching how a real team seat works."""
+    prop = _require_property_owner(property_id, user_email)
+    tier_id = get_active_tier(user_email)
+    if not has_feature(tier_id, "team_seats"):
+        raise HTTPException(
+            status_code=403,
+            detail="Sharing a design with teammates requires an active Studio subscription "
+                   "that includes the team_seats feature."
+        )
+    try:
+        updated = set_shared_with_emails(property_id, user_email, request.emails)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return updated
 
 
 @app.get("/")

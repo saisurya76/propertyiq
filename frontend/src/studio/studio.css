@@ -1482,6 +1482,36 @@
   border-radius: 10px;
 }
 
+.admin-tier-features-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 6px 10px 10px;
+  font-size: 12px;
+  color: #6b5f85;
+}
+
+.admin-tier-features-label {
+  font-weight: 700;
+  color: #9285ab;
+}
+
+.admin-feature-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-feature-checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
 .admin-tier-row:not(.admin-tier-row-header):hover {
   background: #faf7ff;
 }

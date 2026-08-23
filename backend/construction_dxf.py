@@ -290,6 +290,7 @@ def generate_plot_dxf(
     site_elements: Optional[list[dict[str, Any]]] = None,
     road_facing_side: str = "north",
     output_dir: Path = DEFAULT_OUTPUT_DIR,
+    include_dimensions: bool = True,
 ) -> Path:
     """Generate a real, portable DXF (2D CAD exchange format) of the plot
     boundary, room layout, and architectural dimension lines, so the
@@ -306,6 +307,15 @@ def generate_plot_dxf(
     chains along the north and west plot edges (matching the live canvas
     preview's identical algorithm) plus an outer total-dimension line —
     real architectural-style measurements, not decoration.
+
+    include_dimensions=False produces a real, usable DXF without those
+    measurement lines/chains — the room layout, labels, colors, and site
+    elements are all still fully present and accurate; only the
+    dimension annotations are omitted. This backs the priority_cad_formats
+    tier feature: a genuine, functional difference between tiers (fully
+    measured/annotated export vs. layout-only), not a cosmetic one — a
+    lower-tier user still gets a completely usable, accurate DXF, just
+    without the added architectural dimension annotations.
 
     This is a genuine, working DXF export — not a mock. It does not attempt
     full 3D BIM, automatic door placement, or furniture symbols (those need
@@ -396,12 +406,15 @@ def generate_plot_dxf(
             dxfattribs=label_attribs,
         ).set_placement(label_point, align=ezdxf.enums.TextEntityAlignment.MIDDLE_CENTER)
 
-    # Architectural dimension lines
-    north_segments = _compute_edge_dimension_segments(rooms, plot_length_ft, plot_width_ft, "north")
-    west_segments = _compute_edge_dimension_segments(rooms, plot_length_ft, plot_width_ft, "west")
-    _draw_dimension_chain(msp, north_segments, "north", plot_length_ft, plot_width_ft)
-    _draw_dimension_chain(msp, west_segments, "west", plot_length_ft, plot_width_ft)
-    _draw_total_dimensions(msp, plot_length_ft, plot_width_ft)
+    # Architectural dimension lines — omitted entirely when
+    # include_dimensions=False (the standard-tier DXF), included for
+    # priority_cad_formats tiers.
+    if include_dimensions:
+        north_segments = _compute_edge_dimension_segments(rooms, plot_length_ft, plot_width_ft, "north")
+        west_segments = _compute_edge_dimension_segments(rooms, plot_length_ft, plot_width_ft, "west")
+        _draw_dimension_chain(msp, north_segments, "north", plot_length_ft, plot_width_ft)
+        _draw_dimension_chain(msp, west_segments, "west", plot_length_ft, plot_width_ft)
+        _draw_total_dimensions(msp, plot_length_ft, plot_width_ft)
     _draw_site_elements(msp, site_elements or [])
 
     output_path = output_dir / f"{design_id}.dxf"

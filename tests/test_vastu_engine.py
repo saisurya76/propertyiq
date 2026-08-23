@@ -81,18 +81,29 @@ def test_vastu_check_endpoint_is_live_and_quota_free():
     Studio kept displaying a stale result from whenever a design was last
     generated, even after the user removed or rearranged a room
     afterward. This endpoint recomputes fresh from whatever rooms are
-    passed, with no auth/quota required, so the frontend can call it
-    reactively on every edit instead of relying on a stale snapshot."""
+    passed, with no design QUOTA consumed, so the frontend can call it
+    reactively on every edit instead of relying on a stale snapshot.
+    Does require an active subscription with the vastu_compliance
+    feature though — a separate, later fix closed a real gap where this
+    endpoint had no auth requirement at all despite being a paid
+    feature."""
     from fastapi.testclient import TestClient
     from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
 
     client = TestClient(app)
+    email = "vastu_quota_free_test@example.com"
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_vastu_quota_free", status="active")
 
     with_bedroom = client.post("/api/construction-studio/vastu-check", json={
         "plot_length_ft": 40, "plot_width_ft": 30,
         "rooms": [{"name": "Master Bedroom", "x": 0, "y": 0, "length": 10, "width": 10}],
         "entrance_direction": "north", "road_facing_side": "north",
-    })
+    }, headers=headers)
     assert with_bedroom.status_code == 200
     assert with_bedroom.json()["scope"] == "full_multi_rule_check"
 
@@ -100,6 +111,22 @@ def test_vastu_check_endpoint_is_live_and_quota_free():
         "plot_length_ft": 40, "plot_width_ft": 30,
         "rooms": [],
         "entrance_direction": "north", "road_facing_side": "north",
-    })
+    }, headers=headers)
     assert without_bedroom.status_code == 200
     assert without_bedroom.json()["scope"] != "full_multi_rule_check"
+
+
+def test_vastu_check_requires_auth_and_feature():
+    """A real, confirmed gap this closes: the endpoint previously had NO
+    auth requirement at all, meaning "Vastu Compliance" was listed as a
+    paid subscription feature while actually being available to anyone,
+    logged in or not, on any tier or none."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    no_auth = client.post("/api/construction-studio/vastu-check", json={
+        "plot_length_ft": 40, "plot_width_ft": 30, "rooms": [],
+        "entrance_direction": "north", "road_facing_side": "north",
+    })
+    assert no_auth.status_code == 401
