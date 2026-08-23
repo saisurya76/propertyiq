@@ -787,7 +787,7 @@ function App() {
   return (
     <div className="app">
 
-      <SessionBar onSignOut={() => handleSignOut("main")} />
+      <SessionBar onSignOut={() => handleSignOut("main")} onManagePlan={launchStudio} />
 
       {paymentReturnMessage && (
         <div
