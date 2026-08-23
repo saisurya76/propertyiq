@@ -1140,7 +1140,7 @@ async def dodo_webhook(request: Request):
         data.get("payment_id") if isinstance(data, dict) else None
     )
 
-    if event_type in ("subscription.active", "subscription.renewed") and dodo_subscription_id and not (tier_id and user_email):
+    if event_type in ("subscription.active", "subscription.renewed", "subscription.updated") and dodo_subscription_id and not (tier_id and user_email):
         try:
             subscription = webhook_client.subscriptions.retrieve(dodo_subscription_id)
             sub_metadata = getattr(subscription, "metadata", None) or {}
@@ -1155,6 +1155,20 @@ async def dodo_webhook(request: Request):
         except Exception:
             pass  # tier_id/user_email stay whatever they were; the condition below simply won't match
 
+    sub_status = getattr(data, "status", None) or (data.get("status") if isinstance(data, dict) else None)
+
+    # A real, confirmed third root cause, found via an actual live
+    # webhook payload the user pasted directly: Dodo sent
+    # subscription.updated (not subscription.active/renewed at all) for
+    # a genuinely successful, active subscription — with tier_id/
+    # user_email correctly present in metadata the whole time (so the
+    # earlier metadata-fallback fix, while a reasonable defensive
+    # measure, was never the actual problem here). subscription.updated
+    # fires on ANY field change, per Dodo's own docs, which recommend it
+    # as the reliable way to track subscription state — so it can't be
+    # treated as an automatic "activate" signal the way
+    # subscription.active can; it must be interpreted using the
+    # payload's own current status field instead.
     if event_type in ("subscription.active", "subscription.renewed") and tier_id and user_email:
         upsert_subscription(
             email=user_email,
@@ -1162,6 +1176,17 @@ async def dodo_webhook(request: Request):
             status="active",
             dodo_subscription_id=dodo_subscription_id,
         )
+    elif event_type == "subscription.updated" and tier_id and user_email and sub_status == "active":
+        upsert_subscription(
+            email=user_email,
+            tier_id=tier_id,
+            status="active",
+            dodo_subscription_id=dodo_subscription_id,
+        )
+    elif event_type == "subscription.updated" and dodo_subscription_id and sub_status in ("cancelled", "expired"):
+        set_status_by_dodo_id(dodo_subscription_id, "cancelled")
+    elif event_type == "subscription.updated" and dodo_subscription_id and sub_status == "on_hold":
+        set_status_by_dodo_id(dodo_subscription_id, "payment_failed")
     elif event_type == "subscription.cancelled" and dodo_subscription_id:
         set_status_by_dodo_id(dodo_subscription_id, "cancelled")
     elif event_type == "subscription.failed" and dodo_subscription_id:

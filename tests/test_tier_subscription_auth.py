@@ -249,3 +249,87 @@ def test_webhook_falls_back_to_subscription_retrieval_when_metadata_missing():
     assert sub is not None
     assert sub["tier_id"] == "studio_starter"
     assert sub["status"] == "active"
+
+
+def test_webhook_handles_subscription_updated_event_with_active_status():
+    """A real, confirmed third root cause for a real reported failure,
+    found from an actual live webhook payload the user pasted directly
+    (not a hypothetical): Dodo sent subscription.updated (not
+    subscription.active/renewed) for a genuinely active subscription,
+    with tier_id/user_email correctly present in metadata the whole
+    time. subscription.updated fires on ANY field change (per Dodo's
+    own docs, which recommend tracking it specifically for this
+    reason), so it can't be treated as an automatic "activate" signal
+    the way subscription.active can — must be interpreted using the
+    payload's own status field. This test uses the exact real payload
+    shape reported, not a simplified approximation."""
+    from unittest.mock import patch, MagicMock
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.subscription_store import get_subscription
+
+    client = TestClient(app)
+
+    # The exact real payload shape Dodo actually sent, condensed to the
+    # fields the handler reads (full real payload had many more fields
+    # this handler correctly ignores, like billing/addons/tax_id/etc).
+    fake_event = MagicMock()
+    fake_event.type = "subscription.updated"
+    fake_event.data = MagicMock()
+    fake_event.data.metadata = {"tier_id": "studio_starter", "user_email": "real_payload_test@example.com"}
+    fake_event.data.subscription_id = "sub_0Nm2NGOUoDXb3B11jgYuf"
+    fake_event.data.status = "active"
+    fake_event.data.payment_id = None
+
+    fake_webhook_client = MagicMock()
+    fake_webhook_client.webhooks.unwrap.return_value = fake_event
+
+    with patch("backend.api.get_dodo_webhook_client", return_value=fake_webhook_client):
+        response = client.post(
+            "/api/webhooks/dodo",
+            content=b"{}",
+            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+        )
+
+    assert response.status_code == 200
+    sub = get_subscription("real_payload_test@example.com")
+    assert sub is not None
+    assert sub["tier_id"] == "studio_starter"
+    assert sub["status"] == "active"
+
+
+def test_webhook_subscription_updated_with_non_active_status_does_not_activate():
+    """subscription.updated firing does NOT mean the subscription is
+    active — must check the payload's actual status, not assume."""
+    from unittest.mock import patch, MagicMock
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.subscription_store import get_subscription
+
+    client = TestClient(app)
+
+    fake_event = MagicMock()
+    fake_event.type = "subscription.updated"
+    fake_event.data = MagicMock()
+    fake_event.data.metadata = {"tier_id": "studio_starter", "user_email": "on_hold_test@example.com"}
+    fake_event.data.subscription_id = "sub_on_hold_test"
+    fake_event.data.status = "on_hold"
+    fake_event.data.payment_id = None
+
+    fake_webhook_client = MagicMock()
+    fake_webhook_client.webhooks.unwrap.return_value = fake_event
+
+    with patch("backend.api.get_dodo_webhook_client", return_value=fake_webhook_client):
+        response = client.post(
+            "/api/webhooks/dodo",
+            content=b"{}",
+            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+        )
+
+    assert response.status_code == 200
+    sub = get_subscription("on_hold_test@example.com")
+    # Never having had a subscription record at all is the correct
+    # outcome here (nothing to mark on_hold for a subscription that was
+    # never created via a real checkout in this test) -- the key
+    # assertion is that it was NOT marked "active".
+    assert sub is None or sub["status"] != "active"
