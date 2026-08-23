@@ -37,6 +37,9 @@ function PropertyForm({
               <option>USA</option>
               <option>UAE</option>
               <option>Thailand</option>
+              <option>Philippines</option>
+              <option>Vietnam</option>
+              <option>Indonesia</option>
               <option>Other</option>
             </select>
           </div>

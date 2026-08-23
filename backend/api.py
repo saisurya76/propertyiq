@@ -1329,9 +1329,11 @@ def construction_vastu_check(request: VastuCheckRequest):
     the same role adjacency-check plays for space-planning correctness.
 
     Routes by country OR region: Vastu for India (the original, still
-    the default), the Thai traditional-building engine when either
-    country or region is Thailand. Kept as the same endpoint/URL the
-    frontend already calls (rather than a breaking rename).
+    the default — including when country/region are unset entirely, for
+    backward compatibility with designs saved before this field
+    existed), the Thai traditional-building engine when either country
+    or region is Thailand. Kept as the same endpoint/URL the frontend
+    already calls (rather than a breaking rename).
 
     Treats country and region as equally valid triggers rather than
     having one override the other — a real bug this closes: an older
@@ -1342,7 +1344,20 @@ def construction_vastu_check(request: VastuCheckRequest):
     exact stale-default state IS the bug being fixed, so that "override"
     logic silently defeated the whole point of the fallback — caught by
     testing the exact reported scenario directly rather than assuming
-    the fix worked."""
+    the fix worked.
+
+    For a country that's explicitly set to something OTHER than India
+    or Thailand (Philippines, Vietnam, Indonesia, or any other country
+    added later without a real researched traditional-building system)
+    — this deliberately does NOT fall back to Vastu. Showing "Vastu
+    Compliance" for a Philippines property would be actively misleading,
+    not just incomplete — Vastu is a real, specific Indian tradition,
+    not a generic placeholder. Returns an explicit "no specific
+    tradition researched yet" response instead, which the frontend uses
+    to hide the section entirely rather than show something wrong.
+    The universal, country-agnostic adjacency (space-planning) check is
+    unaffected either way — it's a separate endpoint/section that
+    already works for any country."""
     country = (request.country or "").strip().lower()
     region = (request.region or "").strip().lower()
 
@@ -1357,6 +1372,9 @@ def construction_vastu_check(request: VastuCheckRequest):
             entrance_direction=request.entrance_direction,
             road_facing_side=request.road_facing_side,
         )
+
+    if country not in ("", "india") and region != "india":
+        return {"scope": "no_specific_tradition", "compliant": True, "findings": [], "notes": []}
 
     if request.rooms:
         return check_vastu_full(

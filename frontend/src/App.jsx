@@ -69,8 +69,37 @@ function normalizeLanguage(code) {
 // region/currency/unit system. Deliberately a small, extensible map —
 // more country codes (/in, /us, etc, per the stated plan) get added
 // here later without restructuring anything.
+// Each entry: currency/unit_system/region are always set — every
+// country gets a real, working experience with these. `language` is
+// deliberately a SEPARATE decision per country, not an automatic
+// consequence of visiting /<code> — checked against real research for
+// each one rather than assumed:
+//   - Thailand: Thai is overwhelmingly dominant, forcing it is correct.
+//   - Vietnam: Vietnamese is the unambiguous dominant language across
+//     government/education/media/business — forcing it is correct.
+//   - Indonesia: same — Bahasa Indonesia is the clear national language.
+//   - Philippines: genuinely different. English is CO-OFFICIAL, not a
+//     second-class fallback — used throughout government, law,
+//     business, and education, with ~90%+ comprehension nationally.
+//     Forcing Filipino here would be a wrong default for exactly the
+//     reason English exists as a first-class option: `language` is
+//     left unset, so the page's normal language handling (IP-based
+//     detection, manual selector) applies rather than being overridden.
+//
+// `region` (materials-catalog scoping) is ALSO a deliberately separate
+// decision from country: Thailand has real researched material
+// brands/pricing (region: "thailand"). Philippines, Vietnam, and
+// Indonesia don't have that research done yet — rather than inventing
+// numbers, their region stays "global" (the existing generic catalog)
+// until that research happens as its own later phase. Country-level
+// behavior (currency, unit system, form defaults, and — on the backend
+// — which traditional-building validation engine applies, if any real
+// one exists for that country) is fully wired regardless.
 const COUNTRY_CODE_MAP = {
-  th: { name: "Thailand", currency: "THB", stateProvince: "", city: "", language: "th" },
+  th: { name: "Thailand", currency: "THB", stateProvince: "", city: "", language: "th", region: "thailand", unit_system: "metric" },
+  ph: { name: "Philippines", currency: "PHP", stateProvince: "", city: "", region: "global", unit_system: "metric" },
+  vn: { name: "Vietnam", currency: "VND", stateProvince: "", city: "", language: "vi", region: "global", unit_system: "metric" },
+  id: { name: "Indonesia", currency: "IDR", stateProvince: "", city: "", language: "id", region: "global", unit_system: "metric" },
 };
 
 // Read once at initial load (a useState lazy initializer calls this
@@ -140,7 +169,7 @@ function App() {
     quotedPrice: "",
 
     areaValue: "",
-    areaUnit: urlCountryContext?.code === "th" ? "sq meter" : "sqft",
+    areaUnit: urlCountryContext?.unit_system === "metric" ? "sq meter" : "sqft",
 
     monthlyRent: "",
 

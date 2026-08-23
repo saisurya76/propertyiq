@@ -19,7 +19,7 @@ const UNIT_SYSTEMS = [
   ["metric", "Meters / sqm"],
 ];
 
-const CURRENCIES = ["USD", "INR", "THB", "AED", "GBP", "EUR"];
+const CURRENCIES = ["USD", "INR", "THB", "PHP", "VND", "IDR", "AED", "GBP", "EUR"];
 
 // Auto-syncs region + currency + unit system when the user types a
 // recognized country name — fixes a real, plain gap: country was
@@ -38,6 +38,13 @@ const COUNTRY_TO_REGION_CURRENCY = {
   "thailand": { region: "thailand", currency: "THB", unit_system: "metric" },
   "usa": { region: "usa", currency: "USD", unit_system: "imperial" },
   "united states": { region: "usa", currency: "USD", unit_system: "imperial" },
+  // No real researched materials-catalog data for these yet (unlike
+  // Thailand) — region stays "global" (the existing generic catalog)
+  // rather than inventing country-specific pricing/brands. Currency
+  // and unit system ARE fully real and correct regardless.
+  "philippines": { region: "global", currency: "PHP", unit_system: "metric" },
+  "vietnam": { region: "global", currency: "VND", unit_system: "metric" },
+  "indonesia": { region: "global", currency: "IDR", unit_system: "metric" },
 };
 
 // Unit conversion — a display/input layer ONLY. Internal storage stays
@@ -1539,7 +1546,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
             ) : null}
           </div>
 
-          {liveVastuResult && (
+          {liveVastuResult && liveVastuResult.scope !== "no_specific_tradition" && (
             <div className="cs-vastu-live-section">
               <h4>{liveVastuResult.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
               <p className="studio-subtext" style={{ marginTop: -8, marginBottom: 10 }}>

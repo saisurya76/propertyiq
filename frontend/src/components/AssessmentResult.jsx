@@ -26,6 +26,9 @@ function AssessmentResult({
     "thailand": { code: "THB", symbol: "฿", locale: "th-TH" },
     "usa": { code: "USD", symbol: "$", locale: "en-US" },
     "united states": { code: "USD", symbol: "$", locale: "en-US" },
+    "philippines": { code: "PHP", symbol: "₱", locale: "en-PH" },
+    "vietnam": { code: "VND", symbol: "₫", locale: "vi-VN" },
+    "indonesia": { code: "IDR", symbol: "Rp", locale: "id-ID" },
   };
   const currencyInfo = CURRENCY_BY_COUNTRY[(formData.country || "").trim().toLowerCase()]
     || { code: "USD", symbol: "$", locale: "en-US" };

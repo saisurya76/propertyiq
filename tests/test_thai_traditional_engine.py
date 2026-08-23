@@ -138,3 +138,36 @@ def test_vastu_check_routes_correctly_with_stale_or_missing_country():
     assert check("Thailand", "india")["scope"] == "thai_traditional_full_check"
     # Neither set at all (a very old design) -- falls back to Vastu, the original default
     assert check("", "")["scope"] == "full_multi_rule_check"
+
+
+def test_vastu_check_no_specific_tradition_for_unresearched_countries():
+    """A genuine architectural decision, not an oversight: a country with
+    no real researched traditional-building system (Philippines, Vietnam,
+    Indonesia, or any other added later) must NOT silently fall back to
+    Vastu — showing "Vastu Compliance" for a Philippines property would
+    be actively misleading, not just incomplete, since Vastu is a real,
+    specific Indian tradition. Backward compatibility for designs saved
+    before country/region existed is preserved separately (empty
+    country/region still defaults to Vastu, unchanged)."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+
+    def check(country, region):
+        return client.post("/api/construction-studio/vastu-check", json={
+            "plot_length_ft": 40, "plot_width_ft": 30,
+            "rooms": [{"name": "Kitchen", "x": 0, "y": 0, "length": 10, "width": 10}],
+            "entrance_direction": "east", "road_facing_side": "east",
+            "country": country, "region": region,
+        }).json()
+
+    for country in ("Philippines", "Vietnam", "Indonesia"):
+        result = check(country, "global")
+        assert result["scope"] == "no_specific_tradition"
+        assert result["compliant"] is True
+        assert result["findings"] == []
+
+    # Backward compatibility unchanged: empty country/region still means Vastu
+    assert check("", "")["scope"] == "full_multi_rule_check"
+    assert check("India", "india")["scope"] == "full_multi_rule_check"
