@@ -168,6 +168,13 @@ def list_properties_for_user(user_email: str) -> list[dict[str, Any]]:
                     "floor_count": floor_count,
                     "locked": bool(row["locked"]),
                     "updated_at": row["updated_at"],
+                    # Needed by the Studio designs list to flag a design
+                    # as cross-site (belongs to a different country than
+                    # the current site) directly on the list itself,
+                    # without fetching each design's full details first —
+                    # a real reported gap: cross-site locking previously
+                    # only kicked in once a design was already opened.
+                    "country": plot_spec.get("country"),
                 })
             return summaries
 

@@ -557,6 +557,7 @@ function App() {
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <StudioDesigns
+          urlCountryContext={urlCountryContext}
           onStartNew={() => {
             setResumePropertyId(null);
             setStudioView("construction");

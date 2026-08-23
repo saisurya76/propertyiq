@@ -577,6 +577,11 @@
   white-space: nowrap;
 }
 
+.studio-design-cross-site-badge {
+  color: #991b1b;
+  background: #fef2f2;
+}
+
 .studio-design-card-meta {
   color: #7a6f92;
   font-size: 13px;

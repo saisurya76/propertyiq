@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from backend.api import app
 from backend.auth_store import create_otp
 from backend.subscription_store import upsert_subscription
+from backend.property_store import create_property, list_properties_for_user
 
 client = TestClient(app)
 
@@ -289,3 +290,24 @@ def test_city_and_country_persist_through_save_load():
     r2 = client.get(f"/api/properties/{property_id}", headers=headers)
     assert r2.json()["plot_spec"]["city"] == "Hyderabad"
     assert r2.json()["plot_spec"]["country"] == "India"
+
+
+def test_list_properties_includes_country_for_cross_site_locking():
+    """Real reported gap: the Studio designs list had no way to flag a
+    cross-site design (belongs to a different country than the current
+    site) without opening it first — cross-site locking previously only
+    kicked in once a design was already resumed. The list summary now
+    carries country so the frontend can show this directly on the list."""
+    prop = create_property(
+        user_email="pytest_list_country@example.com",
+        name="Country Summary Test",
+        plot_spec={
+            "plot_size_sqft": 1200, "plot_length_ft": 40, "plot_width_ft": 30,
+            "region": "thailand", "currency": "THB", "country": "Thailand",
+            "entrance_direction": "east", "road_facing_side": "east",
+        },
+        selections={}, labor_selections={}, site_elements=[], floors=[],
+    )
+    summaries = list_properties_for_user("pytest_list_country@example.com")
+    match = next(s for s in summaries if s["property_id"] == prop["property_id"])
+    assert match["country"] == "Thailand"

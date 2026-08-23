@@ -566,6 +566,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   };
 
   const addMasterPlanElement = () => {
+    if (locked) return;
     const usedTypes = new Set((plot.master_plan_elements || []).map((el) => el.type));
     const firstUnused = Object.keys(MASTER_PLAN_ELEMENT_TYPES).find((t) => !usedTypes.has(t)) || "water_body";
     setPlot((p) => ({
@@ -575,6 +576,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   };
 
   const updateMasterPlanElement = (index, field, value) => {
+    if (locked) return;
     setPlot((p) => ({
       ...p,
       master_plan_elements: p.master_plan_elements.map((el, i) => (i === index ? { ...el, [field]: value } : el)),
@@ -582,14 +584,25 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   };
 
   const removeMasterPlanElement = (index) => {
+    if (locked) return;
     setPlot((p) => ({ ...p, master_plan_elements: p.master_plan_elements.filter((_, i) => i !== index) }));
   };
 
+  // Guarded at the function level (a single chokepoint) rather than
+  // trying to disable every individual click target across the
+  // materials/labor tables — a real system-level gap this closes: while
+  // locked (explicitly or via a cross-site mismatch), clicking a row
+  // previously still changed the in-memory selection with no visible
+  // effect (autosave/Save are both already blocked while locked), which
+  // silently discarded what looked like a real edit rather than
+  // preventing it from appearing to work in the first place.
   const toggleMaterial = (category, optionId) => {
+    if (locked) return;
     setSelections((s) => ({ ...s, [category]: optionId }));
   };
 
   const toggleLabor = (category, optionId) => {
+    if (locked) return;
     setLaborSelections((s) => ({ ...s, [category]: optionId }));
   };
 
@@ -749,6 +762,11 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   }, [floors, activeFloorIndex, siteElements, selectedKeys, locked, copySelection, pasteClipboard]);
 
   const updateRoom = (key, field, value) => {
+    // Canvas drag/resize is already blocked while locked, but the room
+    // TABLE's own text/number/color inputs call this function directly
+    // and had no guard at all — a real gap this closes, matching the
+    // same materials/labor selection fix above.
+    if (locked) return;
     const newRooms = rooms.map((r) => (r._key === key ? { ...r, [field]: value } : r));
     if (field === "color") {
       commitRooms(newRooms); // discrete click, not a text field — commit immediately
@@ -780,6 +798,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   };
 
   const removeRoom = (key) => {
+    if (locked) return;
     commitRooms(rooms.filter((r) => r._key !== key));
     setSelectedKeys((sk) => sk.filter((k) => k !== key));
   };
@@ -825,10 +844,12 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   };
 
   const updateElement = (key, field, value) => {
+    if (locked) return;
     commitElements(siteElements.map((el) => (el._key === key ? { ...el, [field]: value } : el)));
   };
 
   const removeElement = (key) => {
+    if (locked) return;
     commitElements(siteElements.filter((el) => el._key !== key));
     setSelectedKeys((sk) => sk.filter((k) => k !== key));
   };
@@ -1263,7 +1284,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           <div className="cs-field-grid">
             <div className="cs-field">
               <label>City</label>
-              <input value={plot.city} onChange={(e) => updatePlotField("city", e.target.value)} placeholder="e.g. Hyderabad" />
+              <input value={plot.city} onChange={(e) => updatePlotField("city", e.target.value)} placeholder="e.g. Hyderabad" readOnly={locked} />
             </div>
             <div className="cs-field">
               <label>Country</label>
@@ -1272,23 +1293,24 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 onChange={(e) => updatePlotField("country", e.target.value)}
                 placeholder="e.g. India"
                 title="Typing a recognized country (India, Thailand, USA) automatically sets the matching region, currency, and unit system below"
+                readOnly={locked}
               />
             </div>
             <div className="cs-field">
               <label>Region</label>
-              <select value={plot.region} onChange={(e) => updatePlotField("region", e.target.value)}>
+              <select value={plot.region} onChange={(e) => updatePlotField("region", e.target.value)} disabled={locked}>
                 {REGIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div className="cs-field">
               <label>Currency</label>
-              <select value={plot.currency} onChange={(e) => updatePlotField("currency", e.target.value)}>
+              <select value={plot.currency} onChange={(e) => updatePlotField("currency", e.target.value)} disabled={locked}>
                 {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="cs-field">
               <label>Unit System</label>
-              <select value={plot.unit_system} onChange={(e) => updatePlotField("unit_system", e.target.value)}>
+              <select value={plot.unit_system} onChange={(e) => updatePlotField("unit_system", e.target.value)} disabled={locked}>
                 {UNIT_SYSTEMS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -1300,6 +1322,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 step={plot.unit_system === "metric" ? "0.01" : "1"}
                 value={feetToDisplay(plot.plot_length_ft, plot.unit_system)}
                 onChange={(e) => updatePlotField("plot_length_ft", displayToFeet(Number(e.target.value), plot.unit_system))}
+                readOnly={locked}
               />
             </div>
             <div className="cs-field">
@@ -1310,23 +1333,24 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 step={plot.unit_system === "metric" ? "0.01" : "1"}
                 value={feetToDisplay(plot.plot_width_ft, plot.unit_system)}
                 onChange={(e) => updatePlotField("plot_width_ft", displayToFeet(Number(e.target.value), plot.unit_system))}
+                readOnly={locked}
               />
             </div>
             <div className="cs-field">
               <label>Road-Facing Side</label>
-              <select value={plot.road_facing_side} onChange={(e) => updatePlotField("road_facing_side", e.target.value)}>
+              <select value={plot.road_facing_side} onChange={(e) => updatePlotField("road_facing_side", e.target.value)} disabled={locked}>
                 {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div className="cs-field">
               <label>Main Entrance Direction</label>
-              <select value={plot.entrance_direction} onChange={(e) => updatePlotField("entrance_direction", e.target.value)}>
+              <select value={plot.entrance_direction} onChange={(e) => updatePlotField("entrance_direction", e.target.value)} disabled={locked}>
                 {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div className="cs-field">
               <label>Plot Slope Direction</label>
-              <select value={plot.slope_direction} onChange={(e) => updatePlotField("slope_direction", e.target.value)}>
+              <select value={plot.slope_direction} onChange={(e) => updatePlotField("slope_direction", e.target.value)} disabled={locked}>
                 {DIRECTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
                 <option value="not_available">Not available / unknown</option>
               </select>

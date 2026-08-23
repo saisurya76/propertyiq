@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { studioApi } from "./studioApi";
 
-function StudioDesigns({ onStartNew, onResume }) {
+function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
   const [properties, setProperties] = useState(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -59,20 +59,38 @@ function StudioDesigns({ onStartNew, onResume }) {
 
       {properties && properties.length > 0 && (
         <div className="studio-designs-grid">
-          {properties.map((p) => (
-            <div key={p.property_id} className="studio-design-card" onClick={() => onResume(p.property_id)}>
-              <div className="studio-design-card-header">
-                <h4>{p.name}</h4>
-                {p.locked && <span className="studio-design-lock-badge">🔒 Locked</span>}
+          {properties.map((p) => {
+            // A design belonging to a different country than the
+            // current site is view-only from here — matches the same
+            // rule already enforced once a design is actually opened
+            // (see ConstructionStudio's cross-site lock), but a real
+            // reported gap was that this list gave no indication of it
+            // BEFORE clicking through. Older designs with no saved
+            // country (predate the field) are treated as India, the
+            // same fallback used everywhere else for that case.
+            const designCountry = p.country || "India";
+            const siteCountry = urlCountryContext ? urlCountryContext.name : "India";
+            const crossSiteLocked = designCountry !== siteCountry;
+            return (
+              <div key={p.property_id} className="studio-design-card" onClick={() => onResume(p.property_id)}>
+                <div className="studio-design-card-header">
+                  <h4>{p.name}</h4>
+                  {p.locked && <span className="studio-design-lock-badge">🔒 Locked</span>}
+                  {!p.locked && crossSiteLocked && (
+                    <span className="studio-design-lock-badge studio-design-cross-site-badge" title={`Created for ${designCountry} — view only on the ${siteCountry} site`}>
+                      🔒 {designCountry} (view only here)
+                    </span>
+                  )}
+                </div>
+                <p className="studio-design-card-meta">
+                  {p.plot_size_sqft} sqft · {p.floor_count} floor{p.floor_count === 1 ? "" : "s"}
+                </p>
+                <p className="studio-design-card-updated">
+                  Updated {new Date(p.updated_at).toLocaleDateString()}
+                </p>
               </div>
-              <p className="studio-design-card-meta">
-                {p.plot_size_sqft} sqft · {p.floor_count} floor{p.floor_count === 1 ? "" : "s"}
-              </p>
-              <p className="studio-design-card-updated">
-                Updated {new Date(p.updated_at).toLocaleDateString()}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
