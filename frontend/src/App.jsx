@@ -70,7 +70,7 @@ function normalizeLanguage(code) {
 // more country codes (/in, /us, etc, per the stated plan) get added
 // here later without restructuring anything.
 const COUNTRY_CODE_MAP = {
-  th: { name: "Thailand", currency: "THB", stateProvince: "", city: "" },
+  th: { name: "Thailand", currency: "THB", stateProvince: "", city: "", language: "th" },
 };
 
 // Read once at initial load (a useState lazy initializer calls this
@@ -230,6 +230,17 @@ function App() {
     };
 
     const detect = async () => {
+      // A URL country context (visiting /th) is an explicit, deliberate
+      // signal — the whole point of visiting /th is to see the page in
+      // Thai, not just get Thailand's region/currency defaults with an
+      // English page around them. This should win outright, skipping
+      // IP-geolocation entirely, rather than just being one more input
+      // that geo-detection could still override.
+      if (urlCountryContext?.language) {
+        applyLanguage(urlCountryContext.language);
+        return;
+      }
+
       try {
         const response = await fetch("https://ipapi.co/json/", { cache: "no-store" });
         if (response.ok) {
