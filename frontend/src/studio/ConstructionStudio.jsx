@@ -442,12 +442,32 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
         // the backend actually persists these fields, restore them from
         // the loaded data with a sensible fallback for older saved
         // designs that predate this fix.
+        //
+        // CRITICAL: country/unit_system fall back to a FIXED, neutral
+        // default ("India"/"imperial") here, NOT `p.country`/`p.unit_system`
+        // — a real, confirmed data-integrity bug this closes: `p` (the
+        // in-memory plot state) can be seeded from the current session's
+        // URL country context (e.g. visiting /vn), which has nothing to
+        // do with THIS specific saved design. Falling back to `p.country`
+        // would silently relabel an older India design (saved before
+        // this field existed, so its plot_spec genuinely lacks a
+        // "country" key) as "Vietnam" purely because of which URL the
+        // user happened to visit from when resuming it — verified this
+        // exact failure with a real test before fixing it: resuming an
+        // old India design (region: "india", no country key) while on
+        // /vn showed "Vietnam" in the country field. `city` doesn't have
+        // this risk (the URL context always seeds it as empty, never a
+        // real value), so its fallback to `p.city` is genuinely safe and
+        // left as-is. `region`/`currency` are spread directly from
+        // `prop.plot_spec` with no fallback at all, since they've been
+        // part of the saved model from the start — confirmed present
+        // even in this "older design" test scenario.
         setPlot((p) => ({
           ...p,
           ...prop.plot_spec,
           city: prop.plot_spec.city || p.city,
-          country: prop.plot_spec.country || p.country,
-          unit_system: prop.plot_spec.unit_system || p.unit_system,
+          country: prop.plot_spec.country || "India",
+          unit_system: prop.plot_spec.unit_system || "imperial",
         }));
         setSelections(prop.selections || {});
         setLaborSelections(prop.labor_selections || {});

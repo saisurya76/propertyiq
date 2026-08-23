@@ -652,32 +652,66 @@ function App() {
 
       <div className="mission-section">
         <div className="mission-content">
-          <h2>Why PropertyIQ exists</h2>
-          <p>
-            Real estate in India runs on trust that's rarely earned. Builders routinely inflate carpet
-            area against sanctioned plans, quote per-square-foot rates with no defensible basis, and bury
-            change-of-plan or cost-escalation clauses deep in agreements few buyers ever read closely.
-            Pricing itself is often little more than "what the market will bear" — copied from a
-            neighboring project, adjusted for a broker's commission, with no grounding in actual
-            construction cost, land value, or comparable sales data.
-          </p>
-          <p>
-            The common loopholes are well known inside the industry and almost invisible outside it:
-            RERA registration numbers that don't match the actual project, occupancy certificates
-            obtained for a different building configuration than what's delivered, and "super built-up
-            area" quoted with a loading factor that can run anywhere from 20% to 40%+ over actual carpet
-            area with no consistent standard — meaning two builders can describe the exact same living
-            space with very different-sounding square footage. A buyer evaluating a single property has
-            no independent way to catch any of this before money changes hands.
-          </p>
-          <p>
-            PropertyIQ exists to close that information gap. Every assessment cross-references public
-            government records, fraud-pattern databases, and comparable transaction data — the same kind
-            of scrutiny a careful lawyer or engineer would apply, made accessible before you commit, not
-            after a dispute. Construction Studio goes a step further: instead of trusting a builder's
-            quoted rate, it prices your build from real material and labor costs, region by region, so
-            you have an independent number to compare against what you're being asked to pay.
-          </p>
+          {formData.country === "India" ? (
+            <>
+              <h2>Why PropertyIQ exists</h2>
+              <p>
+                Real estate in India runs on trust that's rarely earned. Builders routinely inflate carpet
+                area against sanctioned plans, quote per-square-foot rates with no defensible basis, and bury
+                change-of-plan or cost-escalation clauses deep in agreements few buyers ever read closely.
+                Pricing itself is often little more than "what the market will bear" — copied from a
+                neighboring project, adjusted for a broker's commission, with no grounding in actual
+                construction cost, land value, or comparable sales data.
+              </p>
+              <p>
+                The common loopholes are well known inside the industry and almost invisible outside it:
+                RERA registration numbers that don't match the actual project, occupancy certificates
+                obtained for a different building configuration than what's delivered, and "super built-up
+                area" quoted with a loading factor that can run anywhere from 20% to 40%+ over actual carpet
+                area with no consistent standard — meaning two builders can describe the exact same living
+                space with very different-sounding square footage. A buyer evaluating a single property has
+                no independent way to catch any of this before money changes hands.
+              </p>
+              <p>
+                PropertyIQ exists to close that information gap. Every assessment cross-references public
+                government records, fraud-pattern databases, and comparable transaction data — the same kind
+                of scrutiny a careful lawyer or engineer would apply, made accessible before you commit, not
+                after a dispute. Construction Studio goes a step further: instead of trusting a builder's
+                quoted rate, it prices your build from real material and labor costs, region by region, so
+                you have an independent number to compare against what you're being asked to pay.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2>Why PropertyIQ exists</h2>
+              <p>
+                Buying property runs on trust that's rarely earned back. Developers routinely quote areas
+                and per-unit rates with no defensible basis, describe the same living space very differently
+                depending on which measurement convention favors the sale, and bury cost-escalation or
+                change-of-plan clauses in agreements few buyers ever read closely. Asking prices are often
+                little more than "what the market will bear" — copied from a neighboring project, adjusted
+                for a broker's commission, with no real grounding in construction cost, land value, or
+                genuinely comparable sales data.
+              </p>
+              <p>
+                The common loopholes are well known inside the industry and almost invisible outside it:
+                permits and registrations that don't quite match what's actually being delivered, official
+                appraisal or guidance values quoted selectively depending on whether they favor a lower tax
+                bill or a higher resale price, and floor-area figures that shift depending on which
+                convention a developer chooses to use that day. A buyer evaluating a single property has no
+                independent way to catch any of this before money changes hands.
+              </p>
+              <p>
+                PropertyIQ exists to close that information gap. Every assessment cross-references public
+                government records, fraud-pattern databases, and comparable transaction data for your
+                property's country — the same kind of scrutiny a careful lawyer or engineer would apply,
+                made accessible before you commit, not after a dispute. Construction Studio goes a step
+                further: instead of trusting a developer's quoted rate, it prices your build from real,
+                locally-researched material and labor costs, so you have an independent number to compare
+                against what you're being asked to pay.
+              </p>
+            </>
+          )}
           <p className="mission-tagline">
             Independent. Evidence-based. Built for the buyer, not the builder.
           </p>
