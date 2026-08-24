@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
 import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
+import { studioApi, getSession } from "../studio/studioApi";
 
 function AssessmentResult({
   result,
@@ -12,6 +13,57 @@ function AssessmentResult({
   onLaunchStudio
 }) {
   const [reportLoading, setReportLoading] = useState(false);
+
+  // Backs a real, reported gap: there was no obvious link between
+  // generating a report and buying the Insight Add-on at all — the
+  // only path was a collapsed "Similar Property Insights" panel further
+  // down the page that, once expanded and clicked, routed to the
+  // generic Studio pricing page rather than starting checkout directly.
+  // This checks unlock status on load (silently, via getSession — no
+  // error shown if not signed in, since that's a normal state here, not
+  // a failure) so the purchase button doesn't show for a report that's
+  // already unlocked.
+  const [insightState, setInsightState] = useState("checking"); // "checking" | "unlocked" | "not_unlocked" | "starting_checkout" | "error"
+
+  useEffect(() => {
+    if (!reportId) {
+      setTimeout(() => setInsightState("not_unlocked"), 0);
+      return;
+    }
+    if (!getSession()) {
+      setTimeout(() => setInsightState("not_unlocked"), 0); // not signed in yet — button still shows, prompts sign-in when clicked
+      return;
+    }
+    let cancelled = false;
+    studioApi.getInsightStatus(reportId)
+      .then((res) => {
+        if (!cancelled) setInsightState(res.unlocked ? "unlocked" : "not_unlocked");
+      })
+      .catch(() => {
+        if (!cancelled) setInsightState("not_unlocked"); // fails open to showing the button, not a hard error state
+      });
+    return () => { cancelled = true; };
+  }, [reportId]);
+
+  const handleBuyInsight = async () => {
+    if (!getSession()) {
+      onLaunchStudio(); // routes to sign-in first, same pattern as SimilarPropertiesWidget's existing CTA
+      return;
+    }
+    setInsightState("starting_checkout");
+    try {
+      const res = await studioApi.insightCheckout(reportId);
+      if (res.checkout_url) {
+        window.location.href = res.checkout_url;
+        return;
+      }
+      // Beta-bypass path (no real checkout_url returned) — access was granted immediately
+      setInsightState("unlocked");
+    } catch (err) {
+      console.warn("Couldn't start Insight Add-on checkout:", err);
+      setInsightState("error");
+    }
+  };
 
   if (!result) return null;
 
@@ -1133,6 +1185,28 @@ function AssessmentResult({
             ? "Generating Report..."
             : "Download PropertyIQ Report"}
         </button>
+
+        {insightState === "unlocked" ? (
+          <p className="recommendation-insight-unlocked">
+            ✅ Similar-property insights are unlocked for this report — see them further down the page.
+          </p>
+        ) : (
+          <button
+            className="download-report-btn recommendation-insight-btn"
+            onClick={handleBuyInsight}
+            disabled={insightState === "starting_checkout"}
+          >
+            {insightState === "starting_checkout" && <span className="spinner"></span>}
+            {insightState === "starting_checkout"
+              ? "Starting checkout..."
+              : "Unlock Similar-Property Insights"}
+          </button>
+        )}
+        {insightState === "error" && (
+          <p className="recommendation-insight-error">
+            Couldn't start checkout — please try again in a moment.
+          </p>
+        )}
 
       </div>
 
