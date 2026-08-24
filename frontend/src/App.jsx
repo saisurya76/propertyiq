@@ -404,25 +404,61 @@ function App() {
     }
 
     if (params.get("insight") === "1") {
-      const reportId = params.get("report_id");
+      const returnedReportId = params.get("report_id");
       window.history.replaceState({}, "", window.location.pathname);
-      if (!reportId) return;
+      if (!returnedReportId) return;
+
+      // Restores the exact report the user was viewing before checkout
+      // — a real, deliberate fix for a genuine gap: the report only
+      // ever lived in React state (reportId itself is a client-
+      // generated UUID, not something the backend can look up), so it
+      // was lost entirely on the full-page reload checkout requires,
+      // leaving the user on the plain homepage being told to re-enter
+      // the whole property form again just to see what they paid for.
+      let restoredReport = null;
+      try {
+        const pending = sessionStorage.getItem("propertyiq_pending_report");
+        if (pending) {
+          const parsed = JSON.parse(pending);
+          if (parsed.reportId === returnedReportId) {
+            restoredReport = parsed;
+          }
+        }
+      } catch (error) {
+        console.warn("Couldn't restore pending report:", error);
+      }
+      sessionStorage.removeItem("propertyiq_pending_report");
+
+      if (restoredReport) {
+        setTimeout(() => {
+          setResult(restoredReport.result);
+          setFormData(restoredReport.formData);
+          setReportId(restoredReport.reportId);
+        }, 0);
+        // No separate banner here — the restored report's own Final
+        // Recommendation card already shows a clear "✅ unlocked"
+        // confirmation once insightState resolves, so a second,
+        // identical-sounding message at the top of the page would just
+        // be a redundant repeat of the same information.
+        return;
+      }
+
+      // Fallback path — restoration genuinely wasn't possible (a fresh
+      // browser/tab, cleared storage, etc), so this is the one case
+      // where re-running the assessment really is the only option, and
+      // it's worth explaining why rather than just failing silently.
       let cancelled = false;
       const pollInsight = async (attemptsLeft) => {
         if (cancelled) return;
         try {
-          const result = await studioApi.getInsightStatus(reportId);
+          const result = await studioApi.getInsightStatus(returnedReportId);
           if (cancelled) return;
           if (result.unlocked) {
-            // A known, honest limitation, not fully solved here: the
-            // original computed report lived only in React state and
-            // doesn't survive the full page reload checkout requires,
-            // so there's no way to redisplay it automatically —
-            // re-submitting the same property form will show it again,
-            // now correctly unlocked.
             setPaymentReturnMessage({
               tone: "success",
-              text: "Payment successful! Similar-property insights are unlocked — re-run your property assessment to see them.",
+              text: "Payment successful! Similar-property insights are unlocked for this report. "
+                    + "We couldn't restore your report view automatically (this can happen in a new tab or "
+                    + "after clearing browser data) — re-run the same property assessment to see it, now unlocked.",
             });
             return;
           }

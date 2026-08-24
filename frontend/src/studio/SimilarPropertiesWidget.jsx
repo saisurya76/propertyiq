@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { studioApi, getSession } from "./studioApi";
+import { studioApi } from "./studioApi";
 
-function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePerSqft, onNeedAccess }) {
+function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePerSqft }) {
   const [state, setState] = useState("idle"); // "idle" | "loading" | "locked" | "loaded" | "error"
   const [data, setData] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -23,14 +23,6 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
         setState("error");
       }
     }
-  };
-
-  const handleUnlock = () => {
-    if (!getSession()) {
-      onNeedAccess(); // routes to sign-in first
-      return;
-    }
-    onNeedAccess(); // routes to pricing to buy the Insight Add-on
   };
 
   if (state === "idle") {
@@ -59,12 +51,10 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
       <div className="sp-widget">
         <div className="sp-locked">
           <p>
-            Unlock similar property suggestions for this report with the Insight Add-on,
-            or with any active PropertyIQ Studio subscription.
+            Purchase the Insight Add-on using the "Unlock Similar-Property Insights" button
+            further up this page (in the Final Recommendation section) to see comparable
+            properties here — no need for a separate purchase path.
           </p>
-          <button className="studio-cta-btn" onClick={handleUnlock}>
-            Unlock Similar Property Insights
-          </button>
         </div>
       </div>
     );

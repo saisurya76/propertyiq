@@ -24,6 +24,13 @@ function AssessmentResult({
   // a failure) so the purchase button doesn't show for a report that's
   // already unlocked.
   const [insightState, setInsightState] = useState("checking"); // "checking" | "unlocked" | "not_unlocked" | "starting_checkout" | "error"
+  const [insightPriceUsd, setInsightPriceUsd] = useState(null);
+
+  useEffect(() => {
+    studioApi.getTiers()
+      .then((tiers) => setInsightPriceUsd(tiers.insight_addon?.price_usd ?? null))
+      .catch(() => {}); // price display is a nice-to-have, not critical path
+  }, []);
 
   useEffect(() => {
     if (!reportId) {
@@ -47,13 +54,24 @@ function AssessmentResult({
 
   const handleBuyInsight = async () => {
     if (!getSession()) {
-      onLaunchStudio(); // routes to sign-in first, same pattern as SimilarPropertiesWidget's existing CTA
+      onLaunchStudio(); // routes to sign-in first
       return;
     }
     setInsightState("starting_checkout");
     try {
       const res = await studioApi.insightCheckout(reportId);
       if (res.checkout_url) {
+        // Backs a real, deliberate fix: without this, the report
+        // (which only ever lived in React state, never persisted
+        // server-side — reportId itself is a client-generated UUID,
+        // not something the backend can look up) was lost entirely on
+        // the full-page-reload checkout redirect requires, leaving the
+        // user on the plain homepage with only a message telling them
+        // to re-enter the whole property form again just to see what
+        // they'd paid for. Persisting it here lets the app restore the
+        // exact same report automatically on return, already unlocked
+        // — no redundant "go redo this" message needed at all.
+        sessionStorage.setItem("propertyiq_pending_report", JSON.stringify({ result, formData, reportId }));
         window.location.href = res.checkout_url;
         return;
       }
@@ -1191,16 +1209,22 @@ function AssessmentResult({
             ✅ Similar-property insights are unlocked for this report — see them further down the page.
           </p>
         ) : (
-          <button
-            className="download-report-btn recommendation-insight-btn"
-            onClick={handleBuyInsight}
-            disabled={insightState === "starting_checkout"}
-          >
-            {insightState === "starting_checkout" && <span className="spinner"></span>}
-            {insightState === "starting_checkout"
-              ? "Starting checkout..."
-              : "Unlock Similar-Property Insights"}
-          </button>
+          <div className="recommendation-insight-cta">
+            <p className="recommendation-insight-desc">
+              See how this property's price compares to similar ones nearby, with real
+              comparable pricing from actual listings{insightPriceUsd != null ? ` — one-time $${insightPriceUsd}` : ""}.
+            </p>
+            <button
+              className="download-report-btn recommendation-insight-btn"
+              onClick={handleBuyInsight}
+              disabled={insightState === "starting_checkout"}
+            >
+              {insightState === "starting_checkout" && <span className="spinner"></span>}
+              {insightState === "starting_checkout"
+                ? "Starting checkout..."
+                : "Unlock Similar-Property Insights"}
+            </button>
+          </div>
         )}
         {insightState === "error" && (
           <p className="recommendation-insight-error">
@@ -1217,7 +1241,6 @@ function AssessmentResult({
           city={formData.city}
           propertyType={formData.propertyType}
           subjectPricePerSqft={result.quotedPricePerSqft}
-          onNeedAccess={onLaunchStudio}
         />
       </CollapsiblePanel>
 
