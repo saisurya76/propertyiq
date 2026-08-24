@@ -10,7 +10,8 @@ function AssessmentResult({
   result,
   formData,
   reportId,
-  onLaunchStudio
+  onLaunchStudio,
+  scrollToRecommendationSignal
 }) {
   const [reportLoading, setReportLoading] = useState(false);
 
@@ -82,6 +83,20 @@ function AssessmentResult({
       setInsightState("error");
     }
   };
+
+  // Scrolls back to the Final Recommendation card (where the "✅
+  // unlocked" confirmation lives) once a report is restored after an
+  // Insight Add-on purchase — without this, the user lands at the top
+  // of a long report page with no visual indication their purchase
+  // actually did anything, even though it worked correctly underneath.
+  // Guarded on a truthy, non-zero signal specifically so this never
+  // fires on a normal first page load (the signal starts at 0 in
+  // App.jsx and is only ever incremented after a genuine restore).
+  useEffect(() => {
+    if (!scrollToRecommendationSignal) return;
+    const el = document.getElementById("final-recommendation-card");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [scrollToRecommendationSignal]);
 
   if (!result) return null;
 
@@ -1176,7 +1191,7 @@ function AssessmentResult({
 
       </div>
 
-      <div className="recommendation-card">
+      <div className="recommendation-card" id="final-recommendation-card">
 
         <div className="recommendation-title">
           FINAL RECOMMENDATION
@@ -1190,10 +1205,15 @@ function AssessmentResult({
           {result.findings?.overall}
         </div>
 
+        {/* Hidden, not removed — per explicit instruction, the button
+            and its underlying logic (downloadReport, reportLoading)
+            stay fully intact for whenever this feature is ready to
+            re-enable, just not shown to users right now. */}
         <button
           className="download-report-btn"
           onClick={downloadReport}
           disabled={true}
+          style={{ display: "none" }}
         >
           {reportLoading && (
             <span className="spinner"></span>
@@ -1222,7 +1242,7 @@ function AssessmentResult({
               {insightState === "starting_checkout" && <span className="spinner"></span>}
               {insightState === "starting_checkout"
                 ? "Starting checkout..."
-                : "Unlock Similar-Property Insights"}
+                : `Buy & Unlock Similar-Property Insights${insightPriceUsd != null ? ` ($${insightPriceUsd})` : ""}`}
             </button>
           </div>
         )}

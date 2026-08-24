@@ -184,6 +184,12 @@ function App() {
   });
 
   const [result, setResult] = useState(null);
+  // Bumped (not just toggled true/false) each time a report is restored
+  // after an Insight Add-on purchase, so the scroll effect in
+  // AssessmentResult can detect it via a genuinely changing dependency
+  // — a plain boolean set to true twice in a row wouldn't re-trigger a
+  // useEffect, since React sees no change.
+  const [scrollToRecommendationSignal, setScrollToRecommendationSignal] = useState(0);
   const [reportId, setReportId] = useState(null);
   const [studioView, setStudioView] = useState(() => {
     // Real URL access: hitting /admin directly loads straight into the
@@ -434,6 +440,7 @@ function App() {
           setResult(restoredReport.result);
           setFormData(restoredReport.formData);
           setReportId(restoredReport.reportId);
+          setScrollToRecommendationSignal((n) => n + 1);
         }, 0);
         // No separate banner here — the restored report's own Final
         // Recommendation card already shows a clear "✅ unlocked"
@@ -982,6 +989,7 @@ function App() {
         formData={formData}
         reportId={reportId}
         onLaunchStudio={launchStudio}
+        scrollToRecommendationSignal={scrollToRecommendationSignal}
       />
 
       <Disclaimer />
