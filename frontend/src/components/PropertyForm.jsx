@@ -1,17 +1,87 @@
+import { useState } from "react";
 import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
 import { getCitiesForCountry } from "../utils/citiesByCountry";
+import { studioApi, getSession } from "../studio/studioApi";
 
 function PropertyForm({
   formData,
   handleChange,
   generateAssessment,
-  loading
+  loading,
+  onBulkFillFromExtraction,
+  onLaunchStudio
 }) {
   const availableCities = getCitiesForCountry(formData.country, formData.city);
   const governmentValueLabel = getGovernmentValueLabel(formData.country);
 
+  // Backs the property_url_import tier feature — paste a listing URL
+  // from any real-estate site, and whichever fields the extraction
+  // genuinely finds get filled in automatically. Deliberately does
+  // NOT attempt the fraud-verification fields (government value,
+  // market average, developer track record) — those are essentially
+  // never published on a listing page, and this feature would rather
+  // leave them blank for the user to independently research than
+  // guess at something a real fraud-check tool needs to verify, not
+  // trust from the same source it's meant to be checking.
+  const [urlImportInput, setUrlImportInput] = useState("");
+  const [urlImportState, setUrlImportState] = useState("idle"); // "idle" | "loading" | "done" | "error"
+  const [urlImportMessage, setUrlImportMessage] = useState("");
+
+  const handleUrlImport = async () => {
+    if (!urlImportInput.trim()) return;
+    if (!getSession()) {
+      onLaunchStudio?.();
+      return;
+    }
+    setUrlImportState("loading");
+    setUrlImportMessage("");
+    try {
+      const res = await studioApi.extractFromUrl(urlImportInput.trim());
+      const found = Object.entries(res.extracted).filter(([, v]) => v !== null && v !== undefined && v !== "");
+      onBulkFillFromExtraction(res.extracted);
+      setUrlImportState("done");
+      setUrlImportMessage(
+        found.length > 0
+          ? `Filled in ${found.length} field${found.length === 1 ? "" : "s"} from the listing. Please review, and fill in the remaining fields yourself — the government value, market average, and developer track-record fields need independent research and are never auto-filled from a listing page.`
+          : "Couldn't find any usable property details on that page — please fill in the form manually."
+      );
+    } catch (err) {
+      setUrlImportState("error");
+      setUrlImportMessage(err.status === 403
+        ? "Importing from a URL requires an active Studio subscription that includes this feature."
+        : (err.message || "Couldn't import from that URL — please fill in the form manually."));
+    }
+  };
+
   return (
     <div className="card">
+
+      <div className="property-url-import">
+        <label htmlFor="property-url-input">Import from a property listing URL (optional)</label>
+        <div className="property-url-import-row">
+          <input
+            id="property-url-input"
+            type="url"
+            placeholder="Paste a listing URL from any property site"
+            value={urlImportInput}
+            onChange={(e) => setUrlImportInput(e.target.value)}
+            disabled={urlImportState === "loading"}
+          />
+          <button
+            type="button"
+            className="property-url-import-btn"
+            onClick={handleUrlImport}
+            disabled={urlImportState === "loading" || !urlImportInput.trim()}
+          >
+            {urlImportState === "loading" ? "Importing..." : "Import"}
+          </button>
+        </div>
+        {urlImportMessage && (
+          <p className={`property-url-import-message property-url-import-${urlImportState}`}>
+            {urlImportMessage}
+          </p>
+        )}
+      </div>
 
       <p className="required-note">
        Only fields marked <strong>*</strong> are required. All other fields improve assessment accuracy.

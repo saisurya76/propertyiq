@@ -138,4 +138,7 @@ export const studioApi = {
 
   getInsightStatus: (reportId) =>
     apiFetch(`/api/insight/status/${encodeURIComponent(reportId)}`),
+
+  extractFromUrl: (url) =>
+    apiFetch("/api/property/extract-from-url", { method: "POST", body: JSON.stringify({ url }) }),
 };

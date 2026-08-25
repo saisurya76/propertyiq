@@ -771,6 +771,64 @@ textarea {
   text-align: center;
 }
 
+.property-url-import {
+  margin-bottom: 20px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #faf7ff;
+  border: 1px solid #ede4fc;
+}
+
+.property-url-import label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5c4f78;
+  margin-bottom: 8px;
+}
+
+.property-url-import-row {
+  display: flex;
+  gap: 10px;
+}
+
+.property-url-import-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ede4fc;
+  font-size: 14px;
+}
+
+.property-url-import-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #7c5cbf;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.property-url-import-btn:disabled {
+  background: #c9bde3;
+  cursor: not-allowed;
+}
+
+.property-url-import-message {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.property-url-import-done {
+  color: #065f46;
+}
+
+.property-url-import-error {
+  color: #991b1b;
+}
+
 .form-section {
   margin-top: 28px;
 }

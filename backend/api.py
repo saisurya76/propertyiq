@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import os
 import uuid
+import requests
 
 from dodopayments import DodoPayments
 
@@ -99,6 +100,8 @@ from backend.subscription_store import (
     get_active_tier,
     list_all_subscriptions,
 )
+
+from backend.property_url_extract import extract_property_data
 
 from backend.insight_store import (
     initialize_insight_store,
@@ -1088,6 +1091,48 @@ def insight_status(report_id: str, user_email: str = Depends(get_current_user_em
     report-unlock order-status endpoint) since insight access is tied to
     a specific logged-in account, not a bare capability token."""
     return {"report_id": report_id, "unlocked": has_insight_access(report_id, user_email)}
+
+
+class PropertyUrlExtractRequest(BaseModel):
+    url: str
+
+
+@app.post("/api/property/extract-from-url")
+def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: str = Depends(get_current_user_email)):
+    """Fetches a real-estate listing URL from any site and extracts
+    whichever property-form fields are genuinely stated on the page,
+    via Claude — the property_url_import tier feature. Gated by
+    has_feature like every other tier feature; the same enforcement
+    point admin-toggling already controls.
+
+    Deliberately does NOT attempt to fill the fraud-verification fields
+    (government guidance value, independently-researched market
+    average, developer track record) — those are essentially never
+    published on a listing page, and this endpoint would rather return
+    null for a field than guess or hallucinate a value for something a
+    real fraud-detection tool needs to independently verify, not trust
+    from the same listing it's meant to be checking."""
+    tier_id = get_active_tier(user_email)
+    if not has_feature(tier_id, "property_url_import"):
+        raise HTTPException(
+            status_code=403,
+            detail="Importing property details from a URL requires an active Studio "
+                   "subscription that includes this feature."
+        )
+
+    if not request.url.strip().lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Please provide a valid http(s) URL.")
+
+    try:
+        extracted = extract_property_data(request.url.strip())
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Couldn't fetch that URL: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {"extracted": extracted}
 
 
 @app.post("/api/webhooks/dodo")

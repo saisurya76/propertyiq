@@ -184,12 +184,6 @@ function App() {
   });
 
   const [result, setResult] = useState(null);
-  // Bumped (not just toggled true/false) each time a report is restored
-  // after an Insight Add-on purchase, so the scroll effect in
-  // AssessmentResult can detect it via a genuinely changing dependency
-  // — a plain boolean set to true twice in a row wouldn't re-trigger a
-  // useEffect, since React sees no change.
-  const [scrollToRecommendationSignal, setScrollToRecommendationSignal] = useState(0);
   const [reportId, setReportId] = useState(null);
   const [studioView, setStudioView] = useState(() => {
     // Real URL access: hitting /admin directly loads straight into the
@@ -440,7 +434,6 @@ function App() {
           setResult(restoredReport.result);
           setFormData(restoredReport.formData);
           setReportId(restoredReport.reportId);
-          setScrollToRecommendationSignal((n) => n + 1);
         }, 0);
         // No separate banner here — the restored report's own Final
         // Recommendation card already shows a clear "✅ unlocked"
@@ -500,6 +493,23 @@ function App() {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  // Backs the property_url_import tier feature: merges whichever
+  // fields the backend's extraction genuinely found on a pasted
+  // listing URL into the form. Only overwrites fields with a real,
+  // non-null extracted value — deliberately never blanks out a field
+  // the user may have already filled in with something the extractor
+  // didn't find, and always converts to string since every form field
+  // here is a controlled text/number input expecting string values.
+  const handleBulkFillFromExtraction = (extracted) => {
+    const updates = {};
+    for (const [key, value] of Object.entries(extracted)) {
+      if (value !== null && value !== undefined && value !== "") {
+        updates[key] = String(value);
+      }
+    }
+    setFormData((prev) => ({ ...prev, ...updates }));
   };
 
   const buildRequestPayload = () => ({
@@ -980,6 +990,8 @@ function App() {
             handleChange={handleChange}
             generateAssessment={generateAssessment}
             loading={loading}
+            onBulkFillFromExtraction={handleBulkFillFromExtraction}
+            onLaunchStudio={launchStudio}
           />
         </CollapsiblePanel>
       </div>
@@ -989,7 +1001,6 @@ function App() {
         formData={formData}
         reportId={reportId}
         onLaunchStudio={launchStudio}
-        scrollToRecommendationSignal={scrollToRecommendationSignal}
       />
 
       <Disclaimer />
