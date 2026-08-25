@@ -1051,6 +1051,13 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
     BETA: if PROPERTYIQ_BETA_BYPASS_PAYMENTS=true, skips Dodo entirely and
     returns immediate access — no real payment, no checkout_url."""
 
+    insight_tier = get_tier("insight_addon")
+    if insight_tier and insight_tier.get("mode") == "free":
+        raise HTTPException(
+            status_code=400,
+            detail="Similar property suggestions are currently free for everyone — there's nothing to buy."
+        )
+
     if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
         grant_insight_access(request.report_id, user_email)
         return {
@@ -1089,8 +1096,15 @@ def insight_status(report_id: str, user_email: str = Depends(get_current_user_em
     path this SPA has no route for at all, and nothing on the frontend
     read the insight=1 query param either. Authenticated (unlike the
     report-unlock order-status endpoint) since insight access is tied to
-    a specific logged-in account, not a bare capability token."""
-    return {"report_id": report_id, "unlocked": has_insight_access(report_id, user_email)}
+    a specific logged-in account, not a bare capability token.
+
+    Uses the same _has_similar_properties_access check the actual data
+    endpoint uses (not a narrower has_insight_access-only check) — a
+    real consistency gap this closes: this previously only checked for
+    a specific per-report purchase grant, so it would have incorrectly
+    reported "not unlocked" for a user with free-mode or subscription
+    access, even though they could genuinely already see the data."""
+    return {"report_id": report_id, "unlocked": _has_similar_properties_access(user_email, report_id)}
 
 
 class PropertyUrlExtractRequest(BaseModel):
@@ -1284,8 +1298,14 @@ def subscribe_status(user_email: str = Depends(get_current_user_email)):
 
 
 def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
-    """Access via either the one-time Insight Add-on grant for this specific
-    report, or an active subscription tier whose features include it."""
+    """Access via free mode (an admin-toggleable, product-wide setting —
+    see insight_addon's "mode" field), the one-time Insight Add-on grant
+    for this specific report, or an active subscription tier whose
+    features include it."""
+    insight_tier = get_tier("insight_addon")
+    if insight_tier and insight_tier.get("mode") == "free":
+        return True
+
     if has_insight_access(report_id, user_email):
         return True
 

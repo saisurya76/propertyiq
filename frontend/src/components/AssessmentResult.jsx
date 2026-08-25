@@ -26,11 +26,21 @@ function AssessmentResult({
   // already unlocked.
   const [insightState, setInsightState] = useState("checking"); // "checking" | "unlocked" | "not_unlocked" | "starting_checkout" | "error"
   const [insightPriceUsd, setInsightPriceUsd] = useState(null);
+  // Backs the new admin-toggleable insight_addon "mode" setting — a
+  // real, reported gap this closes: the Similar Property Insights
+  // panel was always visible (as a locked teaser) regardless of
+  // purchase status. Defaults to "paid" (current/prior behavior) until
+  // the real value loads, so there's no flash of free-mode content
+  // before the actual setting is known.
+  const [insightMode, setInsightMode] = useState("paid");
 
   useEffect(() => {
     studioApi.getTiers()
-      .then((tiers) => setInsightPriceUsd(tiers.insight_addon?.price_usd ?? null))
-      .catch(() => {}); // price display is a nice-to-have, not critical path
+      .then((tiers) => {
+        setInsightPriceUsd(tiers.insight_addon?.price_usd ?? null);
+        setInsightMode(tiers.insight_addon?.mode ?? "paid");
+      })
+      .catch(() => {}); // price/mode display is a nice-to-have, not critical path
   }, []);
 
   useEffect(() => {
@@ -1224,7 +1234,11 @@ function AssessmentResult({
             : "Download PropertyIQ Report"}
         </button>
 
-        {insightState === "unlocked" ? (
+        {insightMode === "free" ? (
+          <p className="recommendation-insight-unlocked">
+            ✅ Similar-property insights are included for everyone — see them further down the page.
+          </p>
+        ) : insightState === "unlocked" ? (
           <p className="recommendation-insight-unlocked">
             ✅ Similar-property insights are unlocked for this report — see them further down the page.
           </p>
@@ -1246,7 +1260,7 @@ function AssessmentResult({
             </button>
           </div>
         )}
-        {insightState === "error" && (
+        {insightMode === "paid" && insightState === "error" && (
           <p className="recommendation-insight-error">
             Couldn't start checkout — please try again in a moment.
           </p>
@@ -1255,14 +1269,16 @@ function AssessmentResult({
       </div>
 
 
-      <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
-        <SimilarPropertiesWidget
-          reportId={reportId}
-          city={formData.city}
-          propertyType={formData.propertyType}
-          subjectPricePerSqft={result.quotedPricePerSqft}
-        />
-      </CollapsiblePanel>
+      {(insightMode === "free" || insightState === "unlocked") && (
+        <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
+          <SimilarPropertiesWidget
+            reportId={reportId}
+            city={formData.city}
+            propertyType={formData.propertyType}
+            subjectPricePerSqft={result.quotedPricePerSqft}
+          />
+        </CollapsiblePanel>
+      )}
 
       <CollapsiblePanel title="PropertyIQ Studio" defaultOpen={false} color="purple">
         <StudioPromoCard onLaunch={onLaunchStudio} />

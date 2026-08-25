@@ -13,6 +13,16 @@ DEFAULT_TIER_CONFIG = {
         "features": ["similar_property_suggestions"],
         "design_quota_per_month": 0,
         "saved_designs_limit": 0,
+        # "paid" (default, current behavior): similar-property suggestions
+        # require a purchase or an active subscription that includes the
+        # feature — the panel itself stays hidden until unlocked, not
+        # just its data. "free": suggestions are available to everyone
+        # with no purchase at all, and the buy button disappears since
+        # there's nothing to buy. A real, admin-toggleable product
+        # decision, not a per-tier feature flag, since it's an either/or
+        # switch for the whole product rather than something that
+        # differs by subscription tier.
+        "mode": "paid",
     },
     "studio_starter": {
         "label": "Studio Starter",

@@ -121,3 +121,81 @@ def test_insight_status_endpoint_reflects_grant():
     # Requires auth
     no_auth = client.get("/api/insight/status/rep_status_test")
     assert no_auth.status_code == 401
+
+
+def test_free_mode_grants_access_with_no_purchase_at_all():
+    """Backs the new admin-toggleable insight_addon "mode" setting — a
+    real, reported UX gap this closes alongside it: the Similar
+    Property Insights panel was previously always visible (as a locked
+    teaser) regardless of purchase status. In free mode, access should
+    require nothing at all beyond being signed in — no purchase, no
+    active subscription."""
+    from unittest.mock import patch
+
+    email = "free_mode_test@example.com"
+    headers = _authed_headers(email)
+
+    free_tier_config = {"insight_addon": {"mode": "free", "features": ["similar_property_suggestions"]}}
+    with patch("backend.api.get_tier", side_effect=lambda tid: free_tier_config.get(tid)):
+        r = client.get("/api/similar-properties/rep_never_purchased", headers=headers,
+                        params={"city": "Hyderabad", "property_type": "Apartment", "subject_price_per_sqft": 9500})
+    assert r.status_code == 200
+
+
+def test_free_mode_rejects_checkout_attempts():
+    """Nothing to buy in free mode — the checkout endpoint should say
+    so clearly rather than creating a real Dodo checkout session for a
+    feature that's free for everyone."""
+    from unittest.mock import patch
+
+    email = "free_mode_checkout_test@example.com"
+    headers = _authed_headers(email)
+
+    free_tier_config = {"insight_addon": {"mode": "free", "features": ["similar_property_suggestions"]}}
+    with patch("backend.api.get_tier", side_effect=lambda tid: free_tier_config.get(tid)):
+        r = client.post("/api/insight/checkout", headers=headers, json={"report_id": "rep_free_mode"})
+    assert r.status_code == 400
+    assert "free for everyone" in r.json()["detail"]
+
+
+def test_paid_mode_is_the_default_and_still_requires_purchase():
+    """Confirms the default ("paid") mode preserves all prior, correct
+    gating behavior — this feature is additive, not a regression."""
+    headers = _authed_headers("paid_mode_default_test@example.com")
+    r = client.get("/api/similar-properties/rep_paid_mode_default", headers=headers,
+                    params={"city": "Hyderabad", "property_type": "Apartment"})
+    assert r.status_code == 403
+
+
+def test_insight_status_reflects_free_mode_and_subscription_access_too():
+    """Real consistency gap this closes: /api/insight/status previously
+    only checked for a specific per-report purchase grant, so it would
+    have incorrectly reported "not unlocked" for a user with free-mode
+    or active-subscription access, even though they could genuinely
+    already see the similar-properties data via the actual data
+    endpoint. Both status endpoints must agree."""
+    from unittest.mock import patch
+
+    # Free mode
+    free_email = "insight_status_free_test@example.com"
+    free_headers = _authed_headers(free_email)
+    free_tier_config = {"insight_addon": {"mode": "free", "features": ["similar_property_suggestions"]}}
+    with patch("backend.api.get_tier", side_effect=lambda tid: free_tier_config.get(tid)):
+        r = client.get("/api/insight/status/rep_never_purchased_free_mode", headers=free_headers)
+    assert r.status_code == 200
+    assert r.json()["unlocked"] is True
+
+    # Active subscription, no per-report purchase at all
+    sub_email = "insight_status_subscriber_test@example.com"
+    sub_headers = _authed_headers(sub_email)
+    upsert_subscription(email=sub_email, tier_id="studio_starter", status="active", dodo_subscription_id="sub_insight_status_test")
+    r = client.get("/api/insight/status/rep_never_purchased_by_subscriber", headers=sub_headers)
+    assert r.status_code == 200
+    assert r.json()["unlocked"] is True
+
+    # Neither -- correctly still locked
+    plain_email = "insight_status_plain_test@example.com"
+    plain_headers = _authed_headers(plain_email)
+    r = client.get("/api/insight/status/rep_genuinely_not_unlocked", headers=plain_headers)
+    assert r.status_code == 200
+    assert r.json()["unlocked"] is False

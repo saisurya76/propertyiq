@@ -269,6 +269,29 @@ function AdminPanel({ onBack }) {
                   </label>
                 ))}
               </div>
+              {tierId === "insight_addon" && (
+                <div className="admin-tier-features-row" title="Free: similar-property suggestions are available to everyone, no purchase — the buy button disappears. Paid: the current behavior — a purchase or active subscription is required, and the panel stays hidden until unlocked.">
+                  <span className="admin-tier-features-label">Mode:</span>
+                  <label className="admin-feature-checkbox">
+                    <input
+                      type="radio"
+                      name="insight-addon-mode"
+                      checked={(tier.mode ?? "paid") === "paid"}
+                      onChange={() => updateTierField(tierId, "mode", "paid")}
+                    />
+                    Paid (default — requires purchase or subscription)
+                  </label>
+                  <label className="admin-feature-checkbox">
+                    <input
+                      type="radio"
+                      name="insight-addon-mode"
+                      checked={tier.mode === "free"}
+                      onChange={() => updateTierField(tierId, "mode", "free")}
+                    />
+                    Free (available to everyone, no purchase)
+                  </label>
+                </div>
+              )}
             </Fragment>
           );
         })}
