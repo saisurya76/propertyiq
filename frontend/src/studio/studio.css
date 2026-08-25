@@ -1519,6 +1519,21 @@
   cursor: pointer;
 }
 
+.admin-feature-hide-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-feature-hide-btn:hover {
+  background: #fee2e2;
+}
+
 .admin-tier-row:not(.admin-tier-row-header):hover {
   background: #faf7ff;
 }

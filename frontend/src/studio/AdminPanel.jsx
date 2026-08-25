@@ -57,6 +57,26 @@ function AdminPanel({ onBack }) {
     });
   };
 
+  // A real, explicit admin control: removes a feature from every tier
+  // at once, matching what the report page checks to decide whether to
+  // show the feature at all — "hiding" a feature IS unchecking it
+  // everywhere, not a separate flag, so the per-tier checkboxes below
+  // correctly show as unchecked immediately, with no separate state to
+  // keep in sync. Same in-memory-until-saved convention as every other
+  // field here.
+  const hideFeatureEverywhere = (feature) => {
+    setTierConfig((cfg) => {
+      const next = { ...cfg };
+      for (const tierId of Object.keys(next)) {
+        next[tierId] = {
+          ...next[tierId],
+          features: (next[tierId].features || []).filter((f) => f !== feature),
+        };
+      }
+      return next;
+    });
+  };
+
   const saveTiers = async () => {
     setSaveMessage("");
     setError("");
@@ -322,6 +342,20 @@ function AdminPanel({ onBack }) {
             </Fragment>
           );
         })}
+        <div className="admin-tier-features-row" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #ede4fc" }}>
+          <span className="admin-tier-features-label">Hide from main page (all tiers):</span>
+          {allFeatures.map((feature) => (
+            <button
+              key={feature}
+              type="button"
+              className="admin-feature-hide-btn"
+              title={`Removes ${feature} from every tier at once, hiding it from the main page entirely — same as unchecking it above on each tier, just in one click. Requires Save Changes below to take effect.`}
+              onClick={() => hideFeatureEverywhere(feature)}
+            >
+              Hide {feature}
+            </button>
+          ))}
+        </div>
         <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveTiers} disabled={loading}>
           {loading ? "Saving..." : "Save Changes"}
         </button>

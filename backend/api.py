@@ -1168,6 +1168,17 @@ def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: st
 
     try:
         extracted = extract_property_data(request.url.strip())
+    except requests.Timeout as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="That site took too long to respond. Please try again, or fill in the form manually."
+        ) from exc
+    except requests.ConnectionError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Couldn't reach that site at all — please double-check the URL is correct and the "
+                   "site is currently online."
+        ) from exc
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in (403, 429):
@@ -1177,6 +1188,18 @@ def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: st
                        "protection that a simple fetch can't get past). Please copy the property details "
                        "into the form manually instead."
             ) from exc
+        if status == 404:
+            raise HTTPException(
+                status_code=422,
+                detail="That page doesn't exist (404) — please double-check the URL, or the listing may "
+                       "have been taken down."
+            ) from exc
+        if status is not None and status >= 500:
+            raise HTTPException(
+                status_code=422,
+                detail="That site is having problems on its own end right now — please try again in a "
+                       "few minutes, or fill in the form manually."
+            ) from exc
         raise HTTPException(status_code=502, detail=f"Couldn't fetch that URL: {exc}") from exc
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"Couldn't fetch that URL: {exc}") from exc
@@ -1184,6 +1207,17 @@ def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: st
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        # A genuine safety net, not expected to fire in normal operation:
+        # without this, any exception type not explicitly anticipated
+        # above (a real bug, an unexpected library error) would surface
+        # to the user as FastAPI's bare, unhelpful default 500 response
+        # instead of a clear, actionable message.
+        raise HTTPException(
+            status_code=500,
+            detail="Something unexpected went wrong while importing from that URL. "
+                   "Please try again, or fill in the form manually."
+        ) from exc
 
     return {"extracted": extracted}
 

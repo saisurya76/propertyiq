@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
 import { getCitiesForCountry } from "../utils/citiesByCountry";
 import { studioApi, getSession } from "../studio/studioApi";
@@ -26,6 +26,22 @@ function PropertyForm({
   const [urlImportInput, setUrlImportInput] = useState("");
   const [urlImportState, setUrlImportState] = useState("idle"); // "idle" | "loading" | "done" | "error"
   const [urlImportMessage, setUrlImportMessage] = useState("");
+  // Real, explicit admin control: if the admin has removed
+  // property_url_import from every tier (the "hide from main page"
+  // action in the admin panel — a bulk uncheck of the same per-tier
+  // checkboxes, not a separate hidden flag), this feature should be
+  // completely absent from the report page, not just non-functional
+  // when tried.
+  const [urlImportFeatureAvailable, setUrlImportFeatureAvailable] = useState(false);
+
+  useEffect(() => {
+    studioApi.getTiers()
+      .then((tiers) => {
+        const anyTierHasIt = Object.values(tiers).some((tier) => (tier.features || []).includes("property_url_import"));
+        setUrlImportFeatureAvailable(anyTierHasIt);
+      })
+      .catch(() => {}); // fails closed (stays hidden) — a nice-to-have display check, not critical path
+  }, []);
 
   const handleUrlImport = async () => {
     if (!urlImportInput.trim()) return;
@@ -56,32 +72,38 @@ function PropertyForm({
   return (
     <div className="card">
 
-      <div className="property-url-import">
-        <label htmlFor="property-url-input">Import from a property listing URL (optional)</label>
-        <div className="property-url-import-row">
-          <input
-            id="property-url-input"
-            type="url"
-            placeholder="Paste a listing URL from any property site"
-            value={urlImportInput}
-            onChange={(e) => setUrlImportInput(e.target.value)}
-            disabled={urlImportState === "loading"}
-          />
-          <button
-            type="button"
-            className="property-url-import-btn"
-            onClick={handleUrlImport}
-            disabled={urlImportState === "loading" || !urlImportInput.trim()}
-          >
-            {urlImportState === "loading" ? "Importing..." : "Import"}
-          </button>
-        </div>
-        {urlImportMessage && (
-          <p className={`property-url-import-message property-url-import-${urlImportState}`}>
-            {urlImportMessage}
+      {urlImportFeatureAvailable && (
+        <div className="property-url-import">
+          <label htmlFor="property-url-input">Import from a property listing URL (optional)</label>
+          <div className="property-url-import-row">
+            <input
+              id="property-url-input"
+              type="url"
+              placeholder="Paste a listing URL from any property site"
+              value={urlImportInput}
+              onChange={(e) => setUrlImportInput(e.target.value)}
+              disabled={urlImportState === "loading"}
+            />
+            <button
+              type="button"
+              className="property-url-import-btn"
+              onClick={handleUrlImport}
+              disabled={urlImportState === "loading" || !urlImportInput.trim()}
+            >
+              {urlImportState === "loading" ? "Importing..." : "Import"}
+            </button>
+          </div>
+          <p className="property-url-import-expectation-note">
+            Note: some listing sites block automated access — if that happens, it's an expected limitation
+            of that specific site, not a sign anything is wrong. Just fill in the form manually instead.
           </p>
-        )}
-      </div>
+          {urlImportMessage && (
+            <p className={`property-url-import-message property-url-import-${urlImportState}`}>
+              {urlImportMessage}
+            </p>
+          )}
+        </div>
+      )}
 
       <p className="required-note">
        Only fields marked <strong>*</strong> are required. All other fields improve assessment accuracy.

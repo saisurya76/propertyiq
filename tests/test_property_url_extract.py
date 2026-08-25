@@ -328,3 +328,99 @@ def test_admin_settings_endpoint_sets_gemini_key():
     assert overview.json()["gemini_api_key_configured"] is True
     # Never returns the actual key value back, even to an authenticated admin
     assert "sk-real-test-key" not in json.dumps(overview.json())
+
+
+def _authed_headers_for_url_import(client_module, email):
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
+    code = create_otp(email)
+    r = client_module.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id=f"sub_{email}", status="active")
+    return headers
+
+
+def test_endpoint_gives_meaningful_message_for_timeout():
+    import requests as requests_module
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    headers = _authed_headers_for_url_import(client, "timeout_message_test@example.com")
+
+    with patch("backend.api.extract_property_data", side_effect=requests_module.Timeout("timed out")):
+        r = client.post("/api/property/extract-from-url", json={"url": "https://example.com/listing/1"}, headers=headers)
+
+    assert r.status_code == 422
+    assert "too long to respond" in r.json()["detail"]
+
+
+def test_endpoint_gives_meaningful_message_for_connection_error():
+    import requests as requests_module
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    headers = _authed_headers_for_url_import(client, "connerr_message_test@example.com")
+
+    with patch("backend.api.extract_property_data", side_effect=requests_module.ConnectionError("could not connect")):
+        r = client.post("/api/property/extract-from-url", json={"url": "https://example.com/listing/1"}, headers=headers)
+
+    assert r.status_code == 422
+    assert "Couldn't reach that site" in r.json()["detail"]
+
+
+def test_endpoint_gives_meaningful_message_for_404():
+    import requests as requests_module
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    headers = _authed_headers_for_url_import(client, "notfound_message_test@example.com")
+
+    fake_response = MagicMock()
+    fake_response.status_code = 404
+    fake_error = requests_module.HTTPError(response=fake_response)
+
+    with patch("backend.api.extract_property_data", side_effect=fake_error):
+        r = client.post("/api/property/extract-from-url", json={"url": "https://example.com/listing/gone"}, headers=headers)
+
+    assert r.status_code == 422
+    assert "doesn't exist (404)" in r.json()["detail"]
+
+
+def test_endpoint_gives_meaningful_message_for_server_error():
+    import requests as requests_module
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    headers = _authed_headers_for_url_import(client, "servererr_message_test@example.com")
+
+    fake_response = MagicMock()
+    fake_response.status_code = 503
+    fake_error = requests_module.HTTPError(response=fake_response)
+
+    with patch("backend.api.extract_property_data", side_effect=fake_error):
+        r = client.post("/api/property/extract-from-url", json={"url": "https://example.com/listing/1"}, headers=headers)
+
+    assert r.status_code == 422
+    assert "having problems on its own end" in r.json()["detail"]
+
+
+def test_endpoint_catches_genuinely_unexpected_exceptions():
+    """A real safety net: any exception type not explicitly anticipated
+    must still surface as a clear, actionable message — never FastAPI's
+    bare, unhelpful default 500 response."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    headers = _authed_headers_for_url_import(client, "unexpected_error_test@example.com")
+
+    with patch("backend.api.extract_property_data", side_effect=KeyError("some genuinely unexpected bug")):
+        r = client.post("/api/property/extract-from-url", json={"url": "https://example.com/listing/1"}, headers=headers)
+
+    assert r.status_code == 500
+    assert "unexpected" in r.json()["detail"].lower()
+    assert "try again" in r.json()["detail"].lower()
