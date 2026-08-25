@@ -3,12 +3,12 @@ URL — the property_url_import feature. Tries a genuinely free extraction
 path first (the page's own embedded schema.org JSON-LD and Open Graph
 metadata — real estate listing sites commonly publish this for SEO/social-
 preview purposes, unrelated to whether they'll let a scraper read their
-visible page text), and only falls back to asking Claude to read the raw
-page text when that free path doesn't find enough — an explicit, real cost
-reduction, not a hypothetical one: many established listing sites (the
-kind most PropertyIQ users would actually paste) publish exactly this kind
-of structured data, so a real fraction of imports should cost nothing at
-all beyond the page fetch itself.
+visible page text), and only falls back to a Google Gemini call to read
+the raw page text when that free path doesn't find enough — an explicit,
+real cost reduction, not a hypothetical one: many established listing
+sites (the kind most PropertyIQ users would actually paste) publish
+exactly this kind of structured data, so a real fraction of imports should
+cost nothing at all beyond the page fetch itself.
 
 Honest, deliberate scope limitation, not an oversight, on EITHER path: a
 real listing page typically only publishes "marketing-side" facts (name,
@@ -31,10 +31,20 @@ import re
 from typing import Any, Optional
 
 import requests
-from anthropic import Anthropic
+from google import genai
 from bs4 import BeautifulSoup
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+from backend.config_store import get_app_setting
+
+# Env var is a fallback default only — the admin-configurable value in the
+# database (set via the admin panel, stored through get_app_setting) takes
+# priority whenever it's actually set, so the key can be changed at
+# runtime without a redeploy.
+_GEMINI_ENV_FALLBACK = os.getenv("GEMINI_API_KEY", "")
+
+
+def get_gemini_api_key() -> str:
+    return get_app_setting("gemini_api_key") or _GEMINI_ENV_FALLBACK
 
 # Only fields a real listing page could plausibly publish — the
 # verification-specific fields are deliberately excluded from what this
@@ -56,6 +66,26 @@ EXTRACTABLE_FIELDS = [
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
+# A fuller, more realistic header set than User-Agent alone — genuinely
+# helps against basic bot-detection that checks for an incomplete/bare
+# header set, though it's honest to note this cannot bypass sophisticated,
+# JS-challenge or TLS-fingerprint-based protection (Cloudflare, Akamai,
+# etc), which a plain HTTP request fundamentally can't pass regardless of
+# which headers are sent — that class of site would need a real headless
+# browser to render the page, which is out of scope for this feature.
+_REQUEST_HEADERS = {
+    "User-Agent": _UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+}
+
 # A result counts as "good enough to skip the paid LLM call entirely" once
 # it has the property's name plus at least one real number (price or
 # area) — genuinely useful without a person needing to type it in, even
@@ -70,7 +100,7 @@ def fetch_page_html(url: str, timeout: int = 12) -> str:
     response isn't real HTML — both are meant to be caught by the caller
     and turned into a clear, honest error message rather than silently
     returning nothing."""
-    response = requests.get(url, headers={"User-Agent": _UA}, timeout=timeout)
+    response = requests.get(url, headers=_REQUEST_HEADERS, timeout=timeout)
     response.raise_for_status()
 
     content_type = response.headers.get("Content-Type", "")
@@ -227,7 +257,7 @@ def extract_property_data(url: str) -> dict[str, Any]:
     path first (extract_structured_data) — if that finds enough to be
     genuinely useful (the property's name plus at least a price or an
     area), returns it directly with zero LLM cost. Only falls back to
-    asking Claude to read the page's visible text when the free path
+    asking Gemini to read the page's visible text when the free path
     comes up short. Returns a dict with exactly EXTRACTABLE_FIELDS keys
     either way — any field not found is explicitly None, not omitted, so
     the caller always knows the full set of fields that were attempted.
@@ -239,7 +269,8 @@ def extract_property_data(url: str) -> dict[str, Any]:
     if _is_good_enough_to_skip_llm(structured):
         return structured
 
-    if not ANTHROPIC_API_KEY:
+    gemini_api_key = get_gemini_api_key()
+    if not gemini_api_key:
         # No paid fallback configured — return whatever the free path
         # found rather than failing outright, since a partial real
         # result is more useful than none, and this isn't necessarily
@@ -263,7 +294,7 @@ def extract_property_data(url: str) -> dict[str, Any]:
     # stays reasonably fast and cheap regardless of page size.
     page_text = page_text[:15000]
 
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = genai.Client(api_key=gemini_api_key)
     prompt = f"""You are extracting structured data from a real-estate listing page's text content. Below is the visible text of a property listing page.
 
 Extract ONLY these fields, and ONLY if the value is genuinely, explicitly present in the text below. Do NOT guess, estimate, or infer a value that isn't actually stated. If a field isn't clearly present, its value MUST be null.
@@ -287,12 +318,11 @@ Respond with ONLY a single JSON object with exactly these 10 keys, no other text
 Page text:
 {page_text}"""
 
-    message = client.messages.create(
-        model="claude-sonnet-5",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+    response = client.models.generate_content(
+        model="gemini-flash-latest",
+        contents=prompt,
     )
-    raw = message.content[0].text.strip()
+    raw = (response.text or "").strip()
     raw = re.sub(r"^```(json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
 
     try:

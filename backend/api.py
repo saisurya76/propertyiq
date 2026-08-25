@@ -90,6 +90,7 @@ from backend.config_store import (
     get_all_tiers_merged,
     has_feature,
     ALL_FEATURES,
+    set_app_setting,
 )
 
 from backend.subscription_store import (
@@ -101,7 +102,7 @@ from backend.subscription_store import (
     list_all_subscriptions,
 )
 
-from backend.property_url_extract import extract_property_data
+from backend.property_url_extract import extract_property_data, get_gemini_api_key
 
 from backend.insight_store import (
     initialize_insight_store,
@@ -982,7 +983,35 @@ def admin_overview(request: AdminAuthRequest):
         "subscriptions": list_all_subscriptions(),
         "insight_grants": list_all_grants(),
         "all_features": ALL_FEATURES,
+        # Never returns the actual key value, even to an authenticated
+        # admin — just whether one is configured, matching how most
+        # admin panels handle displaying secrets back. The panel shows
+        # "configured"/"not set" and a field to overwrite it, not the
+        # current value.
+        "gemini_api_key_configured": bool(get_gemini_api_key()),
     }
+
+
+class AdminSettingsRequest(BaseModel):
+    password: str
+    gemini_api_key: Optional[str] = None
+
+
+@app.post("/api/admin/settings")
+def admin_settings(request: AdminSettingsRequest):
+    """Admin-only: sets the Gemini API key used as the LLM fallback for
+    property_url_import when the free structured-data extraction path
+    isn't enough — a real, explicit request: making this admin-
+    configurable at runtime rather than only an env var, so it can be
+    changed without a redeploy. Only ever accepts a new value to set;
+    never returns the current one back (see admin_overview's
+    gemini_api_key_configured for the presence-only status check)."""
+    _require_admin_password(request.password)
+
+    if request.gemini_api_key is not None:
+        set_app_setting("gemini_api_key", request.gemini_api_key.strip())
+
+    return {"gemini_api_key_configured": bool(get_gemini_api_key())}
 
 
 @app.post("/api/subscribe/checkout")
@@ -1139,6 +1168,16 @@ def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: st
 
     try:
         extracted = extract_property_data(request.url.strip())
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        if status in (403, 429):
+            raise HTTPException(
+                status_code=422,
+                detail="This site is blocking automated access to this page (some listing sites use bot "
+                       "protection that a simple fetch can't get past). Please copy the property details "
+                       "into the form manually instead."
+            ) from exc
+        raise HTTPException(status_code=502, detail=f"Couldn't fetch that URL: {exc}") from exc
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"Couldn't fetch that URL: {exc}") from exc
     except ValueError as exc:

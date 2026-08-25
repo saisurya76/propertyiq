@@ -1465,6 +1465,13 @@
 .admin-section-purple { border-top-color: #7c3aed; }
 .admin-section-blue { border-top-color: #3b82f6; }
 .admin-section-green { border-top-color: #059669; }
+
+.admin-section-note {
+  font-size: 13px;
+  color: #6b5f85;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
 .admin-section-amber { border-top-color: #d97706; }
 
 .admin-section h3 {

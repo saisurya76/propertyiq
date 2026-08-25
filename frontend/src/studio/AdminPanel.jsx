@@ -14,6 +14,9 @@ function AdminPanel({ onBack }) {
   const [grants, setGrants] = useState([]);
   const [saveMessage, setSaveMessage] = useState("");
   const [allFeatures, setAllFeatures] = useState([]);
+  const [geminiKeyConfigured, setGeminiKeyConfigured] = useState(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState("");
+  const [geminiSaveMessage, setGeminiSaveMessage] = useState("");
 
   const login = async (e) => {
     e.preventDefault();
@@ -25,6 +28,7 @@ function AdminPanel({ onBack }) {
       setSubscriptions(data.subscriptions);
       setGrants(data.insight_grants);
       setAllFeatures(data.all_features || []);
+      setGeminiKeyConfigured(!!data.gemini_api_key_configured);
       setAuthed(true);
     } catch (err) {
       setError(err.message || "Incorrect password.");
@@ -62,6 +66,29 @@ function AdminPanel({ onBack }) {
       setSaveMessage("Tier config saved.");
     } catch (err) {
       setError(err.message || "Couldn't save changes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Backs the property_url_import feature's LLM fallback (used only
+  // when the free structured-data extraction path doesn't find enough)
+  // — a real, explicit request: making this key admin-configurable at
+  // runtime rather than only an env var, so it can be changed without a
+  // redeploy. The backend never returns the actual key value back, even
+  // here — only whether one is currently configured.
+  const saveGeminiKey = async () => {
+    setGeminiSaveMessage("");
+    setError("");
+    if (!geminiKeyInput.trim()) return;
+    setLoading(true);
+    try {
+      const res = await studioApi.adminUpdateSettings(password, geminiKeyInput.trim());
+      setGeminiKeyConfigured(!!res.gemini_api_key_configured);
+      setGeminiKeyInput("");
+      setGeminiSaveMessage("Gemini API key saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save the Gemini API key.");
     } finally {
       setLoading(false);
     }
@@ -298,6 +325,28 @@ function AdminPanel({ onBack }) {
         <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveTiers} disabled={loading}>
           {loading ? "Saving..." : "Save Changes"}
         </button>
+      </div>
+
+      <div className="admin-section admin-section-purple">
+        <h3>Property URL Import — Gemini API Key</h3>
+        <p className="admin-section-note">
+          Used only as a fallback when the free structured-data extraction path (schema.org / Open Graph
+          metadata already on the page) doesn't find enough — many imports cost nothing at all beyond this.
+          Status: <strong>{geminiKeyConfigured ? "Configured" : "Not set"}</strong> (the key itself is never
+          shown back once saved, for security).
+        </p>
+        <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto" }}>
+          <input
+            type="password"
+            placeholder={geminiKeyConfigured ? "Enter a new key to replace the current one" : "Enter your Gemini API key"}
+            value={geminiKeyInput}
+            onChange={(e) => setGeminiKeyInput(e.target.value)}
+          />
+          <button className="cs-nav-btn cs-nav-primary" onClick={saveGeminiKey} disabled={loading || !geminiKeyInput.trim()}>
+            {loading ? "Saving..." : "Save Key"}
+          </button>
+        </div>
+        {geminiSaveMessage && <div className="studio-status-banner">{geminiSaveMessage}</div>}
       </div>
 
       <div className="admin-section admin-section-blue">

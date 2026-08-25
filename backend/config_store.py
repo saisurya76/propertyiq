@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Optional
 
 from backend.db import get_connection
 
@@ -111,6 +111,30 @@ def set_tier_config(config: dict[str, Any]) -> None:
                 "INSERT INTO app_config (key, value) VALUES (%s, %s) "
                 "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
                 (_CONFIG_KEY, json.dumps(config, separators=(",", ":"))),
+            )
+        connection.commit()
+
+
+# Generic app-wide settings (not tied to tiers/pricing) reusing the same
+# app_config key-value table — currently backs the admin-configurable
+# Gemini API key for the property_url_import feature's LLM fallback, but
+# is intentionally generic so future global settings don't each need
+# their own table.
+def get_app_setting(key: str) -> Optional[str]:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT value FROM app_config WHERE key = %s", (key,))
+            row = cursor.fetchone()
+    return row["value"] if row else None
+
+
+def set_app_setting(key: str, value: str) -> None:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO app_config (key, value) VALUES (%s, %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                (key, value),
             )
         connection.commit()
 

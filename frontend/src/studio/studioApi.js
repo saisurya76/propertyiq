@@ -102,6 +102,9 @@ export const studioApi = {
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
 
+  adminUpdateSettings: (password, geminiApiKey) =>
+    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey }) }),
+
   listProperties: () => apiFetch("/api/properties"),
 
   getProperty: (propertyId) => apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`),
