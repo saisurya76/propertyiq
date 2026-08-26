@@ -1295,3 +1295,119 @@ body {
   font-size: 14px;
   color: #6b5f85;
 }
+
+.hidden-deal-panel {
+  padding: 4px 0;
+}
+
+.hidden-deal-intro {
+  font-size: 13px;
+  color: #6b5f85;
+  margin-bottom: 16px;
+}
+
+.hidden-deal-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hidden-deal-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5c4f78;
+  margin-bottom: 4px;
+}
+
+.hidden-deal-field input,
+.hidden-deal-field select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #ede4fc;
+  font-size: 14px;
+}
+
+.hidden-deal-area-row {
+  display: flex;
+  gap: 6px;
+}
+
+.hidden-deal-area-row input {
+  flex: 1;
+}
+
+.hidden-deal-area-row select {
+  width: auto;
+}
+
+.hidden-deal-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+  background: #7c5cbf;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hidden-deal-btn:disabled {
+  background: #c9bde3;
+  cursor: not-allowed;
+}
+
+.hidden-deal-error {
+  margin-top: 12px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.hidden-deal-result {
+  margin-top: 18px;
+}
+
+.hidden-deal-teaser {
+  font-size: 15px;
+  font-weight: 600;
+  color: #4a4160;
+  margin-bottom: 14px;
+}
+
+.hidden-deal-finding {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #faf7ff;
+  border: 1px solid #ede4fc;
+  margin-bottom: 10px;
+}
+
+.hidden-deal-finding-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #4a4160;
+  margin-bottom: 6px;
+}
+
+.hidden-deal-finding-detail {
+  font-size: 14px;
+  color: #4a4160;
+}
+
+.hidden-deal-reveal-btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1px solid #7c5cbf;
+  background: white;
+  color: #7c5cbf;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hidden-deal-cta {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #6b5f85;
+  font-style: italic;
+}

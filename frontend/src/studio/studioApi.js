@@ -150,4 +150,10 @@ export const studioApi = {
       method: "POST",
       body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
     }),
+
+  getHiddenDeal: (price, city, propertyType, areaValue, areaUnit) =>
+    apiFetch("/api/hidden-deal", {
+      method: "POST",
+      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
+    }),
 };

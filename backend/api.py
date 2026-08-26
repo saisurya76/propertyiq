@@ -117,6 +117,8 @@ from backend.similar_properties import (
 
 from backend.instant_score import compute_instant_score
 
+from backend.hidden_deal import find_hidden_deal_insights
+
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
@@ -1419,6 +1421,30 @@ def instant_score(request: InstantScoreRequest):
         raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
 
     return compute_instant_score(
+        price=request.price,
+        city=request.city,
+        property_type=request.property_type,
+        area_value=request.area_value,
+        area_unit=request.area_unit,
+    )
+
+
+@app.post("/api/hidden-deal")
+def hidden_deal(request: InstantScoreRequest):
+    """PropertyIQ "Hidden Deal" — reuses the exact same real, honest
+    price-vs-comparables logic as Instant Property Score (via
+    find_hidden_deal_insights, which calls compute_instant_score
+    internally), so the two features can never disagree about the same
+    property's market position. Also public/unauthenticated, matching
+    Instant Property Score's own no-signup design. The staged, one-at-a-
+    time reveal described in the feature spec is a frontend presentation
+    concern — this endpoint returns the full, real result at once."""
+    if request.price <= 0 or request.area_value <= 0:
+        raise HTTPException(status_code=400, detail="Price and area must both be greater than zero.")
+    if request.area_unit not in ("sqft", "sqm"):
+        raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
+
+    return find_hidden_deal_insights(
         price=request.price,
         city=request.city,
         property_type=request.property_type,

@@ -5,6 +5,7 @@ import "./studio/studio.css";
 import PropertyForm from "./components/PropertyForm";
 import CollapsiblePanel from "./components/CollapsiblePanel";
 import InstantScorePanel from "./components/InstantScorePanel";
+import HiddenDealPanel from "./components/HiddenDealPanel";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
@@ -987,6 +988,12 @@ function App() {
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="⚡ Instant Property Score (Free, No Signup)" defaultOpen={false} color="blue">
           <InstantScorePanel country={formData.country} />
+        </CollapsiblePanel>
+      </div>
+
+      <div className="property-assessment-wrap">
+        <CollapsiblePanel title="🔍 Hidden Deal — What Did PropertyIQ Find? (Free)" defaultOpen={false} color="blue">
+          <HiddenDealPanel country={formData.country} />
         </CollapsiblePanel>
       </div>
 
