@@ -4,6 +4,7 @@ import "./studio/studio.css";
 
 import PropertyForm from "./components/PropertyForm";
 import CollapsiblePanel from "./components/CollapsiblePanel";
+import InstantScorePanel from "./components/InstantScorePanel";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
@@ -981,6 +982,12 @@ function App() {
             Independent. Evidence-based. Built for the buyer, not the builder.
           </p>
         </div>
+      </div>
+
+      <div className="property-assessment-wrap">
+        <CollapsiblePanel title="⚡ Instant Property Score (Free, No Signup)" defaultOpen={false} color="blue">
+          <InstantScorePanel country={formData.country} />
+        </CollapsiblePanel>
       </div>
 
       <div className="property-assessment-wrap">

@@ -115,6 +115,8 @@ from backend.similar_properties import (
     get_similar_properties,
 )
 
+from backend.instant_score import compute_instant_score
+
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
@@ -1389,6 +1391,40 @@ def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
             return True
 
     return False
+
+
+class InstantScoreRequest(BaseModel):
+    price: float
+    city: str
+    property_type: str
+    area_value: float
+    area_unit: str = "sqft"
+
+
+@app.post("/api/instant-score")
+def instant_score(request: InstantScoreRequest):
+    """PropertyIQ Instant Property Score — a free, no-signup, price +
+    location + area-only quick score. Deliberately public/unauthenticated
+    (no Depends(get_current_user_email)) — unlike every other feature in
+    this app, this one is explicitly meant to work with zero account
+    needed, matching its role as a lightweight funnel into the full
+    assessment, not a gated feature of its own.
+
+    Honestly returns coverage="unsupported" (no fabricated score) for any
+    city/property_type combination without real comparable data — see
+    compute_instant_score's own docstring for why."""
+    if request.price <= 0 or request.area_value <= 0:
+        raise HTTPException(status_code=400, detail="Price and area must both be greater than zero.")
+    if request.area_unit not in ("sqft", "sqm"):
+        raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
+
+    return compute_instant_score(
+        price=request.price,
+        city=request.city,
+        property_type=request.property_type,
+        area_value=request.area_value,
+        area_unit=request.area_unit,
+    )
 
 
 @app.get("/api/similar-properties/{report_id}")

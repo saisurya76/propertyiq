@@ -1196,3 +1196,102 @@ body {
   border: 1px solid #ede4fc;
   color: #5c4f78;
 }
+
+.instant-score-panel {
+  padding: 4px 0;
+}
+
+.instant-score-intro {
+  font-size: 13px;
+  color: #6b5f85;
+  margin-bottom: 16px;
+}
+
+.instant-score-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.instant-score-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5c4f78;
+  margin-bottom: 4px;
+}
+
+.instant-score-field input,
+.instant-score-field select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #ede4fc;
+  font-size: 14px;
+}
+
+.instant-score-area-row {
+  display: flex;
+  gap: 6px;
+}
+
+.instant-score-area-row input {
+  flex: 1;
+}
+
+.instant-score-area-row select {
+  width: auto;
+}
+
+.instant-score-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+  background: #7c5cbf;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.instant-score-btn:disabled {
+  background: #c9bde3;
+  cursor: not-allowed;
+}
+
+.instant-score-error {
+  margin-top: 12px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.instant-score-result {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #faf7ff;
+  border: 1px solid #ede4fc;
+}
+
+.instant-score-badge {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.instant-score-reason {
+  font-size: 14px;
+  color: #4a4160;
+  margin-bottom: 10px;
+}
+
+.instant-score-cta {
+  font-size: 13px;
+  color: #6b5f85;
+  font-style: italic;
+}
+
+.instant-score-unsupported {
+  font-size: 14px;
+  color: #6b5f85;
+}

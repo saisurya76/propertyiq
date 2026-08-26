@@ -144,4 +144,10 @@ export const studioApi = {
 
   extractFromUrl: (url) =>
     apiFetch("/api/property/extract-from-url", { method: "POST", body: JSON.stringify({ url }) }),
+
+  getInstantScore: (price, city, propertyType, areaValue, areaUnit) =>
+    apiFetch("/api/instant-score", {
+      method: "POST",
+      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
+    }),
 };
