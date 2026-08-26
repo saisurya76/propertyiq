@@ -121,6 +121,13 @@ from backend.hidden_deal import find_hidden_deal_insights
 
 from backend.red_flag_hunt import evaluate_red_flag_guess, VALID_CATEGORIES
 
+from backend.challenge_store import (
+    initialize_challenge_store,
+    create_challenge,
+    get_challenge,
+    reveal_challenge_guess,
+)
+
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
@@ -155,6 +162,7 @@ initialize_auth_store()
 initialize_config_store()
 initialize_subscription_store()
 initialize_insight_store()
+initialize_challenge_store()
 
 DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
@@ -1490,6 +1498,61 @@ def red_flag_hunt(request: RedFlagGuessRequest):
         area_unit=request.area_unit,
         guessed_category=request.guessed_category,
     )
+
+
+class CreateChallengeRequest(BaseModel):
+    price: float
+    city: str
+    property_type: str
+    area_value: float
+    area_unit: str = "sqft"
+
+
+class ChallengeGuessRequest(BaseModel):
+    guessed_price: float
+
+
+@app.post("/api/challenges")
+def api_create_challenge(request: CreateChallengeRequest):
+    """PropertyIQ "Should I Buy This?" Challenge — creates a shareable,
+    persistent challenge. Genuinely new infrastructure compared to the
+    other quick-check features: this one needs a real database record,
+    since a challenge must stay viewable via a stable link long after
+    creation, to however many different recipients open it. Public, no
+    account required, matching the feature's own explicit design."""
+    try:
+        return create_challenge(
+            price=request.price, city=request.city, property_type=request.property_type,
+            area_value=request.area_value, area_unit=request.area_unit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/challenges/{challenge_id}")
+def api_get_challenge(challenge_id: str):
+    """Public — anyone with the link can view a challenge's property
+    details, no account needed, matching the feature's "no account
+    required for the initial prediction" design."""
+    challenge = get_challenge(challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=404, detail="This challenge doesn't exist or may have expired.")
+    return challenge
+
+
+@app.post("/api/challenges/{challenge_id}/guess")
+def api_reveal_challenge_guess(challenge_id: str, request: ChallengeGuessRequest):
+    """Reveals how a recipient's guess compares to PropertyIQ's real fair
+    value — reuses the exact same comparables-backed logic as Instant
+    Score and Hidden Deal (see reveal_challenge_guess's own docstring),
+    so a challenge reveal can never disagree with what those other two
+    features would say about the same property. Public, no account."""
+    try:
+        return reveal_challenge_guess(challenge_id, request.guessed_price)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "No challenge found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
 @app.get("/api/similar-properties/{report_id}")

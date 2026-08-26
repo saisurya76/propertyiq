@@ -165,4 +165,19 @@ export const studioApi = {
         guessed_category: guessedCategory,
       }),
     }),
+
+  createChallenge: (price, city, propertyType, areaValue, areaUnit) =>
+    apiFetch("/api/challenges", {
+      method: "POST",
+      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
+    }),
+
+  getChallenge: (challengeId) =>
+    apiFetch(`/api/challenges/${encodeURIComponent(challengeId)}`),
+
+  guessChallenge: (challengeId, guessedPrice) =>
+    apiFetch(`/api/challenges/${encodeURIComponent(challengeId)}/guess`, {
+      method: "POST",
+      body: JSON.stringify({ guessed_price: guessedPrice }),
+    }),
 };

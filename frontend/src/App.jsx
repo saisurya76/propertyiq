@@ -7,6 +7,7 @@ import CollapsiblePanel from "./components/CollapsiblePanel";
 import InstantScorePanel from "./components/InstantScorePanel";
 import HiddenDealPanel from "./components/HiddenDealPanel";
 import RedFlagHuntPanel from "./components/RedFlagHuntPanel";
+import ChallengeCreatePanel from "./components/ChallengeCreatePanel";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
@@ -1001,6 +1002,12 @@ function App() {
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="🚩 Red Flag Hunt — Can You Spot the Red Flags? (Free)" defaultOpen={false} color="blue">
           <RedFlagHuntPanel country={formData.country} />
+        </CollapsiblePanel>
+      </div>
+
+      <div className="property-assessment-wrap">
+        <CollapsiblePanel title="🎯 Should I Buy This? — Challenge a Friend (Free)" defaultOpen={false} color="blue">
+          <ChallengeCreatePanel country={formData.country} />
         </CollapsiblePanel>
       </div>
 
