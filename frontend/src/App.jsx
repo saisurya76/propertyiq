@@ -6,6 +6,7 @@ import PropertyForm from "./components/PropertyForm";
 import CollapsiblePanel from "./components/CollapsiblePanel";
 import InstantScorePanel from "./components/InstantScorePanel";
 import HiddenDealPanel from "./components/HiddenDealPanel";
+import RedFlagHuntPanel from "./components/RedFlagHuntPanel";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
@@ -994,6 +995,12 @@ function App() {
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="🔍 Hidden Deal — What Did PropertyIQ Find? (Free)" defaultOpen={false} color="blue">
           <HiddenDealPanel country={formData.country} />
+        </CollapsiblePanel>
+      </div>
+
+      <div className="property-assessment-wrap">
+        <CollapsiblePanel title="🚩 Red Flag Hunt — Can You Spot the Red Flags? (Free)" defaultOpen={false} color="blue">
+          <RedFlagHuntPanel country={formData.country} />
         </CollapsiblePanel>
       </div>
 

@@ -1411,3 +1411,149 @@ body {
   color: #6b5f85;
   font-style: italic;
 }
+
+.red-flag-hunt-panel {
+  padding: 4px 0;
+}
+
+.red-flag-hunt-intro {
+  font-size: 13px;
+  color: #6b5f85;
+  margin-bottom: 16px;
+}
+
+.red-flag-hunt-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.red-flag-hunt-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5c4f78;
+  margin-bottom: 4px;
+}
+
+.red-flag-hunt-field input,
+.red-flag-hunt-field select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #ede4fc;
+  font-size: 14px;
+}
+
+.red-flag-hunt-area-row {
+  display: flex;
+  gap: 6px;
+}
+
+.red-flag-hunt-area-row input {
+  flex: 1;
+}
+
+.red-flag-hunt-area-row select {
+  width: auto;
+}
+
+.red-flag-hunt-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+  background: #7c5cbf;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.red-flag-hunt-btn:disabled {
+  background: #c9bde3;
+  cursor: not-allowed;
+}
+
+.red-flag-hunt-question {
+  font-size: 15px;
+  font-weight: 600;
+  color: #4a4160;
+  margin-bottom: 14px;
+}
+
+.red-flag-hunt-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.red-flag-hunt-category-btn {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #7c5cbf;
+  background: white;
+  color: #7c5cbf;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.red-flag-hunt-category-btn:hover {
+  background: #faf7ff;
+}
+
+.red-flag-hunt-error {
+  margin-top: 12px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.red-flag-hunt-result {
+  margin-top: 8px;
+}
+
+.red-flag-hunt-verdict {
+  font-size: 16px;
+  font-weight: 700;
+  color: #4a4160;
+  margin-bottom: 8px;
+}
+
+.red-flag-hunt-verdict-detail {
+  font-size: 14px;
+  color: #4a4160;
+  margin-bottom: 16px;
+}
+
+.red-flag-hunt-more-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a4160;
+  margin-bottom: 10px;
+}
+
+.red-flag-hunt-finding {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #faf7ff;
+  border: 1px solid #ede4fc;
+  margin-bottom: 10px;
+}
+
+.red-flag-hunt-finding-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #4a4160;
+  margin-bottom: 6px;
+}
+
+.red-flag-hunt-finding-detail {
+  font-size: 14px;
+  color: #4a4160;
+}
+
+.red-flag-hunt-cta {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #6b5f85;
+  font-style: italic;
+}

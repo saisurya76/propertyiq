@@ -156,4 +156,13 @@ export const studioApi = {
       method: "POST",
       body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
     }),
+
+  getRedFlagVerdict: (price, city, propertyType, areaValue, areaUnit, guessedCategory) =>
+    apiFetch("/api/red-flag-hunt", {
+      method: "POST",
+      body: JSON.stringify({
+        price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit,
+        guessed_category: guessedCategory,
+      }),
+    }),
 };

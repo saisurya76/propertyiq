@@ -119,6 +119,8 @@ from backend.instant_score import compute_instant_score
 
 from backend.hidden_deal import find_hidden_deal_insights
 
+from backend.red_flag_hunt import evaluate_red_flag_guess, VALID_CATEGORIES
+
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
@@ -1450,6 +1452,43 @@ def hidden_deal(request: InstantScoreRequest):
         property_type=request.property_type,
         area_value=request.area_value,
         area_unit=request.area_unit,
+    )
+
+
+class RedFlagGuessRequest(BaseModel):
+    price: float
+    city: str
+    property_type: str
+    area_value: float
+    area_unit: str = "sqft"
+    guessed_category: str
+
+
+@app.post("/api/red-flag-hunt")
+def red_flag_hunt(request: RedFlagGuessRequest):
+    """PropertyIQ "Red Flag Hunt" — an interactive quiz: the user guesses
+    which category (Price/Area/Builder/Location/Amenities/Other) is most
+    suspicious about a property, and gets an honest verdict. Reuses the
+    same real price-vs-comparables logic as Instant Property Score and
+    Hidden Deal (via evaluate_red_flag_guess -> compute_instant_score) —
+    Price/Area guesses are judged against real data; Builder/Location/
+    Amenities/Other honestly get a "this quick check can't verify that"
+    verdict rather than a fabricated judgment. Public/unauthenticated,
+    matching the other two quick-check features."""
+    if request.price <= 0 or request.area_value <= 0:
+        raise HTTPException(status_code=400, detail="Price and area must both be greater than zero.")
+    if request.area_unit not in ("sqft", "sqm"):
+        raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
+    if request.guessed_category not in VALID_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"guessed_category must be one of {VALID_CATEGORIES}.")
+
+    return evaluate_red_flag_guess(
+        price=request.price,
+        city=request.city,
+        property_type=request.property_type,
+        area_value=request.area_value,
+        area_unit=request.area_unit,
+        guessed_category=request.guessed_category,
     )
 
 
