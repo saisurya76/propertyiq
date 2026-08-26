@@ -45,6 +45,79 @@ HYDERABAD_COMPARABLES = [
     )
 ]
 
+# Everything below this line was added in a single research pass (Aug
+# 2026) to extend real-comparables coverage beyond Hyderabad — a real,
+# explicit request, not incremental. Each entry is a genuinely researched
+# citywide market-average asking price, sourced from real estate market
+# reports/portals current as of Aug 2026 (SquareYards, 99acres,
+# GlobalPropertyGuide, Bamboo Routes, and similar), NOT multiple named
+# project comparables like Hyderabad has above — that level of per-
+# project detail wasn't available within this research pass for every
+# city, so each is honestly labeled "Citywide Average" rather than
+# invented project names. All figures are Apartment/condo-type only
+# (the most consistently reported type across all sources); Villa/Plot/
+# Commercial are NOT included here and will correctly fall through to
+# the honest "not enough data" response via get_comparables' existing
+# type filter, same as any unsupported city.
+#
+# Only cities with a genuinely findable, city-level (not just a single
+# neighborhood's cheapest/priciest micro-market) figure were included.
+# Smaller cities not listed here were NOT found with a clear enough
+# citywide figure during this research pass and are deliberately left
+# unsupported rather than filled in with a guess — see the chat summary
+# accompanying this delivery for the exact list of what's covered vs not.
+#
+# SEA countries' original sources quote per square meter; converted to
+# price-per-sqft here (÷10.7639) purely for consistency with this
+# module's existing field name — the conversion is arithmetic, not a
+# separate data point.
+
+INDIA_COMPARABLES = [
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Mumbai", "Apartment", 14000),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Delhi", "Apartment", 13000),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Bangalore", "Apartment", 12100),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Chennai", "Apartment", 7900),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Kolkata", "Apartment", 6400),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Pune", "Apartment", 12950),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Ahmedabad", "Apartment", 5900),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Lucknow", "Apartment", 6700),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Nagpur", "Apartment", 4350),
+]
+
+THAILAND_COMPARABLES = [
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Bangkok", "Apartment", round(130000 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Chiang Mai", "Apartment", round(60000 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Phuket", "Apartment", round(96285 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Pattaya", "Apartment", round(70000 / 10.7639)),
+]
+
+VIETNAM_COMPARABLES = [
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Ho Chi Minh City", "Apartment", round((4500 * 25500) / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Hanoi", "Apartment", round((3852 * 25500) / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Da Nang", "Apartment", round((1800 * 25500) / 10.7639)),
+]
+
+INDONESIA_COMPARABLES = [
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Jakarta", "Apartment", round(36_000_000 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Bandung", "Apartment", round(16_000_000 / 10.7639)),
+]
+
+PHILIPPINES_COMPARABLES = [
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Manila", "Apartment", round(120000 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Quezon City", "Apartment", round(100000 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Cebu City", "Apartment", round(162195 / 10.7639)),
+    ComparableProject("Citywide Average (Aug 2026)", "Market data", "Makati", "Apartment", round(230000 / 10.7639)),
+]
+
+ALL_COMPARABLES = (
+    HYDERABAD_COMPARABLES
+    + INDIA_COMPARABLES
+    + THAILAND_COMPARABLES
+    + VIETNAM_COMPARABLES
+    + INDONESIA_COMPARABLES
+    + PHILIPPINES_COMPARABLES
+)
+
 
 def get_comparables(
     city: str,
@@ -54,16 +127,13 @@ def get_comparables(
     if not city:
         return []
 
-    city = city.strip().lower()
-
-    if city != "hyderabad":
-        return []
+    city_normalized = city.strip().lower()
 
     return [
         c
-        for c in HYDERABAD_COMPARABLES
-        if c.property_type.lower()
-        == property_type.lower()
+        for c in ALL_COMPARABLES
+        if c.city.lower() == city_normalized
+        and c.property_type.lower() == property_type.lower()
     ]
 
 
