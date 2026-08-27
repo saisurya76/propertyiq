@@ -6,6 +6,8 @@ from pydantic import BaseModel
 
 import os
 import uuid
+import asyncio
+from contextlib import asynccontextmanager
 import requests
 
 from dodopayments import DodoPayments
@@ -128,6 +130,14 @@ from backend.challenge_store import (
     reveal_challenge_guess,
 )
 
+from backend.price_watch_store import (
+    initialize_price_watch_store,
+    create_price_watch,
+    get_price_watch,
+    update_watch_price,
+)
+from backend.price_watch_scheduler import price_watch_check_loop
+
 from backend.assessment_pipeline import (
     PropertyInput,
     run_assessment
@@ -153,7 +163,26 @@ from backend.renderers.pdf_renderer import (
     generate_pdf
 )
 
-app = FastAPI()
+_price_watch_task = None
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Starts the periodic price-watch re-checker as a background
+    asyncio task within this same process on startup, cancels it
+    cleanly on shutdown — see backend/price_watch_scheduler.py's own
+    docstring for why this approach (rather than a separate cron
+    service) is the real, working choice given Render's standard
+    web-service tier."""
+    global _price_watch_task
+    _price_watch_task = asyncio.create_task(price_watch_check_loop())
+    yield
+    if _price_watch_task is not None:
+        _price_watch_task.cancel()
+
+
+app = FastAPI(lifespan=_lifespan)
+
 
 initialize_payment_store()
 initialize_construction_store()
@@ -163,6 +192,7 @@ initialize_config_store()
 initialize_subscription_store()
 initialize_insight_store()
 initialize_challenge_store()
+initialize_price_watch_store()
 
 DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
@@ -1552,6 +1582,117 @@ def api_reveal_challenge_guess(challenge_id: str, request: ChallengeGuessRequest
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if "No challenge found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+class CreatePriceWatchRequest(BaseModel):
+    email: str
+    target_price: float
+    area_unit: str = "sqft"
+    url: Optional[str] = None
+    # Required only when url is not provided (manual entry mode) — when
+    # a URL is given, the real current price/city/type/area are
+    # extracted from the listing itself, not guessed by the frontend.
+    price: Optional[float] = None
+    city: Optional[str] = None
+    property_type: Optional[str] = None
+    area_value: Optional[float] = None
+
+
+class UpdateWatchPriceRequest(BaseModel):
+    new_price: float
+
+
+@app.post("/api/price-watches")
+def api_create_price_watch(request: CreatePriceWatchRequest):
+    """PropertyIQ "Price Drop Alert" — creates a watch. Public, no
+    account required (only an email to notify), matching the other
+    quick-check features' own no-signup design. Honest distinction the
+    frontend must surface clearly: a watch created with a URL gets
+    genuinely, automatically re-checked in the background every few
+    hours (see price_watch_scheduler.py); one created from manual price
+    entry has no source to re-fetch from, so its price only ever
+    changes when the user comes back and calls the update endpoint
+    below themselves.
+
+    A real design fix, caught before shipping: when a URL is given, its
+    real current price/city/type/area are extracted from the listing
+    itself right here — the frontend never needs to guess or send
+    placeholder values for fields a URL-based watch will genuinely learn
+    from the page itself."""
+    price = request.price
+    city = request.city
+    property_type = request.property_type
+    area_value = request.area_value
+
+    if request.url:
+        try:
+            extracted = extract_property_data(request.url)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Couldn't read that listing to set up the watch: {exc}"
+            ) from exc
+
+        if extracted.get("quotedPrice"):
+            price = extracted["quotedPrice"]
+        if extracted.get("city"):
+            city = extracted["city"]
+        if extracted.get("propertyType"):
+            property_type = extracted["propertyType"]
+        if extracted.get("areaValue"):
+            area_value = extracted["areaValue"]
+            if extracted.get("areaUnit"):
+                request.area_unit = extracted["areaUnit"]
+
+        if price is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Couldn't determine this listing's current price — please enter it "
+                       "manually instead, or try a different listing."
+            )
+        # Context fields (city/type/area) are nice-to-have for display,
+        # not required for the watch's core purpose (price vs target) —
+        # reasonable defaults if the extraction genuinely found nothing.
+        city = city or "Unknown"
+        property_type = property_type or "Apartment"
+        area_value = area_value or 1
+
+    elif price is None or city is None or property_type is None or area_value is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide a listing URL, or price/city/property_type/area_value manually."
+        )
+
+    try:
+        return create_price_watch(
+            email=request.email, price=price, city=city,
+            property_type=property_type, area_value=area_value,
+            target_price=request.target_price, area_unit=request.area_unit, url=request.url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/price-watches/{watch_id}")
+def api_get_price_watch(watch_id: str):
+    """Public — lets the creator check on their watch's status via the
+    link, no account needed."""
+    watch = get_price_watch(watch_id)
+    if watch is None:
+        raise HTTPException(status_code=404, detail="This price watch doesn't exist.")
+    return watch
+
+
+@app.post("/api/price-watches/{watch_id}/update-price")
+def api_update_watch_price(watch_id: str, request: UpdateWatchPriceRequest):
+    """The only way a manual-entry (no-URL) watch's price can ever
+    change — see create_price_watch's own docstring for why."""
+    try:
+        return update_watch_price(watch_id, request.new_price)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "No price watch found" in detail else 400
         raise HTTPException(status_code=status_code, detail=detail) from exc
 
 

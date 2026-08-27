@@ -8,6 +8,7 @@ import InstantScorePanel from "./components/InstantScorePanel";
 import HiddenDealPanel from "./components/HiddenDealPanel";
 import RedFlagHuntPanel from "./components/RedFlagHuntPanel";
 import ChallengeCreatePanel from "./components/ChallengeCreatePanel";
+import PriceWatchPanel from "./components/PriceWatchPanel";
 import AssessmentResult from "./components/AssessmentResult";
 import Disclaimer from "./components/Disclaimer";
 import StudioAuth from "./studio/StudioAuth";
@@ -1008,6 +1009,12 @@ function App() {
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="🎯 Should I Buy This? — Challenge a Friend (Free)" defaultOpen={false} color="blue">
           <ChallengeCreatePanel country={formData.country} />
+        </CollapsiblePanel>
+      </div>
+
+      <div className="property-assessment-wrap">
+        <CollapsiblePanel title="💰 Price Drop Alert — Let PropertyIQ Watch For You (Free)" defaultOpen={false} color="blue">
+          <PriceWatchPanel country={formData.country} />
         </CollapsiblePanel>
       </div>
 

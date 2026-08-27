@@ -17,6 +17,38 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "PropertyIQ <noreply@propertyiqweb.com>")
 
 
+def send_email(to_email: str, subject: str, html: str) -> bool:
+    """Generic email sender, extracted from send_otp_email so other
+    features (price-drop alerts) can send email through the same
+    livingiq-auth-relay-first, direct-Resend-fallback path without
+    duplicating that logic. send_otp_email is rebuilt on top of this
+    with byte-for-byte identical request bodies/behavior to before this
+    extraction — this is a pure refactor, not a behavior change."""
+    if LIVINGIQ_AUTH_BASE_URL and INTERNAL_APP_API_KEY:
+        response = requests.post(
+            f"{LIVINGIQ_AUTH_BASE_URL}/api/notifications/email",
+            headers={"x-internal-api-key": INTERNAL_APP_API_KEY},
+            json={"to": to_email, "subject": subject, "html": html},
+            timeout=10,
+        )
+        return response.status_code < 300
+
+    if RESEND_API_KEY:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={"from": RESEND_FROM_EMAIL, "to": [to_email], "subject": subject, "html": html},
+            timeout=10,
+        )
+        return response.status_code < 300
+
+    raise HTTPException(
+        status_code=503,
+        detail="Email sending is not configured. Set LIVINGIQ_AUTH_BASE_URL + INTERNAL_APP_API_KEY "
+               "(preferred, uses livingiq-auth's centralized Resend) or RESEND_API_KEY directly."
+    )
+
+
 def send_otp_email(to_email: str, code: str, purpose: str = "sign_in") -> bool:
     """Send the OTP code. Tries livingiq-auth's centralized Resend relay
     first (POST /api/notifications/email, x-internal-api-key auth — same
@@ -47,29 +79,7 @@ def send_otp_email(to_email: str, code: str, purpose: str = "sign_in") -> bool:
             f"<p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>"
         )
 
-    if LIVINGIQ_AUTH_BASE_URL and INTERNAL_APP_API_KEY:
-        response = requests.post(
-            f"{LIVINGIQ_AUTH_BASE_URL}/api/notifications/email",
-            headers={"x-internal-api-key": INTERNAL_APP_API_KEY},
-            json={"to": to_email, "subject": subject, "html": html},
-            timeout=10,
-        )
-        return response.status_code < 300
-
-    if RESEND_API_KEY:
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
-            json={"from": RESEND_FROM_EMAIL, "to": [to_email], "subject": subject, "html": html},
-            timeout=10,
-        )
-        return response.status_code < 300
-
-    raise HTTPException(
-        status_code=503,
-        detail="Email sending is not configured. Set LIVINGIQ_AUTH_BASE_URL + INTERNAL_APP_API_KEY "
-               "(preferred, uses livingiq-auth's centralized Resend) or RESEND_API_KEY directly."
-    )
+    return send_email(to_email, subject, html)
 
 
 def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
