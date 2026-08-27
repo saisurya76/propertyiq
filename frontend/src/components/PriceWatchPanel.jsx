@@ -24,6 +24,7 @@ function PriceWatchPanel({ country, onLaunchStudio }) {
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("");
   const [city, setCity] = useState("");
+  const [location, setLocation] = useState("");
   const [propertyType, setPropertyType] = useState("Apartment");
   const [areaValue, setAreaValue] = useState("");
   const [areaUnit, setAreaUnit] = useState("sqft");
@@ -51,10 +52,13 @@ function PriceWatchPanel({ country, onLaunchStudio }) {
     try {
       // In URL mode, price/city/propertyType/areaValue are intentionally
       // left for the backend to extract from the listing itself — never
-      // guessed or sent as placeholders here.
+      // guessed or sent as placeholders here. location is left undefined
+      // too, so the backend's own URL extraction fills it in, same as
+      // the other fields — unless the manual mode below is used, where
+      // there's nothing to extract from and it's always user-provided.
       const data = mode === "url"
         ? await studioApi.createPriceWatch(undefined, undefined, undefined, undefined, Number(targetPrice), areaUnit, url)
-        : await studioApi.createPriceWatch(Number(price), city, propertyType, Number(areaValue), Number(targetPrice), areaUnit, null);
+        : await studioApi.createPriceWatch(Number(price), city, propertyType, Number(areaValue), Number(targetPrice), areaUnit, null, location);
       setWatch(data);
       setState("done");
     } catch (err) {
@@ -135,6 +139,10 @@ function PriceWatchPanel({ country, onLaunchStudio }) {
                   </select>
                 </div>
                 <div className="price-watch-field">
+                  <label>Locality (optional, for reference)</label>
+                  <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Gachibowli" />
+                </div>
+                <div className="price-watch-field">
                   <label>Property Type</label>
                   <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
                     <option value="Apartment">Apartment</option>
@@ -171,6 +179,9 @@ function PriceWatchPanel({ country, onLaunchStudio }) {
 
       {state === "done" && watch && (
         <div className="price-watch-result">
+          {watch.location && (
+            <p className="price-watch-location">📍 {watch.location}, {watch.city}</p>
+          )}
           <p className="price-watch-success">
             ✅ PropertyIQ is watching this property for you — we'll email {watch.email} at {watch.target_price.toLocaleString()} or below.
           </p>

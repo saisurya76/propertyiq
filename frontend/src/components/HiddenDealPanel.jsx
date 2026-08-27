@@ -10,6 +10,7 @@ import { studioApi } from "../studio/studioApi";
 function HiddenDealPanel({ country }) {
   const [price, setPrice] = useState("");
   const [city, setCity] = useState("");
+  const [location, setLocation] = useState("");
   const [propertyType, setPropertyType] = useState("Apartment");
   const [areaValue, setAreaValue] = useState("");
   const [areaUnit, setAreaUnit] = useState("sqft");
@@ -26,7 +27,7 @@ function HiddenDealPanel({ country }) {
     setErrorMessage("");
     setRevealedCount(0);
     try {
-      const data = await studioApi.getHiddenDeal(Number(price), city, propertyType, Number(areaValue), areaUnit);
+      const data = await studioApi.getHiddenDeal(Number(price), city, propertyType, Number(areaValue), areaUnit, location);
       setResult(data);
       setState("done");
     } catch (err) {
@@ -57,6 +58,10 @@ function HiddenDealPanel({ country }) {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+        </div>
+        <div className="hidden-deal-field">
+          <label>Locality (optional, for reference)</label>
+          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Gachibowli" title="Shown alongside your result for clarity — findings are calculated from citywide comparable data, not locality-specific data" />
         </div>
         <div className="hidden-deal-field">
           <label>Property Type</label>
@@ -92,6 +97,9 @@ function HiddenDealPanel({ country }) {
 
       {state === "done" && result && (
         <div className="hidden-deal-result">
+          {result.location && (
+            <p className="hidden-deal-location">📍 {result.location}, {city}</p>
+          )}
           {revealedCount === 0 && (
             <p className="hidden-deal-teaser">
               We found {totalFindings} thing{totalFindings === 1 ? "" : "s"} you should know before buying this property.

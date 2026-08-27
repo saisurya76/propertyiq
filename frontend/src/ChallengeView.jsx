@@ -73,7 +73,10 @@ function ChallengeView({ challengeId }) {
 
       <div className="challenge-view-property-card">
         <div className="challenge-view-card-row"><span>Price</span><strong>{challenge.price.toLocaleString()}</strong></div>
-        <div className="challenge-view-card-row"><span>Location</span><strong>{challenge.city}</strong></div>
+        <div className="challenge-view-card-row"><span>City</span><strong>{challenge.city}</strong></div>
+        {challenge.location && (
+          <div className="challenge-view-card-row"><span>Locality</span><strong>{challenge.location}</strong></div>
+        )}
         <div className="challenge-view-card-row"><span>Type</span><strong>{challenge.property_type}</strong></div>
         <div className="challenge-view-card-row"><span>Area</span><strong>{challenge.area_value} {challenge.area_unit}</strong></div>
       </div>

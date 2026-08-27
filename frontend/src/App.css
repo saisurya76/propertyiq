@@ -2003,3 +2003,13 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+
+.instant-score-location,
+.hidden-deal-location,
+.red-flag-hunt-location,
+.price-watch-location {
+  font-size: 13px;
+  color: #6b5f85;
+  margin-bottom: 8px;
+  font-weight: 600;
+}

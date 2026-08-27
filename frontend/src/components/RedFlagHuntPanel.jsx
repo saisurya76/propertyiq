@@ -13,6 +13,7 @@ const CATEGORIES = ["Price", "Area", "Builder", "Location", "Amenities", "Other"
 function RedFlagHuntPanel({ country }) {
   const [price, setPrice] = useState("");
   const [city, setCity] = useState("");
+  const [propertyLocation, setPropertyLocation] = useState("");
   const [propertyType, setPropertyType] = useState("Apartment");
   const [areaValue, setAreaValue] = useState("");
   const [areaUnit, setAreaUnit] = useState("sqft");
@@ -32,7 +33,7 @@ function RedFlagHuntPanel({ country }) {
     setGuessedCategory(category);
     setErrorMessage("");
     try {
-      const data = await studioApi.getRedFlagVerdict(Number(price), city, propertyType, Number(areaValue), areaUnit, category);
+      const data = await studioApi.getRedFlagVerdict(Number(price), city, propertyType, Number(areaValue), areaUnit, category, propertyLocation);
       setResult(data);
       setStep("result");
     } catch (err) {
@@ -65,6 +66,10 @@ function RedFlagHuntPanel({ country }) {
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
+            </div>
+            <div className="red-flag-hunt-field">
+              <label>Locality (optional, for reference)</label>
+              <input type="text" value={propertyLocation} onChange={(e) => setPropertyLocation(e.target.value)} placeholder="e.g. Gachibowli" title="Shown alongside your result for clarity — the verdict is calculated from citywide comparable data, not locality-specific data" />
             </div>
             <div className="red-flag-hunt-field">
               <label>Property Type</label>
@@ -114,6 +119,9 @@ function RedFlagHuntPanel({ country }) {
 
       {step === "result" && result && (
         <div className="red-flag-hunt-result">
+          {result.location && (
+            <p className="red-flag-hunt-location">📍 {result.location}, {city}</p>
+          )}
           <div className="red-flag-hunt-verdict">
             {verdictIcon} You guessed "{guessedCategory}" — {verdictLabel}
           </div>

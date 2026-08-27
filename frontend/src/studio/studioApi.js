@@ -145,31 +145,31 @@ export const studioApi = {
   extractFromUrl: (url) =>
     apiFetch("/api/property/extract-from-url", { method: "POST", body: JSON.stringify({ url }) }),
 
-  getInstantScore: (price, city, propertyType, areaValue, areaUnit) =>
+  getInstantScore: (price, city, propertyType, areaValue, areaUnit, location) =>
     apiFetch("/api/instant-score", {
       method: "POST",
-      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
+      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit, location: location || null }),
     }),
 
-  getHiddenDeal: (price, city, propertyType, areaValue, areaUnit) =>
+  getHiddenDeal: (price, city, propertyType, areaValue, areaUnit, location) =>
     apiFetch("/api/hidden-deal", {
       method: "POST",
-      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
+      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit, location: location || null }),
     }),
 
-  getRedFlagVerdict: (price, city, propertyType, areaValue, areaUnit, guessedCategory) =>
+  getRedFlagVerdict: (price, city, propertyType, areaValue, areaUnit, guessedCategory, location) =>
     apiFetch("/api/red-flag-hunt", {
       method: "POST",
       body: JSON.stringify({
         price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit,
-        guessed_category: guessedCategory,
+        guessed_category: guessedCategory, location: location || null,
       }),
     }),
 
-  createChallenge: (price, city, propertyType, areaValue, areaUnit) =>
+  createChallenge: (price, city, propertyType, areaValue, areaUnit, location) =>
     apiFetch("/api/challenges", {
       method: "POST",
-      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit }),
+      body: JSON.stringify({ price, city, property_type: propertyType, area_value: areaValue, area_unit: areaUnit, location: location || null }),
     }),
 
   getChallenge: (challengeId) =>
@@ -181,12 +181,12 @@ export const studioApi = {
       body: JSON.stringify({ guessed_price: guessedPrice }),
     }),
 
-  createPriceWatch: (price, city, propertyType, areaValue, targetPrice, areaUnit, url) =>
+  createPriceWatch: (price, city, propertyType, areaValue, targetPrice, areaUnit, url, location) =>
     apiFetch("/api/price-watches", {
       method: "POST",
       body: JSON.stringify({
         price, city, property_type: propertyType, area_value: areaValue,
-        target_price: targetPrice, area_unit: areaUnit, url: url || null,
+        target_price: targetPrice, area_unit: areaUnit, url: url || null, location: location || null,
       }),
     }),
 

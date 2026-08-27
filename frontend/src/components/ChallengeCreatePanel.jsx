@@ -11,6 +11,7 @@ import { studioApi } from "../studio/studioApi";
 function ChallengeCreatePanel({ country }) {
   const [price, setPrice] = useState("");
   const [city, setCity] = useState("");
+  const [location, setLocation] = useState("");
   const [propertyType, setPropertyType] = useState("Apartment");
   const [areaValue, setAreaValue] = useState("");
   const [areaUnit, setAreaUnit] = useState("sqft");
@@ -27,7 +28,7 @@ function ChallengeCreatePanel({ country }) {
     setErrorMessage("");
     setCopied(false);
     try {
-      const data = await studioApi.createChallenge(Number(price), city, propertyType, Number(areaValue), areaUnit);
+      const data = await studioApi.createChallenge(Number(price), city, propertyType, Number(areaValue), areaUnit, location);
       const url = `${window.location.origin}/challenge/${data.challenge_id}`;
       setShareUrl(url);
       setState("done");
@@ -69,6 +70,10 @@ function ChallengeCreatePanel({ country }) {
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
+            </div>
+            <div className="challenge-create-field">
+              <label>Locality (optional, for reference)</label>
+              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Gachibowli" />
             </div>
             <div className="challenge-create-field">
               <label>Property Type</label>

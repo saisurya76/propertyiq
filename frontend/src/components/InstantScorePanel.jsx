@@ -12,6 +12,7 @@ import { studioApi } from "../studio/studioApi";
 function InstantScorePanel({ country }) {
   const [price, setPrice] = useState("");
   const [city, setCity] = useState("");
+  const [location, setLocation] = useState("");
   const [propertyType, setPropertyType] = useState("Apartment");
   const [areaValue, setAreaValue] = useState("");
   const [areaUnit, setAreaUnit] = useState("sqft");
@@ -26,7 +27,7 @@ function InstantScorePanel({ country }) {
     setState("loading");
     setErrorMessage("");
     try {
-      const data = await studioApi.getInstantScore(Number(price), city, propertyType, Number(areaValue), areaUnit);
+      const data = await studioApi.getInstantScore(Number(price), city, propertyType, Number(areaValue), areaUnit, location);
       setResult(data);
       setState("done");
     } catch (err) {
@@ -57,6 +58,10 @@ function InstantScorePanel({ country }) {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+        </div>
+        <div className="instant-score-field">
+          <label>Locality (optional, for reference)</label>
+          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Gachibowli" title="Shown alongside your result for clarity — the score itself is calculated from citywide comparable data, not locality-specific data" />
         </div>
         <div className="instant-score-field">
           <label>Property Type</label>
@@ -99,6 +104,9 @@ function InstantScorePanel({ country }) {
               <div className="instant-score-badge" style={{ color: scoreColor }}>
                 {scoreEmoji} {result.score}/100 — {result.label}
               </div>
+              {result.location && (
+                <p className="instant-score-location">📍 {result.location}, {result.city}</p>
+              )}
               <p className="instant-score-reason">{result.reason}</p>
               <p className="instant-score-cta">
                 Want the full picture — developer track record, government value comparison, and
