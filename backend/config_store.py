@@ -34,9 +34,11 @@ DEFAULT_TIER_CONFIG = {
             "vastu_compliance",
             "standard_suppliers",
             "property_url_import",
+            "price_drop_alert",
         ],
         "design_quota_per_month": 3,
         "saved_designs_limit": 2,
+        "max_price_watches": 2,
     },
     "studio_pro": {
         "label": "Studio Pro",
@@ -48,9 +50,11 @@ DEFAULT_TIER_CONFIG = {
             "vastu_compliance",
             "premium_global_suppliers",
             "property_url_import",
+            "price_drop_alert",
         ],
         "design_quota_per_month": 15,
         "saved_designs_limit": 10,
+        "max_price_watches": 10,
     },
     "studio_unlimited": {
         "label": "Studio Unlimited",
@@ -64,9 +68,11 @@ DEFAULT_TIER_CONFIG = {
             "priority_cad_formats",
             "team_seats",
             "property_url_import",
+            "price_drop_alert",
         ],
         "design_quota_per_month": None,  # None = unlimited
         "saved_designs_limit": None,  # None = unlimited
+        "max_price_watches": None,  # None = unlimited
     },
 }
 
@@ -199,6 +205,7 @@ ALL_FEATURES = [
     "priority_cad_formats",
     "team_seats",
     "property_url_import",
+    "price_drop_alert",
 ]
 
 

@@ -1014,7 +1014,7 @@ function App() {
 
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="💰 Price Drop Alert — Let PropertyIQ Watch For You (Free)" defaultOpen={false} color="blue">
-          <PriceWatchPanel country={formData.country} />
+          <PriceWatchPanel country={formData.country} onLaunchStudio={launchStudio} />
         </CollapsiblePanel>
       </div>
 

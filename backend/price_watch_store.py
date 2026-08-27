@@ -119,6 +119,21 @@ def list_active_url_watches() -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def count_active_watches_for_email(email: str) -> int:
+    """Backs the per-tier max_price_watches limit — counts only
+    'active' watches (a 'triggered' one has already served its purpose
+    and shouldn't count against the limit, letting a user watch a new
+    property once an old watch fires)."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) AS count FROM price_watches WHERE email = %s AND status = 'active'",
+                (email,),
+            )
+            row = cursor.fetchone()
+    return row["count"] if row else 0
+
+
 def update_watch_price(watch_id: str, new_price: float) -> dict[str, Any]:
     """Lets a user with a manual-entry (no-URL) watch tell PropertyIQ
     their price changed — the only way that kind of watch can ever

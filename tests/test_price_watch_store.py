@@ -171,16 +171,55 @@ def test_email_failure_does_not_prevent_watch_from_being_marked_triggered():
     assert result["status"] == "triggered"
 
 
-def test_endpoints_full_flow_public_no_auth():
+def _authed_headers(client, email, tier_id="studio_starter"):
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id=tier_id, dodo_subscription_id=f"sub_{email}", status="active")
+    return headers
+
+
+def test_endpoint_requires_auth():
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
-        create_resp = client.post("/api/price-watches", json={
-            "email": "endpointtest@example.com", "price": 9500000, "city": "Hyderabad",
-            "property_type": "Apartment", "area_value": 1200, "target_price": 8500000,
+        r = client.post("/api/price-watches", json={
+            "price": 9500000, "city": "Hyderabad", "property_type": "Apartment",
+            "area_value": 1200, "target_price": 8500000,
         })
+        assert r.status_code == 401
+
+
+def test_endpoint_requires_the_feature_to_be_enabled_on_the_users_tier():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    with TestClient(app) as client:
+        headers = _authed_headers(client, "no_feature_test@example.com")
+        with patch("backend.api.has_feature", return_value=False):
+            r = client.post("/api/price-watches", json={
+                "price": 9500000, "city": "Hyderabad", "property_type": "Apartment",
+                "area_value": 1200, "target_price": 8500000,
+            }, headers=headers)
+        assert r.status_code == 403
+        assert "Studio subscription" in r.json()["detail"]
+
+
+def test_full_flow_with_authenticated_subscribed_user():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    with TestClient(app) as client:
+        headers = _authed_headers(client, "endpointtest@example.com")
+        create_resp = client.post("/api/price-watches", json={
+            "price": 9500000, "city": "Hyderabad",
+            "property_type": "Apartment", "area_value": 1200, "target_price": 8500000,
+        }, headers=headers)
         assert create_resp.status_code == 200
+        assert create_resp.json()["email"] == "endpointtest@example.com"
         watch_id = create_resp.json()["watch_id"]
 
         get_resp = client.get(f"/api/price-watches/{watch_id}")
@@ -215,10 +254,11 @@ def test_create_watch_rejects_invalid_input_with_400():
     from backend.api import app
 
     with TestClient(app) as client:
+        headers = _authed_headers(client, "invalidinputtest@example.com")
         r = client.post("/api/price-watches", json={
-            "email": "not-an-email", "price": 9500000, "city": "Hyderabad",
-            "property_type": "Apartment", "area_value": 1200, "target_price": 8500000,
-        })
+            "price": 9500000, "city": "Hyderabad",
+            "property_type": "Apartment", "area_value": -1200, "target_price": 8500000,
+        }, headers=headers)
         assert r.status_code == 400
 
 
@@ -226,20 +266,19 @@ def test_create_watch_from_url_extracts_real_initial_values():
     """The real design fix: a URL-mode watch's initial price/city/type/
     area come from actually extracting the listing, not placeholder
     values the frontend would otherwise have to guess."""
-    from unittest.mock import patch
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
+        headers = _authed_headers(client, "urlwatch@example.com")
         with patch("backend.api.extract_property_data", return_value={
             "propertyName": "Test Towers", "quotedPrice": 9500000, "city": "Hyderabad",
             "propertyType": "Apartment", "areaValue": 1200, "areaUnit": "sqft",
             "developerName": None, "location": None, "totalUnits": None, "monthlyRent": None,
         }):
             r = client.post("/api/price-watches", json={
-                "email": "urlwatch@example.com", "target_price": 8500000,
-                "url": "https://example.com/listing/watch-test",
-            })
+                "target_price": 8500000, "url": "https://example.com/listing/watch-test",
+            }, headers=headers)
         assert r.status_code == 200
         body = r.json()
         assert body["price"] == 9500000
@@ -249,20 +288,19 @@ def test_create_watch_from_url_extracts_real_initial_values():
 
 
 def test_create_watch_from_url_fails_clearly_when_price_not_found():
-    from unittest.mock import patch
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
+        headers = _authed_headers(client, "urlwatch2@example.com")
         with patch("backend.api.extract_property_data", return_value={
             "propertyName": None, "quotedPrice": None, "city": None, "propertyType": None,
             "areaValue": None, "areaUnit": None, "developerName": None, "location": None,
             "totalUnits": None, "monthlyRent": None,
         }):
             r = client.post("/api/price-watches", json={
-                "email": "urlwatch2@example.com", "target_price": 8500000,
-                "url": "https://example.com/listing/no-price-found",
-            })
+                "target_price": 8500000, "url": "https://example.com/listing/no-price-found",
+            }, headers=headers)
         assert r.status_code == 422
         assert "current price" in r.json()["detail"]
 
@@ -271,20 +309,19 @@ def test_create_watch_from_url_fills_reasonable_defaults_for_missing_context_fie
     """City/type/area are nice-to-have context, not required for the
     watch's core purpose -- must not block creation just because the
     extraction found a price but not, say, the city."""
-    from unittest.mock import patch
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
+        headers = _authed_headers(client, "urlwatch3@example.com")
         with patch("backend.api.extract_property_data", return_value={
             "propertyName": "Test Towers", "quotedPrice": 9500000, "city": None,
             "propertyType": None, "areaValue": None, "areaUnit": None,
             "developerName": None, "location": None, "totalUnits": None, "monthlyRent": None,
         }):
             r = client.post("/api/price-watches", json={
-                "email": "urlwatch3@example.com", "target_price": 8500000,
-                "url": "https://example.com/listing/partial-data",
-            })
+                "target_price": 8500000, "url": "https://example.com/listing/partial-data",
+            }, headers=headers)
         assert r.status_code == 200
         assert r.json()["price"] == 9500000
         assert r.json()["city"] == "Unknown"
@@ -295,84 +332,88 @@ def test_create_watch_without_url_or_manual_fields_returns_clear_400():
     from backend.api import app
 
     with TestClient(app) as client:
-        r = client.post("/api/price-watches", json={
-            "email": "neither@example.com", "target_price": 8500000,
-        })
+        headers = _authed_headers(client, "neither@example.com")
+        r = client.post("/api/price-watches", json={"target_price": 8500000}, headers=headers)
         assert r.status_code == 400
         assert "listing URL" in r.json()["detail"]
 
 
-def test_endpoint_extracts_price_city_type_area_from_url_at_creation():
-    """The real design fix: a URL-based watch's initial details are
-    genuinely read from the listing itself at creation time, not
-    guessed or left as placeholders."""
-    from unittest.mock import patch
+def test_max_price_watches_limit_is_enforced_per_tier():
+    """The real, explicit request this whole auth shift exists for:
+    alerts cannot be unlimited — an admin-configurable per-tier cap."""
+    import uuid
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
-        with patch("backend.api.extract_property_data", return_value={
-            "quotedPrice": 9500000, "city": "Hyderabad", "propertyType": "Apartment",
-            "areaValue": 1250, "areaUnit": "sqft",
-        }):
+        # A genuinely unique email each run — this test's assertions
+        # depend on an exact count starting from zero, so reusing a
+        # fixed email across repeated local test runs (the real test
+        # database persists between runs, unlike a fresh in-memory DB)
+        # would silently accumulate leftover watches from prior runs
+        # and break this test's exact-count assumption.
+        email = f"limittest-{uuid.uuid4().hex[:8]}@example.com"
+        headers = _authed_headers(client, email, tier_id="studio_starter")
+        # studio_starter's default max_price_watches is 2
+        for i in range(2):
             r = client.post("/api/price-watches", json={
-                "email": "urlcreate@example.com", "target_price": 8500000,
-                "url": "https://example.com/listing/real-extraction-test",
-            })
-        assert r.status_code == 200
-        body = r.json()
-        assert body["price"] == 9500000
-        assert body["city"] == "Hyderabad"
-        assert body["area_value"] == 1250
-        assert body["url"] == "https://example.com/listing/real-extraction-test"
+                "price": 9000000, "city": "Hyderabad", "property_type": "Apartment",
+                "area_value": 1200, "target_price": 8000000,
+            }, headers=headers)
+            assert r.status_code == 200, f"watch {i+1} should succeed"
+
+        r3 = client.post("/api/price-watches", json={
+            "price": 9000000, "city": "Hyderabad", "property_type": "Apartment",
+            "area_value": 1200, "target_price": 8000000,
+        }, headers=headers)
+        assert r3.status_code == 403
+        assert "allows watching up to 2" in r3.json()["detail"]
 
 
-def test_endpoint_fails_clearly_when_url_extraction_finds_no_price():
-    """Price is the one field genuinely required even from a URL — no
-    reasonable fallback exists for the one number this whole feature is
-    built around."""
-    from unittest.mock import patch
+def test_unlimited_tier_has_no_max_price_watches_cap():
+    import uuid
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
-        with patch("backend.api.extract_property_data", return_value={
-            "quotedPrice": None, "city": "Hyderabad", "propertyType": "Apartment", "areaValue": 1200,
-        }):
+        email = f"unlimitedtest-{uuid.uuid4().hex[:8]}@example.com"
+        headers = _authed_headers(client, email, tier_id="studio_unlimited")
+        for i in range(5):
             r = client.post("/api/price-watches", json={
-                "email": "nopricetest@example.com", "target_price": 8500000,
-                "url": "https://example.com/listing/no-price-found",
-            })
-        assert r.status_code == 422
-        assert "current price" in r.json()["detail"].lower()
+                "price": 9000000, "city": "Hyderabad", "property_type": "Apartment",
+                "area_value": 1200, "target_price": 8000000,
+            }, headers=headers)
+            assert r.status_code == 200, f"watch {i+1} should succeed on the unlimited tier"
 
 
-def test_endpoint_falls_back_to_reasonable_defaults_for_non_price_fields():
-    """City/type/area are context, not the core price-vs-target purpose
-    of this feature — a listing missing these shouldn't block creating
-    the watch, just fall back to something reasonable and honest."""
-    from unittest.mock import patch
+def test_a_triggered_watch_does_not_count_against_the_limit():
+    """A triggered watch has already served its purpose — a user should
+    be able to start a new watch once an old one fires, without it
+    counting against their limit forever."""
+    import uuid
     from fastapi.testclient import TestClient
     from backend.api import app
 
     with TestClient(app) as client:
-        with patch("backend.api.extract_property_data", return_value={
-            "quotedPrice": 9000000, "city": None, "propertyType": None, "areaValue": None,
-        }):
-            r = client.post("/api/price-watches", json={
-                "email": "fallbacktest@example.com", "target_price": 8000000,
-                "url": "https://example.com/listing/minimal-data",
-            })
-        assert r.status_code == 200
-        assert r.json()["price"] == 9000000
+        email = f"triggeredlimittest-{uuid.uuid4().hex[:8]}@example.com"
+        headers = _authed_headers(client, email, tier_id="studio_starter")
+        r1 = client.post("/api/price-watches", json={
+            "price": 8000000, "city": "Hyderabad", "property_type": "Apartment",
+            "area_value": 1200, "target_price": 8500000,  # already at/below target -- triggers immediately on first check
+        }, headers=headers)
+        assert r1.status_code == 200
+        watch1_id = r1.json()["watch_id"]
+        client.post(f"/api/price-watches/{watch1_id}/update-price", json={"new_price": 7000000})  # forces a check, triggers
 
-
-def test_endpoint_requires_either_url_or_full_manual_fields():
-    from fastapi.testclient import TestClient
-    from backend.api import app
-
-    with TestClient(app) as client:
-        r = client.post("/api/price-watches", json={
-            "email": "neithertest@example.com", "target_price": 8000000,
-        })
-        assert r.status_code == 400
+        # Two more watches should still succeed even though 1 exists total,
+        # since the first is now triggered, not active
+        r2 = client.post("/api/price-watches", json={
+            "price": 9000000, "city": "Hyderabad", "property_type": "Apartment",
+            "area_value": 1200, "target_price": 8000000,
+        }, headers=headers)
+        r3 = client.post("/api/price-watches", json={
+            "price": 9000000, "city": "Hyderabad", "property_type": "Apartment",
+            "area_value": 1200, "target_price": 8000000,
+        }, headers=headers)
+        assert r2.status_code == 200
+        assert r3.status_code == 200

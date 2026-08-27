@@ -181,11 +181,11 @@ export const studioApi = {
       body: JSON.stringify({ guessed_price: guessedPrice }),
     }),
 
-  createPriceWatch: (email, price, city, propertyType, areaValue, targetPrice, areaUnit, url) =>
+  createPriceWatch: (price, city, propertyType, areaValue, targetPrice, areaUnit, url) =>
     apiFetch("/api/price-watches", {
       method: "POST",
       body: JSON.stringify({
-        email, price, city, property_type: propertyType, area_value: areaValue,
+        price, city, property_type: propertyType, area_value: areaValue,
         target_price: targetPrice, area_unit: areaUnit, url: url || null,
       }),
     }),

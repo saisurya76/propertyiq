@@ -1,19 +1,26 @@
 import { useState } from "react";
 import { getCitiesForCountry } from "../utils/citiesByCountry";
-import { studioApi } from "../studio/studioApi";
+import { studioApi, getSession } from "../studio/studioApi";
 
 // PropertyIQ "Price Drop Alert" — lets a user watch a property and get
-// emailed when it hits their target price. Honest distinction surfaced
-// directly in the UI, not glossed over: a watch created from a URL gets
-// genuinely, automatically re-checked every few hours by re-fetching the
-// listing (its real starting price is also read from the listing itself
-// on creation, not guessed). A watch created from manual entry has
-// nothing to re-fetch — its price only changes when the user comes back
-// and updates it themselves, via the "update my price" flow shown after
-// creation.
-function PriceWatchPanel({ country }) {
+// emailed when it hits their target price. Now a real, tier-gated
+// feature (like every other paid feature in this app) rather than a
+// public, no-account tool — a real, explicit shift made necessary by
+// the per-tier watch-count limit, which can only be meaningful if a
+// watch is tied to a signed-in account rather than an arbitrary email
+// string anyone could vary to bypass it. Notifications go to whichever
+// email the user is signed in with — there's no separate email field
+// to fill in.
+//
+// Honest distinction surfaced directly in the UI, not glossed over: a
+// watch created from a URL gets genuinely, automatically re-checked
+// every few hours by re-fetching the listing (its real starting price
+// is also read from the listing itself on creation, not guessed). A
+// watch created from manual entry has nothing to re-fetch — its price
+// only changes when the user comes back and updates it themselves, via
+// the "update my price" flow shown after creation.
+function PriceWatchPanel({ country, onLaunchStudio }) {
   const [mode, setMode] = useState("manual"); // "manual" | "url"
-  const [email, setEmail] = useState("");
   const [url, setUrl] = useState("");
   const [price, setPrice] = useState("");
   const [city, setCity] = useState("");
@@ -31,10 +38,14 @@ function PriceWatchPanel({ country }) {
 
   const availableCities = getCitiesForCountry(country || "India", city);
 
-  const canCreate = email && targetPrice && (mode === "url" ? url : (price && city && areaValue));
+  const canCreate = targetPrice && (mode === "url" ? url : (price && city && areaValue));
 
   const handleCreate = async () => {
     if (!canCreate) return;
+    if (!getSession()) {
+      onLaunchStudio?.(); // routes to sign-in first, same pattern as every other gated feature
+      return;
+    }
     setState("loading");
     setErrorMessage("");
     try {
@@ -42,8 +53,8 @@ function PriceWatchPanel({ country }) {
       // left for the backend to extract from the listing itself — never
       // guessed or sent as placeholders here.
       const data = mode === "url"
-        ? await studioApi.createPriceWatch(email, undefined, undefined, undefined, undefined, Number(targetPrice), areaUnit, url)
-        : await studioApi.createPriceWatch(email, Number(price), city, propertyType, Number(areaValue), Number(targetPrice), areaUnit, null);
+        ? await studioApi.createPriceWatch(undefined, undefined, undefined, undefined, Number(targetPrice), areaUnit, url)
+        : await studioApi.createPriceWatch(Number(price), city, propertyType, Number(areaValue), Number(targetPrice), areaUnit, null);
       setWatch(data);
       setState("done");
     } catch (err) {
@@ -70,7 +81,7 @@ function PriceWatchPanel({ country }) {
     <div className="price-watch-panel">
       <p className="price-watch-intro">
         Don't chase property prices — let PropertyIQ watch for you. We'll email you when a
-        property hits your target price. Free, no account needed.
+        property hits your target price.
       </p>
 
       {state !== "done" && (
@@ -104,11 +115,6 @@ function PriceWatchPanel({ country }) {
           )}
 
           <div className="price-watch-field-grid">
-            <div className="price-watch-field">
-              <label>Your Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-            </div>
-
             {mode === "url" ? (
               <div className="price-watch-field">
                 <label>Listing URL</label>
@@ -197,7 +203,7 @@ function PriceWatchPanel({ country }) {
           <button
             type="button"
             className="price-watch-another-btn"
-            onClick={() => { setState("idle"); setWatch(null); setEmail(""); setPrice(""); setTargetPrice(""); setUrl(""); }}
+            onClick={() => { setState("idle"); setWatch(null); setPrice(""); setTargetPrice(""); setUrl(""); }}
           >
             Watch another property
           </button>

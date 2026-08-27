@@ -135,6 +135,7 @@ from backend.price_watch_store import (
     create_price_watch,
     get_price_watch,
     update_watch_price,
+    count_active_watches_for_email,
 )
 from backend.price_watch_scheduler import price_watch_check_loop
 
@@ -1586,7 +1587,6 @@ def api_reveal_challenge_guess(challenge_id: str, request: ChallengeGuessRequest
 
 
 class CreatePriceWatchRequest(BaseModel):
-    email: str
     target_price: float
     area_unit: str = "sqft"
     url: Optional[str] = None
@@ -1604,22 +1604,46 @@ class UpdateWatchPriceRequest(BaseModel):
 
 
 @app.post("/api/price-watches")
-def api_create_price_watch(request: CreatePriceWatchRequest):
-    """PropertyIQ "Price Drop Alert" — creates a watch. Public, no
-    account required (only an email to notify), matching the other
-    quick-check features' own no-signup design. Honest distinction the
-    frontend must surface clearly: a watch created with a URL gets
-    genuinely, automatically re-checked in the background every few
-    hours (see price_watch_scheduler.py); one created from manual price
-    entry has no source to re-fetch from, so its price only ever
-    changes when the user comes back and calls the update endpoint
-    below themselves.
+def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = Depends(get_current_user_email)):
+    """PropertyIQ "Price Drop Alert" — creates a watch. Gated by
+    has_feature (price_drop_alert) like every other tier feature, the
+    same enforcement point admin-toggling already controls — a real,
+    explicit shift from this feature's earlier public/no-account design,
+    made necessary by the per-tier watch-count limit below, which can
+    only be meaningful if a watch is tied to a real signed-in account
+    rather than an arbitrary email string anyone could vary to bypass
+    it. Notifications go to this same authenticated email, not a
+    separate user-supplied one. Honest distinction the frontend must
+    surface clearly: a watch created with a URL gets genuinely,
+    automatically re-checked in the background every few hours (see
+    price_watch_scheduler.py); one created from manual price entry has
+    no source to re-fetch from, so its price only ever changes when the
+    user comes back and calls the update endpoint below themselves.
 
     A real design fix, caught before shipping: when a URL is given, its
     real current price/city/type/area are extracted from the listing
     itself right here — the frontend never needs to guess or send
     placeholder values for fields a URL-based watch will genuinely learn
     from the page itself."""
+    tier_id = get_active_tier(user_email)
+    if not has_feature(tier_id, "price_drop_alert"):
+        raise HTTPException(
+            status_code=403,
+            detail="Price Drop Alert requires an active Studio subscription that includes this feature."
+        )
+
+    tier = get_tier(tier_id)
+    max_watches = tier.get("max_price_watches") if tier else None
+    if max_watches is not None:
+        current_count = count_active_watches_for_email(user_email)
+        if current_count >= max_watches:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Your plan allows watching up to {max_watches} propert{'y' if max_watches == 1 else 'ies'} "
+                       f"at a time. You're already watching {current_count} — cancel one or upgrade your plan "
+                       f"to watch more."
+            )
+
     price = request.price
     city = request.city
     property_type = request.property_type
@@ -1666,7 +1690,7 @@ def api_create_price_watch(request: CreatePriceWatchRequest):
 
     try:
         return create_price_watch(
-            email=request.email, price=price, city=city,
+            email=user_email, price=price, city=city,
             property_type=property_type, area_value=area_value,
             target_price=request.target_price, area_unit=request.area_unit, url=request.url,
         )
