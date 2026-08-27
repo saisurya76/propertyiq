@@ -885,6 +885,57 @@ function App() {
 
       <div className="hero hero-banner">
 
+       <svg className="hero-skyline-bg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+         <defs>
+           <linearGradient id="heroSkyFade" x1="0" y1="0" x2="0" y2="1">
+             <stop offset="0%" stopColor="#0b2545" />
+             <stop offset="100%" stopColor="#132f5c" />
+           </linearGradient>
+         </defs>
+         <rect x="0" y="0" width="1200" height="400" fill="url(#heroSkyFade)" />
+         <g opacity="0.35" stroke="#2f4f80" strokeWidth="1">
+           <line x1="0" y1="80" x2="1200" y2="80" />
+           <line x1="0" y1="160" x2="1200" y2="160" />
+           <line x1="0" y1="240" x2="1200" y2="240" />
+         </g>
+         <g fill="#132f5c" opacity="0.8">
+           <rect x="-20" y="260" width="90" height="140" />
+           <rect x="80" y="220" width="60" height="180" />
+           <rect x="150" y="280" width="70" height="120" />
+           <rect x="1000" y="230" width="80" height="170" />
+           <rect x="1090" y="270" width="70" height="130" />
+           <rect x="1160" y="200" width="60" height="200" />
+         </g>
+         <g fill="#1c3f70">
+           <rect x="220" y="200" width="70" height="200" />
+           <rect x="300" y="150" width="55" height="250" />
+           <rect x="365" y="260" width="75" height="140" />
+           <rect x="450" y="290" width="60" height="110" />
+           <rect x="520" y="300" width="65" height="100" />
+           <rect x="595" y="290" width="70" height="110" />
+           <rect x="675" y="260" width="55" height="140" />
+           <rect x="740" y="220" width="70" height="180" />
+           <rect x="820" y="140" width="60" height="260" />
+           <rect x="890" y="210" width="75" height="190" />
+           <rect x="975" y="180" width="55" height="220" />
+         </g>
+         <g fill="#fbbf24" opacity="0.85">
+           <rect x="238" y="230" width="8" height="8" />
+           <rect x="256" y="260" width="8" height="8" />
+           <rect x="317" y="190" width="8" height="8" />
+           <rect x="317" y="230" width="8" height="8" />
+           <rect x="382" y="290" width="8" height="8" />
+           <rect x="467" y="320" width="8" height="8" />
+           <rect x="612" y="320" width="8" height="8" />
+           <rect x="692" y="290" width="8" height="8" />
+           <rect x="757" y="260" width="8" height="8" />
+           <rect x="837" y="190" width="8" height="8" />
+           <rect x="837" y="230" width="8" height="8" />
+           <rect x="907" y="250" width="8" height="8" />
+           <rect x="992" y="220" width="8" height="8" />
+         </g>
+       </svg>
+
        <div className="hero-brand-row">
 
         <svg className="hero-logo-mark" width="30" height="30" viewBox="0 0 28 28" aria-hidden="true">
