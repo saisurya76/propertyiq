@@ -129,6 +129,30 @@ def get_comparables(
 
     city_normalized = city.strip().lower()
 
+    # Live data, when it can genuinely be fetched, REPLACES the static
+    # snapshot for this city rather than being blended with it — a
+    # deliberate choice, not an oversight: averaging a live, current
+    # figure together with a static one that's already confirmed to be
+    # meaningfully wrong for at least one city (Mumbai: static ~₹14,000
+    # vs live ~₹38,600) would still produce a wrong, merely-less-wrong
+    # number. Only India Apartment listings are covered by this live
+    # source (see live_comparables.py's own docstring for the honest
+    # scope limits) — everything else falls through to the static data
+    # exactly as before, completely unaffected by this addition.
+    if property_type.lower() == "apartment":
+        from backend.live_comparables import get_live_price_per_sqft
+        live_price = get_live_price_per_sqft(city)
+        if live_price is not None:
+            return [
+                ComparableProject(
+                    "Live Market Data (SquareYards, current month)",
+                    "Live market data",
+                    city,
+                    "Apartment",
+                    live_price,
+                )
+            ]
+
     return [
         c
         for c in ALL_COMPARABLES
