@@ -127,3 +127,23 @@ def test_create_challenge_rejects_invalid_input_with_400():
         "price": 0, "city": "Hyderabad", "property_type": "Apartment", "area_value": 1200,
     })
     assert r.status_code == 400
+
+
+def test_endpoint_creates_and_reveals_challenge_with_location():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    create_resp = client.post("/api/challenges", json={
+        "price": 9500000, "city": "Hyderabad", "property_type": "Apartment",
+        "area_value": 1200, "location": "Gachibowli",
+    })
+    assert create_resp.status_code == 200
+    assert create_resp.json()["location"] == "Gachibowli"
+
+    challenge_id = create_resp.json()["challenge_id"]
+    get_resp = client.get(f"/api/challenges/{challenge_id}")
+    assert get_resp.json()["location"] == "Gachibowli"
+
+    guess_resp = client.post(f"/api/challenges/{challenge_id}/guess", json={"guessed_price": 8500000})
+    assert guess_resp.json()["challenge"]["location"] == "Gachibowli"

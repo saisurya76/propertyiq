@@ -150,3 +150,15 @@ def test_endpoint_rejects_non_positive_values():
         "area_value": 1200, "guessed_category": "Price",
     })
     assert r.status_code == 400
+
+
+def test_endpoint_passes_location_through_for_display():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r = client.post("/api/red-flag-hunt", json={
+        "price": 12000000, "city": "Hyderabad", "property_type": "Apartment",
+        "area_value": 1200, "guessed_category": "Price", "location": "Gachibowli",
+    })
+    assert r.json()["location"] == "Gachibowli"

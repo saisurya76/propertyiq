@@ -18,7 +18,7 @@ never a fabricated correct/false-alarm judgment about something with zero
 actual data behind it.
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from backend.instant_score import compute_instant_score
 
@@ -45,22 +45,28 @@ def evaluate_red_flag_guess(
     area_value: float,
     area_unit: str,
     guessed_category: str,
+    location: Optional[str] = None,
 ) -> dict[str, Any]:
     """Returns a verdict for the user's guessed category, plus up to 2
     additional findings (from the same real logic Hidden Deal uses) they
     should investigate — genuinely computed, not fabricated to hit a
-    round number of "findings"."""
+    round number of "findings".
+
+    `location` is passed straight through to compute_instant_score for
+    context/display only — see that function's own docstring for why it
+    doesn't (yet) change the underlying verdict, which is city-level."""
     if guessed_category not in VALID_CATEGORIES:
         raise ValueError(f"guessed_category must be one of {VALID_CATEGORIES}")
 
     score_result = compute_instant_score(
         price=price, city=city, property_type=property_type,
-        area_value=area_value, area_unit=area_unit,
+        area_value=area_value, area_unit=area_unit, location=location,
     )
 
     if score_result["coverage"] == "unsupported":
         return {
             "coverage": "unsupported",
+            "location": location,
             "guessed_category": guessed_category,
             "verdict": "unknown",
             "verdict_detail": score_result["reason"],
@@ -115,6 +121,7 @@ def evaluate_red_flag_guess(
 
     return {
         "coverage": "supported",
+        "location": location,
         "guessed_category": guessed_category,
         "verdict": verdict,
         "verdict_detail": verdict_detail,

@@ -140,3 +140,23 @@ def test_endpoint_rejects_invalid_area_unit():
     })
     assert r.status_code == 400
     assert "sqft" in r.json()["detail"]
+
+
+def test_endpoint_passes_location_through_for_display():
+    """location is context/display only -- must be returned, must not
+    change the score itself (still purely city-level)."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    with_location = client.post("/api/instant-score", json={
+        "price": 12000000, "city": "Hyderabad", "property_type": "Apartment",
+        "area_value": 1200, "location": "Gachibowli",
+    })
+    without_location = client.post("/api/instant-score", json={
+        "price": 12000000, "city": "Hyderabad", "property_type": "Apartment", "area_value": 1200,
+    })
+    assert with_location.json()["location"] == "Gachibowli"
+    assert without_location.json()["location"] is None
+    # Same underlying score either way -- location is display-only
+    assert with_location.json()["score"] == without_location.json()["score"]

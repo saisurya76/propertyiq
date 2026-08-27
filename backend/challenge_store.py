@@ -33,6 +33,12 @@ def initialize_challenge_store() -> None:
                 )
                 """
             )
+            # A separate, safe migration for a table that may already
+            # exist in production without this column — ADD COLUMN IF
+            # NOT EXISTS never touches or drops any existing row's data.
+            cursor.execute(
+                "ALTER TABLE property_challenges ADD COLUMN IF NOT EXISTS location TEXT"
+            )
         connection.commit()
 
 
@@ -43,11 +49,17 @@ def create_challenge(
     property_type: str,
     area_value: float,
     area_unit: str = "sqft",
+    location: Optional[str] = None,
 ) -> dict[str, Any]:
     """Creates a new shareable challenge and returns its full record,
     including the generated challenge_id the caller uses to build the
     shareable link. No account/email required — matching the feature's
-    own explicit "no account required" design."""
+    own explicit "no account required" design.
+
+    `location` (a specific locality/neighborhood) is stored and returned
+    for context/display only — see compute_instant_score's own docstring
+    for why it doesn't (yet) change the underlying scoring, which is
+    city-level."""
     if price <= 0 or area_value <= 0:
         raise ValueError("Price and area must both be greater than zero.")
     if area_unit not in ("sqft", "sqm"):
@@ -61,10 +73,10 @@ def create_challenge(
             cursor.execute(
                 """
                 INSERT INTO property_challenges
-                    (challenge_id, price, city, property_type, area_value, area_unit, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (challenge_id, price, city, property_type, area_value, area_unit, location, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (challenge_id, price, city, property_type, area_value, area_unit, now),
+                (challenge_id, price, city, property_type, area_value, area_unit, location, now),
             )
         connection.commit()
 
@@ -75,6 +87,7 @@ def create_challenge(
         "property_type": property_type,
         "area_value": area_value,
         "area_unit": area_unit,
+        "location": location,
         "created_at": now,
     }
 
@@ -96,6 +109,7 @@ def get_challenge(challenge_id: str) -> Optional[dict[str, Any]]:
         "property_type": row["property_type"],
         "area_value": row["area_value"],
         "area_unit": row["area_unit"],
+        "location": row.get("location"),
         "created_at": row["created_at"],
     }
 
@@ -123,11 +137,11 @@ def reveal_challenge_guess(challenge_id: str, guessed_price: float) -> dict[str,
 
     score_result = compute_instant_score(
         price=challenge["price"], city=challenge["city"], property_type=challenge["property_type"],
-        area_value=challenge["area_value"], area_unit=challenge["area_unit"],
+        area_value=challenge["area_value"], area_unit=challenge["area_unit"], location=challenge.get("location"),
     )
     deal_result = find_hidden_deal_insights(
         price=challenge["price"], city=challenge["city"], property_type=challenge["property_type"],
-        area_value=challenge["area_value"], area_unit=challenge["area_unit"],
+        area_value=challenge["area_value"], area_unit=challenge["area_unit"], location=challenge.get("location"),
     )
 
     if score_result["coverage"] == "unsupported":

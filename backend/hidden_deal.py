@@ -11,7 +11,7 @@ statement about what this quick check does NOT cover — never a fabricated
 or generic-sounding "insight" with nothing real behind it.
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from backend.instant_score import compute_instant_score
 
@@ -38,15 +38,20 @@ def find_hidden_deal_insights(
     property_type: str,
     area_value: float,
     area_unit: str = "sqft",
+    location: Optional[str] = None,
 ) -> dict[str, Any]:
     """Returns up to 3 real findings about the property, meant to be
     revealed to the user one at a time by the frontend (this function
     itself just returns the full, real result — staging the reveal is a
     presentation concern, not something to fake server-side). Raises the
-    same ValueError as compute_instant_score for invalid input."""
+    same ValueError as compute_instant_score for invalid input.
+
+    `location` is passed straight through to compute_instant_score for
+    context/display only — see that function's own docstring for why it
+    doesn't (yet) change the underlying score, which is city-level."""
     score_result = compute_instant_score(
         price=price, city=city, property_type=property_type,
-        area_value=area_value, area_unit=area_unit,
+        area_value=area_value, area_unit=area_unit, location=location,
     )
 
     if score_result["coverage"] == "unsupported":
@@ -55,6 +60,7 @@ def find_hidden_deal_insights(
         # the one finding that's true regardless of data coverage.
         return {
             "coverage": "unsupported",
+            "location": location,
             "findings": [_MISSING_INFO_FINDING],
             "reason": score_result["reason"],
         }
@@ -106,6 +112,7 @@ def find_hidden_deal_insights(
 
     return {
         "coverage": "supported",
+        "location": location,
         "findings": [pricing_finding, _MISSING_INFO_FINDING, negotiation_finding],
         "score": score_result["score"],
         "label": score_result["label"],

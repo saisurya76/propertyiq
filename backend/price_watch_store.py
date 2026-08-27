@@ -48,6 +48,9 @@ def initialize_price_watch_store() -> None:
                 )
                 """
             )
+            cursor.execute(
+                "ALTER TABLE price_watches ADD COLUMN IF NOT EXISTS location TEXT"
+            )
         connection.commit()
 
 
@@ -61,6 +64,7 @@ def create_price_watch(
     target_price: float,
     area_unit: str = "sqft",
     url: Optional[str] = None,
+    location: Optional[str] = None,
 ) -> dict[str, Any]:
     """Creates a watch. Persistence only — resolving price/city/
     property_type/area_value from a listing URL (when the caller hasn't
@@ -68,7 +72,11 @@ def create_price_watch(
     (api_create_price_watch in api.py), which has its own fallback
     rules for what's strictly required vs nice-to-have from a real
     extraction. Keeping that resolution logic in exactly one place
-    avoids the two layers silently disagreeing about it."""
+    avoids the two layers silently disagreeing about it.
+
+    `location` is stored and returned for context/display only — see
+    compute_instant_score's own docstring for why it doesn't (yet)
+    change the underlying scoring, which is city-level."""
     if price <= 0 or area_value <= 0 or target_price <= 0:
         raise ValueError("Price, area, and target price must all be greater than zero.")
     if area_unit not in ("sqft", "sqm"):
@@ -85,11 +93,11 @@ def create_price_watch(
                 """
                 INSERT INTO price_watches
                     (watch_id, email, url, price, city, property_type, area_value, area_unit,
-                     target_price, status, created_at, last_checked_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     target_price, status, created_at, last_checked_at, location)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (watch_id, email, url, price, city, property_type, area_value, area_unit,
-                 target_price, "active", now, None),
+                 target_price, "active", now, None, location),
             )
         connection.commit()
 

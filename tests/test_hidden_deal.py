@@ -102,3 +102,15 @@ def test_endpoint_rejects_non_positive_values():
     })
     assert r.status_code == 400
     assert "greater than zero" in r.json()["detail"]
+
+
+def test_endpoint_passes_location_through_for_display():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r = client.post("/api/hidden-deal", json={
+        "price": 12000000, "city": "Hyderabad", "property_type": "Apartment",
+        "area_value": 1200, "location": "Gachibowli",
+    })
+    assert r.json()["location"] == "Gachibowli"

@@ -1442,6 +1442,7 @@ class InstantScoreRequest(BaseModel):
     property_type: str
     area_value: float
     area_unit: str = "sqft"
+    location: Optional[str] = None
 
 
 @app.post("/api/instant-score")
@@ -1467,6 +1468,7 @@ def instant_score(request: InstantScoreRequest):
         property_type=request.property_type,
         area_value=request.area_value,
         area_unit=request.area_unit,
+        location=request.location,
     )
 
 
@@ -1491,6 +1493,7 @@ def hidden_deal(request: InstantScoreRequest):
         property_type=request.property_type,
         area_value=request.area_value,
         area_unit=request.area_unit,
+        location=request.location,
     )
 
 
@@ -1501,6 +1504,7 @@ class RedFlagGuessRequest(BaseModel):
     area_value: float
     area_unit: str = "sqft"
     guessed_category: str
+    location: Optional[str] = None
 
 
 @app.post("/api/red-flag-hunt")
@@ -1528,6 +1532,7 @@ def red_flag_hunt(request: RedFlagGuessRequest):
         area_value=request.area_value,
         area_unit=request.area_unit,
         guessed_category=request.guessed_category,
+        location=request.location,
     )
 
 
@@ -1537,6 +1542,7 @@ class CreateChallengeRequest(BaseModel):
     property_type: str
     area_value: float
     area_unit: str = "sqft"
+    location: Optional[str] = None
 
 
 class ChallengeGuessRequest(BaseModel):
@@ -1554,7 +1560,7 @@ def api_create_challenge(request: CreateChallengeRequest):
     try:
         return create_challenge(
             price=request.price, city=request.city, property_type=request.property_type,
-            area_value=request.area_value, area_unit=request.area_unit,
+            area_value=request.area_value, area_unit=request.area_unit, location=request.location,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1597,6 +1603,12 @@ class CreatePriceWatchRequest(BaseModel):
     city: Optional[str] = None
     property_type: Optional[str] = None
     area_value: Optional[float] = None
+    # Context/display only, same as every other quick-check feature —
+    # not (yet) fed into the comparables-based scoring, which is
+    # city-level. In URL mode, if not given manually, this is extracted
+    # from the listing itself (property_url_import already extracts
+    # location alongside city/type/area) — same pattern as those fields.
+    location: Optional[str] = None
 
 
 class UpdateWatchPriceRequest(BaseModel):
@@ -1648,6 +1660,7 @@ def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = D
     city = request.city
     property_type = request.property_type
     area_value = request.area_value
+    location = request.location
 
     if request.url:
         try:
@@ -1668,6 +1681,8 @@ def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = D
             area_value = extracted["areaValue"]
             if extracted.get("areaUnit"):
                 request.area_unit = extracted["areaUnit"]
+        if location is None and extracted.get("location"):
+            location = extracted["location"]
 
         if price is None:
             raise HTTPException(
@@ -1693,6 +1708,7 @@ def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = D
             email=user_email, price=price, city=city,
             property_type=property_type, area_value=area_value,
             target_price=request.target_price, area_unit=request.area_unit, url=request.url,
+            location=location,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

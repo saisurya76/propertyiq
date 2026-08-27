@@ -417,3 +417,54 @@ def test_a_triggered_watch_does_not_count_against_the_limit():
         }, headers=headers)
         assert r2.status_code == 200
         assert r3.status_code == 200
+
+
+def test_endpoint_stores_manual_location():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    with TestClient(app) as client:
+        headers = _authed_headers(client, "loctest_manual@example.com")
+        r = client.post("/api/price-watches", json={
+            "price": 9500000, "city": "Hyderabad", "property_type": "Apartment",
+            "area_value": 1200, "target_price": 8500000, "location": "Gachibowli",
+        }, headers=headers)
+        assert r.status_code == 200
+        assert r.json()["location"] == "Gachibowli"
+
+
+def test_endpoint_extracts_location_from_url_when_not_given_manually():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    with TestClient(app) as client:
+        headers = _authed_headers(client, "loctest_url@example.com")
+        with patch("backend.api.extract_property_data", return_value={
+            "quotedPrice": 9500000, "city": "Hyderabad", "propertyType": "Apartment",
+            "areaValue": 1200, "areaUnit": "sqft", "location": "Kondapur",
+        }):
+            r = client.post("/api/price-watches", json={
+                "target_price": 8500000, "url": "https://example.com/listing/loc-test",
+            }, headers=headers)
+        assert r.status_code == 200
+        assert r.json()["location"] == "Kondapur"
+
+
+def test_endpoint_prefers_manual_location_over_url_extraction():
+    """If the user explicitly typed a location alongside a URL, that
+    should win over whatever the extraction found."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    with TestClient(app) as client:
+        headers = _authed_headers(client, "loctest_prefer@example.com")
+        with patch("backend.api.extract_property_data", return_value={
+            "quotedPrice": 9500000, "city": "Hyderabad", "propertyType": "Apartment",
+            "areaValue": 1200, "areaUnit": "sqft", "location": "Kondapur",
+        }):
+            r = client.post("/api/price-watches", json={
+                "target_price": 8500000, "url": "https://example.com/listing/loc-test-2",
+                "location": "Manually Entered Location",
+            }, headers=headers)
+        assert r.status_code == 200
+        assert r.json()["location"] == "Manually Entered Location"

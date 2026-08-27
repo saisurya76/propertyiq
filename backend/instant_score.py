@@ -27,6 +27,7 @@ def compute_instant_score(
     property_type: str,
     area_value: float,
     area_unit: str = "sqft",
+    location: Optional[str] = None,
 ) -> dict[str, Any]:
     """Returns a 0-100 score, a label, and a one-line reason — or an
     honest "not enough data for this city/type yet" result when no real
@@ -35,7 +36,17 @@ def compute_instant_score(
     average of actual comparable listings — the same average_price_per_sqft
     already used by Similar Properties, so the two features can never
     silently disagree about what "market average" means for the same
-    city/property type."""
+    city/property type.
+
+    `location` (a specific locality/neighborhood, e.g. "Gachibowli"
+    within Hyderabad) is captured and returned for context/display only
+    — an honest limitation, not an oversight: comparables.py's real
+    market data is researched at the city level, not locality level, so
+    there is no genuine locality-specific average to score against yet.
+    Passing a location makes results more identifiable and useful to
+    read (especially in a shared challenge card), but does not change
+    the score itself, which would require real locality-level
+    comparable data this module doesn't have."""
     if price <= 0 or area_value <= 0:
         raise ValueError("Price and area must both be greater than zero.")
 
@@ -47,6 +58,7 @@ def compute_instant_score(
         return {
             "coverage": "unsupported",
             "city": city,
+            "location": location,
             "property_type": property_type,
             "price_per_sqft": round(price_per_sqft, 2),
             "score": None,
@@ -87,6 +99,7 @@ def compute_instant_score(
     return {
         "coverage": "supported",
         "city": city,
+        "location": location,
         "property_type": property_type,
         "price_per_sqft": round(price_per_sqft, 2),
         "market_average_price_per_sqft": round(market_avg, 2),
