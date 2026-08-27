@@ -887,6 +887,14 @@ function App() {
 
        <div className="hero-brand-row">
 
+        <svg className="hero-logo-mark" width="30" height="30" viewBox="0 0 28 28" aria-hidden="true">
+          <path d="M4 12 L14 3 L24 12" fill="none" stroke="#dbeafe" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M6 12 L6 24 L22 24 L22 12" fill="none" stroke="#dbeafe" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="12" y="17" width="4" height="7" fill="none" stroke="#dbeafe" strokeWidth="1.5" strokeLinejoin="round" />
+          <circle cx="22" cy="21" r="6.5" fill="#fbbf24" stroke="#0b2545" strokeWidth="1.5" />
+          <path d="M19 21 L21 23 L25 18.5" fill="none" stroke="#2c1f47" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+
         <div className="hero-brand">
           PROPERTYIQ
         </div>
