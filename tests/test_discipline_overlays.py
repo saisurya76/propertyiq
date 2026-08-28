@@ -87,19 +87,60 @@ def test_plumbing_overlay_with_no_wet_rooms_is_honestly_empty_not_fabricated():
     assert result["main_riser"] is None
 
 
-def test_electrical_overlay_places_one_light_and_switch_per_real_room():
+def test_electrical_overlay_places_one_light_fan_and_switch_per_real_room():
     result = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
     assert result["disclaimer"] == ELECTRICAL_DISCLAIMER
     assert len(result["lights"]) == len(SAMPLE_ROOMS)
+    assert len(result["fans"]) == len(SAMPLE_ROOMS)
     assert len(result["switches"]) == len(SAMPLE_ROOMS)
     assert len(result["sockets"]) == len(SAMPLE_ROOMS) * 2
 
 
-def test_electrical_overlay_light_points_are_genuinely_at_room_centers():
+def test_electrical_overlay_fan_points_are_genuinely_at_room_centers():
     result = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
-    living_room_light = next(l for l in result["lights"] if l["room_name"] == "Living Room")
-    assert living_room_light["x"] == 0 + 20 / 2
-    assert living_room_light["y"] == 0 + 15 / 2
+    living_room_fan = next(f for f in result["fans"] if f["room_name"] == "Living Room")
+    assert living_room_fan["x"] == 0 + 20 / 2
+    assert living_room_fan["y"] == 0 + 15 / 2
+
+
+def test_electrical_overlay_light_is_genuinely_offset_from_the_fan_in_the_same_room():
+    """Real rooms commonly have both a fan and a light -- they must not
+    render as two markers sitting exactly on top of each other."""
+    result = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    for room in SAMPLE_ROOMS:
+        light = next(l for l in result["lights"] if l["room_name"] == room["name"])
+        fan = next(f for f in result["fans"] if f["room_name"] == room["name"])
+        assert (light["x"], light["y"]) != (fan["x"], fan["y"])
+
+
+def test_every_discrete_element_type_gets_stable_sequential_labels():
+    """The real, explicit request this labeling exists for: columns as
+    C1/C2/C3, and every other discrete element type similarly."""
+    structural = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    column_labels = [c["label"] for c in structural["columns"]]
+    assert column_labels == [f"C{i+1}" for i in range(len(structural["columns"]))]
+
+    plumbing = compute_plumbing_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    fixture_labels = [f["label"] for f in plumbing["fixtures"]]
+    assert fixture_labels == [f"FX{i+1}" for i in range(len(plumbing["fixtures"]))]
+    assert plumbing["main_riser"]["label"] == "MR"
+
+    electrical = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    assert [l["label"] for l in electrical["lights"]] == [f"L{i+1}" for i in range(len(electrical["lights"]))]
+    assert [f["label"] for f in electrical["fans"]] == [f"FN{i+1}" for i in range(len(electrical["fans"]))]
+    assert [s["label"] for s in electrical["switches"]] == [f"SW{i+1}" for i in range(len(electrical["switches"]))]
+    assert [s["label"] for s in electrical["sockets"]] == [f"SO{i+1}" for i in range(len(electrical["sockets"]))]
+
+
+def test_labels_are_stable_and_deterministic_across_repeated_calls():
+    """The same floor plan must always produce the same labels -- a
+    real requirement for the future spec-mapping phase, where a label
+    needs to reliably refer to the same physical element every time."""
+    result1 = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    result2 = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    labels1 = [(c["label"], c["x"], c["y"]) for c in result1["columns"]]
+    labels2 = [(c["label"], c["x"], c["y"]) for c in result2["columns"]]
+    assert labels1 == labels2
 
 
 def test_all_three_overlays_ignore_rooms_with_no_name_or_zero_dimensions():
