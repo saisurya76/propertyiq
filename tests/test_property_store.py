@@ -393,3 +393,89 @@ def test_team_seats_sharing_full_http_flow():
     stranger_headers = authed_headers("random_stranger@example.com")
     stranger_resp = client.get(f"/api/properties/{property_id}", headers=stranger_headers)
     assert stranger_resp.status_code == 403
+
+
+def test_supplier_preferences_persist_through_the_real_http_save_flow():
+    """The real, explicit bug this fix closes: supplier-preference
+    checkboxes previously lived only in React state and silently
+    vanished on reload with no error shown. Confirms the full round trip
+    through the actual HTTP endpoints a real save/reload uses."""
+    from backend.api import app
+    from fastapi.testclient import TestClient
+    from backend.subscription_store import upsert_subscription
+
+    client = TestClient(app)
+
+    def authed_headers(email):
+        code = create_otp(email)
+        r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+        return {"Authorization": f"Bearer {r.json()['session_token']}"}
+
+    email = "supplier_pref_test@example.com"
+    headers = authed_headers(email)
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_suppref", status="active")
+
+    create_resp = client.post("/api/properties", json={
+        "name": "Supplier Pref Test House",
+        "plot_spec": {
+            "plot_size_sqft": 1200, "plot_length_ft": 40, "plot_width_ft": 30,
+            "region": "india", "currency": "INR",
+            "entrance_direction": "north", "road_facing_side": "north",
+        },
+        "selections": {"flooring": "vitrified_tile"}, "labor_selections": {}, "site_elements": [],
+        "floors": [{"floor_number": 1, "floor_label": "Ground", "rooms": []}],
+        "supplier_preferences": {"vitrified_tile": ["Kajaria Ceramics"]},
+    }, headers=headers)
+    assert create_resp.status_code == 200
+    assert create_resp.json()["supplier_preferences"] == {"vitrified_tile": ["Kajaria Ceramics"]}
+    property_id = create_resp.json()["property_id"]
+    floor_id = create_resp.json()["floors"][0]["floor_id"]
+
+    # Simulate reloading the page -- a fresh GET must show the same preference
+    get_resp = client.get(f"/api/properties/{property_id}", headers=headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["supplier_preferences"] == {"vitrified_tile": ["Kajaria Ceramics"]}
+
+    # Simulate the user changing their preference and hitting Save (sync)
+    sync_resp = client.put(f"/api/properties/{property_id}/sync", json={
+        "supplier_preferences": {"vitrified_tile": ["Kajaria Ceramics", "Somany Ceramics"]},
+        "floors": [{"floor_id": floor_id, "floor_number": 1, "floor_label": "Ground", "rooms": []}],
+    }, headers=headers)
+    assert sync_resp.status_code == 200
+    assert sync_resp.json()["supplier_preferences"] == {"vitrified_tile": ["Kajaria Ceramics", "Somany Ceramics"]}
+
+    # Simulate reloading again -- the updated preference must still be there
+    get_resp_2 = client.get(f"/api/properties/{property_id}", headers=headers)
+    assert get_resp_2.json()["supplier_preferences"] == {"vitrified_tile": ["Kajaria Ceramics", "Somany Ceramics"]}
+
+
+def test_property_created_without_supplier_preferences_defaults_cleanly():
+    """Must never error for a request that doesn't include this field at
+    all -- an omitted field is not the same as a malformed request."""
+    from backend.api import app
+    from fastapi.testclient import TestClient
+    from backend.subscription_store import upsert_subscription
+
+    client = TestClient(app)
+
+    def authed_headers(email):
+        code = create_otp(email)
+        r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+        return {"Authorization": f"Bearer {r.json()['session_token']}"}
+
+    email = "supplier_pref_default_test@example.com"
+    headers = authed_headers(email)
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_suppref2", status="active")
+
+    create_resp = client.post("/api/properties", json={
+        "name": "No Supplier Prefs House",
+        "plot_spec": {
+            "plot_size_sqft": 1200, "plot_length_ft": 40, "plot_width_ft": 30,
+            "region": "india", "currency": "INR",
+            "entrance_direction": "north", "road_facing_side": "north",
+        },
+        "selections": {}, "labor_selections": {}, "site_elements": [],
+        "floors": [{"floor_number": 1, "floor_label": "Ground", "rooms": []}],
+    }, headers=headers)
+    assert create_resp.status_code == 200
+    assert create_resp.json()["supplier_preferences"] == {}

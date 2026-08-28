@@ -241,7 +241,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
   const [selections, setSelections] = useState({});
   const [laborSelections, setLaborSelections] = useState({});
   const [supplierSearch, setSupplierSearch] = useState({}); // { [catId]: searchText }
-  const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — local reference only, not sent to backend (no per-supplier cost model server-side)
+  const [supplierPreferences, setSupplierPreferences] = useState({}); // { [optionId]: [supplierName, ...] } — the user's preferred supplier(s) for reference only (no per-supplier cost model server-side, so this never affects the cost estimate); persisted with the rest of the design via save/sync, same as selections
   const [estimate, setEstimate] = useState(null);
   const [bom, setBom] = useState(null);
   const [boq, setBoq] = useState(null);
@@ -491,6 +491,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
 
         setSelections(prop.selections || {});
         setLaborSelections(prop.labor_selections || {});
+        setSupplierPreferences(prop.supplier_preferences || {});
         setLayoutHistory({
           past: [],
           present: {
@@ -521,6 +522,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           plot_spec: prop.plot_spec,
           selections: prop.selections || {},
           labor_selections: prop.labor_selections || {},
+          supplier_preferences: prop.supplier_preferences || {},
           site_elements: prop.site_elements || [],
           floors: (prop.floors.length > 0 ? prop.floors : [{ floor_number: 0, floor_label: "Ground Floor", rooms: [] }])
             .map((f) => ({ floor_number: f.floor_number, floor_label: f.floor_label, rooms: f.rooms })),
@@ -869,6 +871,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
     },
     selections,
     labor_selections: laborSelections,
+    supplier_preferences: supplierPreferences,
     site_elements: siteElements.map(stripKey),
     floors: floors.map((f) => ({
       floor_number: f.floor_number,

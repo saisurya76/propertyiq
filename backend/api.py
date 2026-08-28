@@ -2219,6 +2219,7 @@ class CreatePropertyRequest(BaseModel):
     labor_selections: dict[str, str] = {}
     site_elements: list[SiteElementSpec] = []
     floors: list[FloorInput] = []
+    supplier_preferences: dict[str, list[str]] = {}
 
 
 class UpdatePropertyRequest(BaseModel):
@@ -2227,6 +2228,7 @@ class UpdatePropertyRequest(BaseModel):
     selections: Optional[dict[str, str]] = None
     labor_selections: Optional[dict[str, str]] = None
     site_elements: Optional[list[SiteElementSpec]] = None
+    supplier_preferences: Optional[dict[str, list[str]]] = None
 
 
 class ShareRequest(BaseModel):
@@ -2252,6 +2254,7 @@ class SyncPropertyRequest(BaseModel):
     selections: Optional[dict[str, str]] = None
     labor_selections: Optional[dict[str, str]] = None
     site_elements: Optional[list[SiteElementSpec]] = None
+    supplier_preferences: Optional[dict[str, list[str]]] = None
     floors: list[UpsertFloorRequest]
 
 
@@ -2323,6 +2326,7 @@ def api_create_property(request: CreatePropertyRequest, user_email: str = Depend
         labor_selections=request.labor_selections,
         site_elements=[e.model_dump() for e in request.site_elements],
         floors=[f.model_dump() for f in request.floors],
+        supplier_preferences=request.supplier_preferences,
     )
     return prop
 
@@ -2361,6 +2365,7 @@ def api_update_property(property_id: str, request: UpdatePropertyRequest, user_e
             selections=request.selections,
             labor_selections=request.labor_selections,
             site_elements=[e.model_dump() for e in request.site_elements] if request.site_elements is not None else None,
+            supplier_preferences=request.supplier_preferences,
         )
     except PermissionError:
         raise HTTPException(status_code=423, detail="This property is locked. Unlock it first to make changes.")
@@ -2398,6 +2403,7 @@ def api_sync_property(property_id: str, request: SyncPropertyRequest, user_email
             selections=request.selections,
             labor_selections=request.labor_selections,
             site_elements=[e.model_dump() for e in request.site_elements] if request.site_elements is not None else None,
+            supplier_preferences=request.supplier_preferences,
             floors=[f.model_dump() for f in request.floors],
         )
     except PermissionError:

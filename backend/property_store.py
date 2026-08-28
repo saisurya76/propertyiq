@@ -48,6 +48,16 @@ def initialize_property_store() -> None:
             cursor.execute(
                 "ALTER TABLE properties ADD COLUMN IF NOT EXISTS shared_with_emails TEXT NOT NULL DEFAULT '[]'"
             )
+            # Same migration pattern as shared_with_emails above — a real,
+            # confirmed gap this closes: supplier-preference checkboxes
+            # (which suppliers the user prefers for a chosen material,
+            # kept purely for their own reference, no per-supplier cost
+            # model server-side) previously lived only in React state and
+            # silently vanished on reload/navigation with no error shown,
+            # which reads as broken even though nothing actually failed.
+            cursor.execute(
+                "ALTER TABLE properties ADD COLUMN IF NOT EXISTS supplier_preferences TEXT NOT NULL DEFAULT '{}'"
+            )
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS property_floors (
@@ -85,6 +95,7 @@ def _row_to_property(row: dict[str, Any], floors: list[dict[str, Any]]) -> dict[
         "updated_at": row["updated_at"],
         "floors": floors,
         "shared_with_emails": json.loads(row["shared_with_emails"]) if row.get("shared_with_emails") else [],
+        "supplier_preferences": json.loads(row["supplier_preferences"]) if row.get("supplier_preferences") else {},
     }
 
 
@@ -119,6 +130,7 @@ def create_property(
     labor_selections: dict[str, str],
     site_elements: list[dict[str, Any]],
     floors: list[dict[str, Any]],
+    supplier_preferences: Optional[dict[str, list[str]]] = None,
 ) -> dict[str, Any]:
     """`floors` = [{"floor_number": int, "floor_label": str, "rooms": [...]}, ...] — at least one required."""
     user_email = user_email.strip().lower()
@@ -131,12 +143,13 @@ def create_property(
                 """
                 INSERT INTO properties (
                     property_id, user_email, name, plot_spec, selections, labor_selections,
-                    site_elements, locked, locked_at, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, NULL, %s, %s)
+                    site_elements, supplier_preferences, locked, locked_at, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, NULL, %s, %s)
                 """,
                 (
                     property_id, user_email, name, json.dumps(plot_spec), json.dumps(selections),
-                    json.dumps(labor_selections), json.dumps(site_elements), now, now,
+                    json.dumps(labor_selections), json.dumps(site_elements),
+                    json.dumps(supplier_preferences or {}), now, now,
                 ),
             )
             for floor in floors:
@@ -284,6 +297,7 @@ def update_property(
     selections: Optional[dict[str, str]] = None,
     labor_selections: Optional[dict[str, str]] = None,
     site_elements: Optional[list[dict[str, Any]]] = None,
+    supplier_preferences: Optional[dict[str, list[str]]] = None,
 ) -> Optional[dict[str, Any]]:
     """Partial update — only provided fields change. Refuses to modify a
     locked property (callers must unlock first via the OTP-gated flow)."""
@@ -300,6 +314,7 @@ def update_property(
         "selections": json.dumps(selections if selections is not None else existing["selections"]),
         "labor_selections": json.dumps(labor_selections if labor_selections is not None else existing["labor_selections"]),
         "site_elements": json.dumps(site_elements if site_elements is not None else existing["site_elements"]),
+        "supplier_preferences": json.dumps(supplier_preferences if supplier_preferences is not None else existing["supplier_preferences"]),
     }
 
     with get_connection() as connection:
@@ -308,11 +323,11 @@ def update_property(
                 """
                 UPDATE properties SET
                     name = %s, plot_spec = %s, selections = %s, labor_selections = %s,
-                    site_elements = %s, updated_at = %s
+                    site_elements = %s, supplier_preferences = %s, updated_at = %s
                 WHERE property_id = %s
                 """,
                 (fields["name"], fields["plot_spec"], fields["selections"], fields["labor_selections"],
-                 fields["site_elements"], now, property_id),
+                 fields["site_elements"], fields["supplier_preferences"], now, property_id),
             )
         connection.commit()
 
@@ -381,6 +396,7 @@ def sync_property(
     labor_selections: Optional[dict[str, str]] = None,
     site_elements: Optional[list[dict[str, Any]]] = None,
     floors: list[dict[str, Any]],
+    supplier_preferences: Optional[dict[str, list[str]]] = None,
 ) -> dict[str, Any]:
     """Saves the property's fields AND its complete floor set in ONE
     database round-trip, instead of the old pattern of one HTTP request
@@ -411,6 +427,7 @@ def sync_property(
         "selections": json.dumps(selections if selections is not None else existing["selections"]),
         "labor_selections": json.dumps(labor_selections if labor_selections is not None else existing["labor_selections"]),
         "site_elements": json.dumps(site_elements if site_elements is not None else existing["site_elements"]),
+        "supplier_preferences": json.dumps(supplier_preferences if supplier_preferences is not None else existing["supplier_preferences"]),
     }
 
     incoming_floor_ids = {f["floor_id"] for f in floors if f.get("floor_id")}
@@ -421,11 +438,11 @@ def sync_property(
                 """
                 UPDATE properties SET
                     name = %s, plot_spec = %s, selections = %s, labor_selections = %s,
-                    site_elements = %s, updated_at = %s
+                    site_elements = %s, supplier_preferences = %s, updated_at = %s
                 WHERE property_id = %s
                 """,
                 (fields["name"], fields["plot_spec"], fields["selections"], fields["labor_selections"],
-                 fields["site_elements"], now, property_id),
+                 fields["site_elements"], fields["supplier_preferences"], now, property_id),
             )
 
             # Delete any floor that existed before but isn't in this save.
