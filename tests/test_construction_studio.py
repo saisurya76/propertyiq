@@ -737,3 +737,63 @@ def test_flooring_subtypes_produce_correctly_ordered_real_cost_estimates():
     imported_marble_total = flooring_total("imported_marble")
 
     assert ceramic_total < vitrified_total < porcelain_total < imported_marble_total
+
+
+def test_painting_catalog_has_real_expanded_subtype_choices_for_india():
+    from backend.construction_studio import get_catalog
+
+    catalog = get_catalog("india")
+    painting_ids = {o["id"]: o["base_cost_usd"] for o in catalog["painting"]["options"]}
+
+    for option_id in ["distemper", "luxury_emulsion", "enamel_paint", "epoxy_coating"]:
+        assert option_id in painting_ids
+        assert painting_ids[option_id] > 0
+
+    assert painting_ids["distemper"] < painting_ids["interior_emulsion"]
+    assert painting_ids["luxury_emulsion"] > painting_ids["premium_textured"]
+    assert painting_ids["distemper"] == min(painting_ids.values())
+
+
+def test_doors_catalog_has_real_expanded_subtype_choices_for_india():
+    from backend.construction_studio import get_catalog
+
+    catalog = get_catalog("india")
+    door_ids = {o["id"]: o["base_cost_usd"] for o in catalog["doors"]["options"]}
+
+    for option_id in ["upvc_door", "wpc_door", "steel_safety_door"]:
+        assert option_id in door_ids
+        assert door_ids[option_id] > 0
+
+    # WPC is a budget wet-area upgrade over basic flush, well below premium doors
+    assert door_ids["flush_door_basic"] < door_ids["wpc_door"] < door_ids["laminate_door"]
+    assert door_ids["steel_safety_door"] < door_ids["solid_wood_door"]
+
+
+def test_windows_catalog_has_real_expanded_subtype_choices_for_india():
+    from backend.construction_studio import get_catalog
+
+    catalog = get_catalog("india")
+    window_ids = {o["id"]: o["base_cost_usd"] for o in catalog["windows"]["options"]}
+
+    for option_id in ["budget_upvc", "premium_double_glazed"]:
+        assert option_id in window_ids
+        assert window_ids[option_id] > 0
+
+    assert window_ids["budget_upvc"] < window_ids["upvc"]
+    assert window_ids["premium_double_glazed"] > window_ids["aluminum"]
+
+
+def test_new_material_subtypes_produce_correctly_ordered_real_cost_estimates():
+    """Confirms the expanded categories don't just look right in the raw
+    catalog -- a real end-to-end cost estimate reflects the same
+    real-world ordering across categories, not just within flooring."""
+    from backend.construction_studio import estimate_cost
+
+    def category_total(category, option_id, plot_size=1000):
+        result = estimate_cost(plot_size_sqft=plot_size, selections={category: option_id}, region="india", currency="INR")
+        line = next(li for li in result["line_items"] if li["category"] == category)
+        return line["line_total_converted"]
+
+    assert category_total("painting", "distemper") < category_total("painting", "luxury_emulsion")
+    assert category_total("doors", "wpc_door") < category_total("doors", "solid_wood_door")
+    assert category_total("windows", "budget_upvc") < category_total("windows", "premium_double_glazed")

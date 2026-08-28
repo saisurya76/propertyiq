@@ -1189,6 +1189,94 @@
           ],
           "quantity_per_sqft": 3.0,
           "quantity_unit": "sqft-of-wall"
+        },
+        {
+          "id": "distemper",
+          "name": "Distemper (Economy)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.163,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Asian Paints (Tractor)",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ],
+          "quantity_per_sqft": 3.0,
+          "quantity_unit": "sqft-of-wall"
+        },
+        {
+          "id": "luxury_emulsion",
+          "name": "Luxury Emulsion (Washable, Designer Finish)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.639,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Asian Paints (Royale Aspira)",
+              "region": "india"
+            },
+            {
+              "name": "Berger (Silk)",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ],
+          "quantity_per_sqft": 3.0,
+          "quantity_unit": "sqft-of-wall"
+        },
+        {
+          "id": "enamel_paint",
+          "name": "Enamel Paint (Wood/Metal Gloss Finish)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.33,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Asian Paints (Apcolite)",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ],
+          "quantity_per_sqft": 3.0,
+          "quantity_unit": "sqft-of-wall"
+        },
+        {
+          "id": "epoxy_coating",
+          "name": "Epoxy Coating (Industrial-Grade, High Durability)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.605,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ],
+          "quantity_per_sqft": 3.0,
+          "quantity_unit": "sqft-of-wall"
         }
       ]
     },
@@ -1456,6 +1544,38 @@
               "region": "global"
             }
           ]
+        },
+        {
+          "id": "budget_upvc",
+          "name": "uPVC Frames (Budget, Single-Pane)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 6.72,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "premium_double_glazed",
+          "name": "Premium Double-Glazed Frames (uPVC/Aluminium)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 22.4,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
         }
       ],
       "opening_area_fraction": 0.12
@@ -1517,6 +1637,57 @@
               "name": "Local Carpentry Contractors",
               "region": "india"
             },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "upvc_door",
+          "name": "uPVC Door",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 3.23,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Fenesta",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "wpc_door",
+          "name": "WPC Door (Wet-Area, Wood-Plastic Composite)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 1.39,
+          "regions": [
+            "india"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "india"
+            }
+          ]
+        },
+        {
+          "id": "steel_safety_door",
+          "name": "Steel Safety Door (Entrance/Security)",
+          "unit": "sqft_opening",
+          "base_cost_usd_per_sqft": 3.7,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
             {
               "name": "Generic Regional Supplier",
               "region": "global"
