@@ -2127,7 +2127,8 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 <DisciplineOverlayView
                   plotLengthFt={plot.plot_length_ft}
                   plotWidthFt={plot.plot_width_ft}
-                  rooms={rooms}
+                  floors={floors}
+                  initialFloorIndex={activeFloorIndex}
                 />
               </div>
 

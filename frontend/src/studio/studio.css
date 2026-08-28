@@ -2313,3 +2313,67 @@
   color: #9a3412;
   line-height: 1.5;
 }
+
+.discipline-overlay-floor-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.discipline-overlay-floor-tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #ede4fc;
+  background: #faf7ff;
+  color: #6b5f85;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discipline-overlay-floor-tab-active {
+  background: #4c1d95;
+  border-color: #4c1d95;
+  color: white;
+}
+
+.discipline-overlay-toolbar-spacer {
+  flex: 1;
+}
+
+.discipline-overlay-zoom-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #7c5cbf;
+  background: white;
+  color: #7c5cbf;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.discipline-overlay-canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fdfcff;
+}
+
+.discipline-overlay-compass {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.discipline-overlay-svg {
+  width: 100%;
+  max-height: 420px;
+  transform-origin: center center;
+  transition: transform 0.15s ease;
+}
