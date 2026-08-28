@@ -689,3 +689,51 @@ def test_materials_endpoint_requires_auth_and_gates_supplier_tier():
     pro_cement_ids = {o["id"] for o in pro_result.json()["categories"]["cement"]["options"]}
     assert "opc_thailand_scg" in pro_cement_ids  # premium tier genuinely sees Thailand's suppliers too
     assert "opc_43" in pro_cement_ids  # and still sees India's own
+
+
+def test_flooring_catalog_has_real_expanded_subtype_choices_for_india():
+    """User's explicit request: material subtypes make a real difference
+    in construction cost, so flooring needed more than 2 real choices
+    for an India user. Confirms the expansion landed with distinct,
+    sensibly-ordered pricing, not just placeholder entries."""
+    from backend.construction_studio import get_catalog
+
+    catalog = get_catalog("india")
+    flooring_ids = {o["id"]: o["base_cost_usd"] for o in catalog["flooring"]["options"]}
+
+    expected_new_options = [
+        "ceramic_tile", "porcelain_tile", "kota_stone",
+        "laminate_flooring", "spc_vinyl_flooring", "imported_marble",
+    ]
+    for option_id in expected_new_options:
+        assert option_id in flooring_ids, f"{option_id} should be available for india"
+        assert flooring_ids[option_id] > 0
+
+    # Real-world cost ordering must hold, not just "some positive number"
+    # for each — budget ceramic cheapest, imported marble most expensive,
+    # everything else in a sensible middle band.
+    assert flooring_ids["ceramic_tile"] < flooring_ids["vitrified_tile"]
+    assert flooring_ids["porcelain_tile"] > flooring_ids["vitrified_tile"]
+    assert flooring_ids["kota_stone"] < flooring_ids["vitrified_tile"]
+    assert flooring_ids["imported_marble"] > flooring_ids["natural_stone"]
+    assert flooring_ids["imported_marble"] == max(flooring_ids.values())
+    assert flooring_ids["ceramic_tile"] == min(flooring_ids.values())
+
+
+def test_flooring_subtypes_produce_correctly_ordered_real_cost_estimates():
+    """Not just that the catalog data looks right in isolation -- a real,
+    end-to-end cost estimate for the same plot must reflect the same
+    real-world cost ordering when a different flooring subtype is chosen."""
+    from backend.construction_studio import estimate_cost
+
+    def flooring_total(option_id):
+        result = estimate_cost(plot_size_sqft=1000, selections={"flooring": option_id}, region="india", currency="INR")
+        line = next(li for li in result["line_items"] if li["category"] == "flooring")
+        return line["line_total_converted"]
+
+    ceramic_total = flooring_total("ceramic_tile")
+    vitrified_total = flooring_total("vitrified_tile")
+    porcelain_total = flooring_total("porcelain_tile")
+    imported_marble_total = flooring_total("imported_marble")
+
+    assert ceramic_total < vitrified_total < porcelain_total < imported_marble_total
