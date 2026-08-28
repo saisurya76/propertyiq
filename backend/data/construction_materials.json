@@ -1696,6 +1696,84 @@
         }
       ],
       "opening_area_fraction": 0.12
+    },
+    "hvac_ventilation": {
+      "label": "HVAC & Ventilation",
+      "options": [
+        {
+          "id": "basic_ventilation_ac_prep",
+          "name": "Basic Ventilation (Exhaust Fans) + AC Point Wiring Prep",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.08,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Havells",
+              "region": "india"
+            },
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "premium_hvac_prep",
+          "name": "Comprehensive AC Provisioning (All Bedrooms + Living) + Premium Ventilation",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.15,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
+    },
+    "fire_safety": {
+      "label": "Fire Safety",
+      "options": [
+        {
+          "id": "basic_fire_safety",
+          "name": "Basic Fire Safety (1 Extinguisher + 1 Smoke Detector)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.015,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        },
+        {
+          "id": "enhanced_fire_safety",
+          "name": "Enhanced Fire Safety (Multiple Extinguishers, Smoke Detectors, Fire Blanket)",
+          "unit": "sqft",
+          "base_cost_usd_per_sqft": 0.04,
+          "regions": [
+            "india",
+            "global"
+          ],
+          "suppliers": [
+            {
+              "name": "Generic Regional Supplier",
+              "region": "global"
+            }
+          ]
+        }
+      ]
     }
   },
   "labor_cost_index": {

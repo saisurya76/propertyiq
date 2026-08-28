@@ -90,3 +90,47 @@ def test_empty_line_items_returns_empty_sections():
 def test_discipline_labels_are_all_real_human_readable_strings():
     for discipline, label in DISCIPLINE_LABELS.items():
         assert isinstance(label, str) and len(label) > 0
+
+
+def test_hvac_and_fire_safety_categories_are_real_and_correctly_grouped():
+    """The two genuine catalog gaps identified during the design-output
+    audit -- confirms they're now real, selectable categories that land
+    in their own honestly-labeled sections, not folded into an
+    unrelated discipline."""
+    from backend.construction_studio import get_catalog
+
+    catalog = get_catalog("india")
+    assert "hvac_ventilation" in catalog
+    assert "fire_safety" in catalog
+    hvac_ids = {o["id"] for o in catalog["hvac_ventilation"]["options"]}
+    fire_ids = {o["id"] for o in catalog["fire_safety"]["options"]}
+    assert "basic_ventilation_ac_prep" in hvac_ids
+    assert "basic_fire_safety" in fire_ids
+
+    result = estimate_cost(
+        plot_size_sqft=1200,
+        selections={"hvac_ventilation": "premium_hvac_prep", "fire_safety": "enhanced_fire_safety"},
+        region="india", currency="INR",
+    )
+    sections = group_by_discipline(result["line_items"])
+    by_discipline = {s["discipline"]: s for s in sections}
+
+    assert "hvac" in by_discipline
+    assert by_discipline["hvac"]["label"] == "HVAC & Ventilation"
+    assert by_discipline["hvac"]["line_items"][0]["category"] == "hvac_ventilation"
+
+    assert "fire_safety" in by_discipline
+    assert by_discipline["fire_safety"]["label"] == "Fire Safety"
+    assert by_discipline["fire_safety"]["line_items"][0]["category"] == "fire_safety"
+
+
+def test_hvac_and_fire_safety_appear_in_the_correct_section_order():
+    result = estimate_cost(
+        plot_size_sqft=1200,
+        selections={"structure": "rcc_frame", "hvac_ventilation": "basic_ventilation_ac_prep",
+                    "fire_safety": "basic_fire_safety", "flooring": "vitrified_tile"},
+        region="india", currency="INR",
+    )
+    sections = group_by_discipline(result["line_items"])
+    disciplines_in_order = [s["discipline"] for s in sections]
+    assert disciplines_in_order == ["structural", "hvac", "fire_safety", "finishes"]

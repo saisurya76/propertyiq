@@ -23,6 +23,8 @@ DISCIPLINE_LABELS = {
     "finishes": "Finishes & Interior",
     "roofing": "Roofing",
     "waterproofing": "Waterproofing",
+    "hvac": "HVAC & Ventilation",
+    "fire_safety": "Fire Safety",
 }
 
 # Every real category id from construction_materials.json's "categories"
@@ -57,6 +59,14 @@ CATEGORY_DISCIPLINES = {
     # sections rather than folded into structural or finishes.
     "roofing": "roofing",
     "waterproofing": "waterproofing",
+    # HVAC/Ventilation and Fire Safety: genuine catalog gaps identified
+    # during the design-output audit — see construction_materials.json's
+    # own comment on these categories for the honest scaling methodology
+    # (typical-home equipment cost divided by representative sqft,
+    # since these are discrete equipment purchases, not a true
+    # per-sqft market rate the way flooring/painting genuinely are).
+    "hvac_ventilation": "hvac",
+    "fire_safety": "fire_safety",
 }
 
 
@@ -91,5 +101,5 @@ def group_by_discipline(line_items: list[dict[str, Any]]) -> list[dict[str, Any]
     # Stable, meaningful order rather than whatever order dict insertion
     # happened to produce (which depends on selection order, not
     # anything a reader would find predictable).
-    order = ["structural", "plumbing", "electrical", "finishes", "roofing", "waterproofing", "other"]
+    order = ["structural", "plumbing", "electrical", "hvac", "fire_safety", "finishes", "roofing", "waterproofing", "other"]
     return [sections[d] for d in order if d in sections]
