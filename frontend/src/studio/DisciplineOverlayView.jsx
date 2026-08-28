@@ -20,12 +20,27 @@ const DISCIPLINES = [
 // between this view and the interactive room-layout canvas.
 const clampZoom = (z) => Math.max(0.4, Math.min(3, z));
 
+// Colors are NEVER hardcoded here — every drawn element's color comes
+// from the backend's own `legend` array (see discipline_overlays.py's
+// LEGEND constant), so the swatch shown in the legend key and the color
+// actually used to draw that element can never drift apart. Falls back
+// to a neutral gray only if a legend entry is ever genuinely missing
+// (should not happen in practice — every element type has one).
+function legendColor(legend, key) {
+  return legend?.find((entry) => entry.key === key)?.color || "#6b7280";
+}
+
 // A single, small label text element, consistently offset from its
 // marker so it never sits exactly on top of it — shared by every
 // discipline's rendering below rather than repeating this in each.
-function ElementLabel({ x, y, plotWidthFt, text }) {
+// Also the click target for showing that element's reference spec.
+function ElementLabel({ x, y, plotWidthFt, text, onClick }) {
   return (
-    <text x={x + 0.5} y={flipY(y, plotWidthFt) - 0.5} fontSize={1.1} fontWeight={700} fill="#1f2937">
+    <text
+      x={x + 0.5} y={flipY(y, plotWidthFt) - 0.5}
+      fontSize={1.1} fontWeight={700} fill="#1f2937"
+      onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}
+    >
       {text}
     </text>
   );
@@ -38,15 +53,22 @@ function ElementLabel({ x, y, plotWidthFt, text }) {
 // the critical honesty boundary every result here carries: this is a
 // SCHEMATIC visualization aid, not a licensed engineer's calculated
 // design — the disclaimer returned by the backend is always shown
-// prominently, never hidden or shortened.
+// prominently, never hidden or shortened. Every element's reference
+// spec (also never calculated for this specific building — same
+// boundary, just per-element instead of a single top-level statement)
+// is shown when the user taps that element's label, not by default,
+// since there's real text-per-element and showing all of it inline for
+// every element at once would overwhelm the drawing.
 function DisciplineOverlayView({ floors, plotLengthFt, plotWidthFt, initialFloorIndex = 0 }) {
   const [floorIndex, setFloorIndex] = useState(initialFloorIndex);
   const [discipline, setDiscipline] = useState("structural");
   const [zoom, setZoom] = useState(1);
   const [overlay, setOverlay] = useState(null);
   const [state, setState] = useState("idle"); // "idle" | "loading" | "done" | "error"
+  const [selectedElement, setSelectedElement] = useState(null); // { label, spec } | null
 
   const rooms = floors[floorIndex]?.rooms || [];
+  const totalFloors = floors.length;
 
   // Depend on a stable, content-based key rather than the `rooms` array
   // reference itself — `rooms` is recomputed from floor/layout state on
@@ -67,15 +89,18 @@ function DisciplineOverlayView({ floors, plotLengthFt, plotWidthFt, initialFloor
     // which still satisfies the "don't setState synchronously in an
     // effect" rule while staying correctly ordered before the fetch's
     // own microtask-based resolution.
-    Promise.resolve().then(() => setState("loading"));
-    studioApi.getDisciplineOverlay(discipline, rooms, plotLengthFt, plotWidthFt)
+    Promise.resolve().then(() => {
+      setState("loading");
+      setSelectedElement(null); // a stale spec from the previous discipline/floor must not linger
+    });
+    studioApi.getDisciplineOverlay(discipline, rooms, plotLengthFt, plotWidthFt, totalFloors)
       .then((data) => {
         setOverlay(data);
         setState("done");
       })
       .catch(() => setState("error"));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- roomsKey is the intentional, stable stand-in for rooms' actual content
-  }, [discipline, plotLengthFt, plotWidthFt, roomsKey]);
+  }, [discipline, plotLengthFt, plotWidthFt, roomsKey, totalFloors]);
 
   if (!plotLengthFt || !plotWidthFt) return null;
 
@@ -126,6 +151,15 @@ function DisciplineOverlayView({ floors, plotLengthFt, plotWidthFt, initialFloor
 
       {state === "done" && overlay && overlay.discipline === discipline && (
         <>
+          <div className="discipline-overlay-legend">
+            {overlay.legend.map((entry) => (
+              <span key={entry.key} className="discipline-overlay-legend-item">
+                <span className="discipline-overlay-legend-swatch" style={{ background: entry.color }} />
+                {entry.label}
+              </span>
+            ))}
+          </div>
+
           <div className="discipline-overlay-canvas-wrap">
             {/* North is always "up" in this app's plot coordinate convention
                 (same as RoomCanvas.jsx's own compass), so this is static,
@@ -168,20 +202,34 @@ function DisciplineOverlayView({ floors, plotLengthFt, plotWidthFt, initialFloor
                 <>
                   {overlay.walls.map((wall, i) => (
                     <rect
-                      key={i}
+                      key={`wall-${i}`}
                       x={wall.x}
                       y={flipY(wall.y + wall.width, plotWidthFt)}
                       width={wall.length}
                       height={wall.width}
                       fill="none"
-                      stroke={wall.kind === "perimeter" ? "#dc2626" : "#f59e0b"}
+                      stroke={legendColor(overlay.legend, wall.kind === "perimeter" ? "perimeter_wall" : "partition_wall")}
                       strokeWidth={wall.kind === "perimeter" ? 0.8 : 0.6}
                     />
                   ))}
-                  {overlay.columns.map((col, i) => (
-                    <g key={i}>
-                      <rect x={col.x - 0.6} y={flipY(col.y, plotWidthFt) - 0.6} width={1.2} height={1.2} fill="#dc2626" />
-                      <ElementLabel x={col.x} y={col.y} plotWidthFt={plotWidthFt} text={col.label} />
+                  {overlay.beams.map((beam) => (
+                    <line
+                      key={beam.label}
+                      x1={beam.x} y1={flipY(beam.y, plotWidthFt)}
+                      x2={beam.x2} y2={flipY(beam.y2, plotWidthFt)}
+                      stroke={legendColor(overlay.legend, "beam")} strokeWidth={0.45} strokeDasharray="0.6,0.6"
+                      onClick={() => setSelectedElement(beam)}
+                      style={{ cursor: "pointer" }}
+                    />
+                  ))}
+                  {overlay.columns.map((col) => (
+                    <g key={col.label}>
+                      <rect
+                        x={col.x - 0.6} y={flipY(col.y, plotWidthFt) - 0.6} width={1.2} height={1.2}
+                        fill={legendColor(overlay.legend, "column")}
+                        onClick={() => setSelectedElement(col)} style={{ cursor: "pointer" }}
+                      />
+                      <ElementLabel x={col.x} y={col.y} plotWidthFt={plotWidthFt} text={col.label} onClick={() => setSelectedElement(col)} />
                     </g>
                   ))}
                 </>
@@ -195,22 +243,27 @@ function DisciplineOverlayView({ floors, plotLengthFt, plotWidthFt, initialFloor
                       key={i}
                       x1={run.from.x} y1={flipY(run.from.y, plotWidthFt)}
                       x2={run.to.x} y2={flipY(run.to.y, plotWidthFt)}
-                      stroke="#2563eb" strokeWidth={0.5} strokeDasharray="1.2,0.8"
+                      stroke={legendColor(overlay.legend, "pipe_run")} strokeWidth={0.5} strokeDasharray="1.2,0.8"
                     />
                   ))}
-                  {overlay.fixtures.map((f, i) => (
-                    <g key={i}>
-                      <circle cx={f.x} cy={flipY(f.y, plotWidthFt)} r={0.8} fill="#2563eb" />
-                      <ElementLabel x={f.x} y={f.y} plotWidthFt={plotWidthFt} text={f.label} />
+                  {overlay.fixtures.map((f) => (
+                    <g key={f.label}>
+                      <circle
+                        cx={f.x} cy={flipY(f.y, plotWidthFt)} r={0.8}
+                        fill={legendColor(overlay.legend, "fixture")}
+                        onClick={() => setSelectedElement(f)} style={{ cursor: "pointer" }}
+                      />
+                      <ElementLabel x={f.x} y={f.y} plotWidthFt={plotWidthFt} text={f.label} onClick={() => setSelectedElement(f)} />
                     </g>
                   ))}
                   {overlay.main_riser && (
                     <g>
                       <rect
                         x={overlay.main_riser.x - 0.7} y={flipY(overlay.main_riser.y, plotWidthFt) - 0.7}
-                        width={1.4} height={1.4} fill="#1e3a8a"
+                        width={1.4} height={1.4} fill={legendColor(overlay.legend, "main_riser")}
+                        onClick={() => setSelectedElement(overlay.main_riser)} style={{ cursor: "pointer" }}
                       />
-                      <ElementLabel x={overlay.main_riser.x} y={overlay.main_riser.y} plotWidthFt={plotWidthFt} text={overlay.main_riser.label} />
+                      <ElementLabel x={overlay.main_riser.x} y={overlay.main_riser.y} plotWidthFt={plotWidthFt} text={overlay.main_riser.label} onClick={() => setSelectedElement(overlay.main_riser)} />
                     </g>
                   )}
                 </>
@@ -219,40 +272,65 @@ function DisciplineOverlayView({ floors, plotLengthFt, plotWidthFt, initialFloor
               {/* Electrical overlay */}
               {discipline === "electrical" && (
                 <>
-                  {overlay.sockets.map((s, i) => (
-                    <g key={`so-${i}`}>
-                      <rect x={s.x - 0.3} y={flipY(s.y, plotWidthFt) - 0.3} width={0.6} height={0.6} fill="#059669" />
-                      <ElementLabel x={s.x} y={s.y} plotWidthFt={plotWidthFt} text={s.label} />
+                  {overlay.sockets.map((s) => (
+                    <g key={s.label}>
+                      <rect
+                        x={s.x - 0.3} y={flipY(s.y, plotWidthFt) - 0.3} width={0.6} height={0.6}
+                        fill={legendColor(overlay.legend, "socket")}
+                        onClick={() => setSelectedElement(s)} style={{ cursor: "pointer" }}
+                      />
+                      <ElementLabel x={s.x} y={s.y} plotWidthFt={plotWidthFt} text={s.label} onClick={() => setSelectedElement(s)} />
                     </g>
                   ))}
-                  {overlay.switches.map((s, i) => (
-                    <g key={`sw-${i}`}>
-                      <rect x={s.x - 0.4} y={flipY(s.y, plotWidthFt) - 0.4} width={0.8} height={0.8} fill="#d97706" />
-                      <ElementLabel x={s.x} y={s.y} plotWidthFt={plotWidthFt} text={s.label} />
+                  {overlay.switches.map((s) => (
+                    <g key={s.label}>
+                      <rect
+                        x={s.x - 0.4} y={flipY(s.y, plotWidthFt) - 0.4} width={0.8} height={0.8}
+                        fill={legendColor(overlay.legend, "switch")}
+                        onClick={() => setSelectedElement(s)} style={{ cursor: "pointer" }}
+                      />
+                      <ElementLabel x={s.x} y={s.y} plotWidthFt={plotWidthFt} text={s.label} onClick={() => setSelectedElement(s)} />
                     </g>
                   ))}
-                  {overlay.fans.map((f, i) => (
+                  {overlay.fans.map((f) => {
                     // A fan-blade cross, distinct from the light's plain
                     // circle outline below, so the two markers (which
                     // sit close together in the same room) are easy to
                     // tell apart at a glance.
-                    <g key={`fn-${i}`}>
-                      <circle cx={f.x} cy={flipY(f.y, plotWidthFt)} r={0.9} fill="none" stroke="#0891b2" strokeWidth={0.35} />
-                      <line x1={f.x - 0.9} y1={flipY(f.y, plotWidthFt)} x2={f.x + 0.9} y2={flipY(f.y, plotWidthFt)} stroke="#0891b2" strokeWidth={0.3} />
-                      <line x1={f.x} y1={flipY(f.y, plotWidthFt) - 0.9} x2={f.x} y2={flipY(f.y, plotWidthFt) + 0.9} stroke="#0891b2" strokeWidth={0.3} />
-                      <ElementLabel x={f.x} y={f.y} plotWidthFt={plotWidthFt} text={f.label} />
-                    </g>
-                  ))}
-                  {overlay.lights.map((l, i) => (
-                    <g key={`l-${i}`}>
-                      <circle cx={l.x} cy={flipY(l.y, plotWidthFt)} r={0.6} fill="none" stroke="#d97706" strokeWidth={0.4} />
-                      <ElementLabel x={l.x} y={l.y} plotWidthFt={plotWidthFt} text={l.label} />
+                    const fanColor = legendColor(overlay.legend, "fan");
+                    return (
+                      <g key={f.label} onClick={() => setSelectedElement(f)} style={{ cursor: "pointer" }}>
+                        <circle cx={f.x} cy={flipY(f.y, plotWidthFt)} r={0.9} fill="none" stroke={fanColor} strokeWidth={0.35} />
+                        <line x1={f.x - 0.9} y1={flipY(f.y, plotWidthFt)} x2={f.x + 0.9} y2={flipY(f.y, plotWidthFt)} stroke={fanColor} strokeWidth={0.3} />
+                        <line x1={f.x} y1={flipY(f.y, plotWidthFt) - 0.9} x2={f.x} y2={flipY(f.y, plotWidthFt) + 0.9} stroke={fanColor} strokeWidth={0.3} />
+                        <ElementLabel x={f.x} y={f.y} plotWidthFt={plotWidthFt} text={f.label} onClick={() => setSelectedElement(f)} />
+                      </g>
+                    );
+                  })}
+                  {overlay.lights.map((l) => (
+                    <g key={l.label}>
+                      <circle
+                        cx={l.x} cy={flipY(l.y, plotWidthFt)} r={0.6} fill="none"
+                        stroke={legendColor(overlay.legend, "light")} strokeWidth={0.4}
+                        onClick={() => setSelectedElement(l)} style={{ cursor: "pointer" }}
+                      />
+                      <ElementLabel x={l.x} y={l.y} plotWidthFt={plotWidthFt} text={l.label} onClick={() => setSelectedElement(l)} />
                     </g>
                   ))}
                 </>
               )}
             </svg>
           </div>
+
+          {selectedElement && (
+            <div className="discipline-overlay-spec-panel">
+              <div className="discipline-overlay-spec-header">
+                <strong>{selectedElement.label}</strong>
+                <button type="button" className="discipline-overlay-spec-close" onClick={() => setSelectedElement(null)} aria-label="Close">×</button>
+              </div>
+              <p className="discipline-overlay-spec-text">{selectedElement.spec}</p>
+            </div>
+          )}
 
           <p className="discipline-overlay-disclaimer">⚠️ {overlay.disclaimer}</p>
         </>
