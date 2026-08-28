@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
 import { evaluateAdjacency, ARCHITECTURAL_STYLE_LABELS } from "./adjacencyEngine";
+import ComplianceInfoIcon from "./ComplianceInfoIcon";
 
 const RoomCanvas = lazy(() => import("./RoomCanvas"));
 
@@ -1630,7 +1631,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
 
           {liveVastuResult && liveVastuResult.scope !== "no_specific_tradition" && (
             <div className="cs-vastu-live-section">
-              <h4>{liveVastuResult.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
+              <div className="cs-compliance-title-row">
+                <h4>{liveVastuResult.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
+                <ComplianceInfoIcon tradition={liveVastuResult.scope?.startsWith("thai_") ? "thai" : "vastu"} />
+              </div>
               <p className="studio-subtext" style={{ marginTop: -8, marginBottom: 10 }}>
                 Updates live as you edit the plot direction and room layout — always reflects the current design, not a snapshot from when you last clicked Generate.
               </p>
@@ -2079,7 +2083,10 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 </span>
               </div>
 
-              <h4>Vastu Compliance</h4>
+              <div className="cs-compliance-title-row">
+                <h4>{result.vastu_result.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
+                <ComplianceInfoIcon tradition={result.vastu_result.scope?.startsWith("thai_") ? "thai" : "vastu"} />
+              </div>
               {result.vastu_result.scope === "full_multi_rule_check" ? (
                 result.vastu_result.findings.map((f, i) => (
                   <div

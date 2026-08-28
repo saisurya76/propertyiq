@@ -2083,3 +2083,108 @@
     min-width: 720px;
   }
 }
+
+.cs-compliance-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cs-compliance-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #7c5cbf;
+  background: white;
+  color: #7c5cbf;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cs-compliance-info-btn:hover {
+  background: #faf7ff;
+}
+
+.cs-compliance-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 10, 40, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.cs-compliance-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.cs-compliance-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cs-compliance-modal-header h4 {
+  margin: 0;
+  color: #2c1f47;
+}
+
+.cs-compliance-modal-close {
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b5f85;
+  padding: 4px 8px;
+}
+
+.cs-compliance-scope-note {
+  font-size: 13px;
+  color: #6b5f85;
+  font-style: italic;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ede4fc;
+}
+
+.cs-compliance-rule {
+  margin-bottom: 14px;
+}
+
+.cs-compliance-rule-category {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #7c5cbf;
+  margin-bottom: 2px;
+}
+
+.cs-compliance-rule-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c1f47;
+  margin-bottom: 4px;
+}
+
+.cs-compliance-rule-detail {
+  font-size: 13px;
+  color: #4a4160;
+  margin: 0;
+}

@@ -198,4 +198,7 @@ export const studioApi = {
       method: "POST",
       body: JSON.stringify({ new_price: newPrice }),
     }),
+
+  getComplianceRules: (tradition) =>
+    apiFetch(`/api/construction-studio/compliance-rules?tradition=${encodeURIComponent(tradition)}`),
 };

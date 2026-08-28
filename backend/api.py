@@ -64,6 +64,8 @@ from backend.thai_traditional_engine import (
     check_thai_orientation,
 )
 
+from backend.compliance_rules import get_vastu_rules, get_thai_rules
+
 from backend.adjacency_engine import (
     evaluate_adjacency,
 )
@@ -1870,6 +1872,22 @@ def construction_materials(region: str = "global", user_email: str = Depends(get
         "categories": get_catalog(effective_region),
         "labor_categories": get_labor_catalog(effective_region),
     }
+
+
+@app.get("/api/construction-studio/compliance-rules")
+def compliance_rules(tradition: str):
+    """Backs the Vastu/Thai compliance info icon — a plain-language
+    listing of every rule the live check actually validates against.
+    Deliberately public (no auth/subscription required): this is
+    informational only, not a computed result specific to any user's
+    design, so there's no reason to gate it the way the live checks
+    themselves are gated by the Studio subscription."""
+    tradition = (tradition or "").strip().lower()
+    if tradition == "vastu":
+        return get_vastu_rules()
+    if tradition == "thai":
+        return get_thai_rules()
+    raise HTTPException(status_code=400, detail="tradition must be 'vastu' or 'thai'.")
 
 
 @app.post("/api/construction-studio/estimate")

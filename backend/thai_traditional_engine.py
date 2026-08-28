@@ -81,6 +81,10 @@ def _rooms_are_adjacent(room_a: dict[str, Any], room_b: dict[str, Any], gap_thre
     return False
 
 
+THAI_FAVORABLE_ENTRANCES = {"east", "north-east", "south-east"}
+THAI_UNFAVORABLE_ENTRANCES = {"west"}
+
+
 def check_thai_orientation(
     *,
     entrance_direction: str,
@@ -92,14 +96,12 @@ def check_thai_orientation(
     unfavorable. This mirrors check_vastu_basics's role — a lightweight,
     entrance-direction-only pass, not the full room-level check."""
 
-    favorable_entrances = {"east", "north-east", "south-east"}
-    unfavorable_entrances = {"west"}
     notes = []
     compliant = True
 
     entrance = (entrance_direction or "").strip().lower()
 
-    if entrance in unfavorable_entrances:
+    if entrance in THAI_UNFAVORABLE_ENTRANCES:
         compliant = False
         notes.append({
             "severity": "warning",
@@ -107,7 +109,7 @@ def check_thai_orientation(
                     "traditional building practice — a west-facing long side is associated with misfortune, "
                     "and traditionally avoided in favor of an eastward orientation.",
         })
-    elif entrance in favorable_entrances:
+    elif entrance in THAI_FAVORABLE_ENTRANCES:
         notes.append({
             "severity": "good",
             "text": f"Entrance/frontage facing '{entrance_direction}' aligns with the traditional Thai "

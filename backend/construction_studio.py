@@ -190,6 +190,10 @@ def estimate_cost(
     }
 
 
+VASTU_FAVORABLE_ENTRANCES = {"north", "east", "north-east"}
+VASTU_UNFAVORABLE_SLOPES = {"south", "west", "south-west"}
+
+
 def check_vastu_basics(
     *,
     entrance_direction: str,
@@ -203,7 +207,6 @@ def check_vastu_basics(
     a complete compliance audit.
     """
 
-    favorable_entrances = {"north", "east", "north-east"}
     notes = []
     compliant = True
 
@@ -211,7 +214,7 @@ def check_vastu_basics(
     road = (road_facing_side or "").strip().lower()
     slope = (slope_direction or "").strip().lower() if slope_direction else None
 
-    if entrance not in favorable_entrances:
+    if entrance not in VASTU_FAVORABLE_ENTRANCES:
         compliant = False
         notes.append(
             f"Entrance facing '{entrance_direction}' is considered less favorable in classical Vastu; "
@@ -227,7 +230,7 @@ def check_vastu_basics(
         )
 
     if slope:
-        if slope in {"south", "west", "south-west"}:
+        if slope in VASTU_UNFAVORABLE_SLOPES:
             compliant = False
             notes.append(
                 f"Slope toward '{slope_direction}' is traditionally considered unfavorable; "
