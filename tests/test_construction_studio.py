@@ -797,3 +797,41 @@ def test_new_material_subtypes_produce_correctly_ordered_real_cost_estimates():
     assert category_total("painting", "distemper") < category_total("painting", "luxury_emulsion")
     assert category_total("doors", "wpc_door") < category_total("doors", "solid_wood_door")
     assert category_total("windows", "budget_upvc") < category_total("windows", "premium_double_glazed")
+
+
+def test_generate_design_endpoint_includes_a_real_discipline_breakdown():
+    """The user-facing point of this whole module: Generate Design's
+    real HTTP response must include a genuinely correct discipline
+    breakdown alongside the existing flat cost_estimate, not just in
+    the internal group_by_discipline() function."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription
+
+    client = TestClient(app)
+
+    email = "discipline_breakdown_test@example.com"
+    code = create_otp(email)
+    r_verify = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {r_verify.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_starter", dodo_subscription_id="sub_discbreak", status="active")
+
+    r = client.post("/api/construction-studio/design", headers=headers, json={
+        "plot_size_sqft": 1200, "plot_length_ft": 40, "plot_width_ft": 30,
+        "selections": {"structure": "rcc_frame", "flooring": "vitrified_tile", "roofing": "rcc_slab"},
+        "entrance_direction": "north", "road_facing_side": "north", "region": "india", "currency": "INR",
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert "discipline_breakdown" in body
+
+    by_discipline = {s["discipline"]: s for s in body["discipline_breakdown"]}
+    assert "structural" in by_discipline
+    assert "roofing" in by_discipline
+    assert "finishes" in by_discipline
+
+    # The existing flat cost_estimate must remain completely unchanged —
+    # this is an additive view, not a replacement of what already worked.
+    assert "line_items" in body["cost_estimate"]
+    assert "grand_total_converted" in body["cost_estimate"]

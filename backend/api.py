@@ -65,6 +65,7 @@ from backend.thai_traditional_engine import (
 )
 
 from backend.compliance_rules import get_vastu_rules, get_thai_rules
+from backend.design_disciplines import group_by_discipline
 
 from backend.adjacency_engine import (
     evaluate_adjacency,
@@ -2180,6 +2181,7 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
     return {
         "design_id": design_id,
         "cost_estimate": cost_estimate,
+        "discipline_breakdown": group_by_discipline(cost_estimate["line_items"]),
         "vastu_result": vastu_result,
         "risks": risks,
         "dxf_available": dxf_path is not None,
