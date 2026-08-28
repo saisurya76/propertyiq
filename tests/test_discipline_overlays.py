@@ -214,3 +214,144 @@ def test_endpoint_rejects_invalid_plot_dimensions():
         "rooms": SAMPLE_ROOMS, "plot_length_ft": 0, "plot_width_ft": PLOT_WIDTH,
     })
     assert r.status_code == 400
+
+
+def test_structural_overlay_includes_one_beam_per_room():
+    result = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    assert len(result["beams"]) == len(SAMPLE_ROOMS)
+    beam_labels = [b["label"] for b in result["beams"]]
+    assert beam_labels == [f"B{i+1}" for i in range(len(result["beams"]))]
+
+
+def test_beam_runs_along_the_rooms_longer_dimension():
+    """A real, checkable geometric property -- the beam's own length
+    (computed from its endpoints) must equal the room's longer side,
+    not an arbitrary fixed direction."""
+    result = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    living_room_beam = next(b for b in result["beams"] if b["span_ft"] == 20)  # Living Room is 20x15
+    beam_length = ((living_room_beam["x2"] - living_room_beam["x"]) ** 2 + (living_room_beam["y2"] - living_room_beam["y"]) ** 2) ** 0.5
+    assert beam_length == 20
+
+
+def test_column_spec_reflects_the_real_total_floors_given():
+    """The core, explicit request this feature exists for: a column's
+    reference spec must genuinely change with the building's real
+    floor count, not return the same generic text regardless."""
+    one_floor = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH, total_floors=1)
+    two_floor = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH, total_floors=2)
+    three_floor = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH, total_floors=3)
+
+    assert "230mm x 230mm" in one_floor["columns"][0]["spec"]
+    assert "230mm x 300mm" in two_floor["columns"][0]["spec"]
+    assert "230mm x 380mm" in three_floor["columns"][0]["spec"]
+    # Different floor counts must genuinely produce different spec text
+    assert one_floor["columns"][0]["spec"] != two_floor["columns"][0]["spec"]
+
+
+def test_every_spec_carries_the_critical_reference_only_disclaimer():
+    """The real safety requirement: every single spec string, across
+    every discipline, must explicitly say it's a reference figure that
+    needs professional verification -- never a bare number with no
+    qualifier attached."""
+    structural = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH, total_floors=2)
+    for col in structural["columns"]:
+        assert "NOT calculated for this specific building" in col["spec"]
+        assert "structural engineer" in col["spec"]
+    for beam in structural["beams"]:
+        assert "NOT calculated for this specific building" in beam["spec"]
+        assert "structural engineer" in beam["spec"]
+
+    plumbing = compute_plumbing_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    for fixture in plumbing["fixtures"]:
+        assert "NOT calculated for this specific building" in fixture["spec"]
+        assert "plumber" in fixture["spec"]
+    assert "plumber" in plumbing["main_riser"]["spec"]
+
+    electrical = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    for group in [electrical["lights"], electrical["fans"], electrical["switches"], electrical["sockets"]]:
+        for el in group:
+            assert "NOT calculated for this specific building" in el["spec"]
+            assert "electrician" in el["spec"]
+
+
+def test_specs_never_mix_up_which_professional_or_verification_basis_applies():
+    """Caught and fixed during development: an earlier version's
+    disclaimer text mentioned 'soil report' for plumbing/electrical
+    specs too, which is a structural-only concept. Confirms this stays
+    fixed -- domain-specific wording, not a generic template leaking
+    irrelevant details across disciplines."""
+    plumbing = compute_plumbing_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    assert "soil report" not in plumbing["fixtures"][0]["spec"]
+    assert "soil report" not in plumbing["main_riser"]["spec"]
+
+    electrical = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    assert "soil report" not in electrical["sockets"][0]["spec"]
+    assert "soil report" not in electrical["lights"][0]["spec"]
+
+
+def test_spec_is_uniform_per_element_type_not_fabricated_per_instance():
+    """A real, important honesty check: every column at the same floor
+    count gets the IDENTICAL spec text -- fabricating slightly
+    different numbers per specific column would falsely imply a real
+    per-element calculation was done, which never happens here."""
+    result = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH, total_floors=2)
+    column_specs = {c["spec"] for c in result["columns"]}
+    assert len(column_specs) == 1
+
+
+def test_every_discipline_returns_a_legend_matching_its_own_drawing_colors():
+    structural = compute_structural_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    plumbing = compute_plumbing_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+    electrical = compute_electrical_overlay(SAMPLE_ROOMS, PLOT_LENGTH, PLOT_WIDTH)
+
+    assert len(structural["legend"]) == 4
+    assert len(plumbing["legend"]) == 3
+    assert len(electrical["legend"]) == 4
+
+    for entry in structural["legend"] + plumbing["legend"] + electrical["legend"]:
+        assert entry["key"]
+        assert entry["label"]
+        assert entry["color"].startswith("#")
+
+
+def test_endpoint_total_floors_genuinely_affects_the_structural_spec():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r1 = client.post("/api/construction-studio/discipline-overlay?discipline=structural", json={
+        "rooms": SAMPLE_ROOMS, "plot_length_ft": PLOT_LENGTH, "plot_width_ft": PLOT_WIDTH, "total_floors": 1,
+    })
+    r2 = client.post("/api/construction-studio/discipline-overlay?discipline=structural", json={
+        "rooms": SAMPLE_ROOMS, "plot_length_ft": PLOT_LENGTH, "plot_width_ft": PLOT_WIDTH, "total_floors": 3,
+    })
+    assert r1.json()["columns"][0]["spec"] != r2.json()["columns"][0]["spec"]
+    assert "230mm x 230mm" in r1.json()["columns"][0]["spec"]
+    assert "230mm x 380mm" in r2.json()["columns"][0]["spec"]
+
+
+def test_endpoint_rejects_invalid_total_floors():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r = client.post("/api/construction-studio/discipline-overlay?discipline=structural", json={
+        "rooms": SAMPLE_ROOMS, "plot_length_ft": PLOT_LENGTH, "plot_width_ft": PLOT_WIDTH, "total_floors": 0,
+    })
+    assert r.status_code == 400
+
+
+def test_endpoint_defaults_total_floors_to_one_when_omitted():
+    """A request that doesn't include total_floors at all (an older
+    client, or genuinely a single-floor design) must not error -- and
+    must default to the single-storey reference, not silently assume
+    a taller building."""
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r = client.post("/api/construction-studio/discipline-overlay?discipline=structural", json={
+        "rooms": SAMPLE_ROOMS, "plot_length_ft": PLOT_LENGTH, "plot_width_ft": PLOT_WIDTH,
+    })
+    assert r.status_code == 200
+    assert "230mm x 230mm" in r.json()["columns"][0]["spec"]

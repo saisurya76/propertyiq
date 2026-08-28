@@ -1880,6 +1880,7 @@ class DisciplineOverlayRequest(BaseModel):
     rooms: list[dict[str, Any]]
     plot_length_ft: float
     plot_width_ft: float
+    total_floors: int = 1
 
 
 @app.post("/api/construction-studio/discipline-overlay")
@@ -1894,13 +1895,25 @@ def discipline_overlay(request: DisciplineOverlayRequest, discipline: str):
     honesty boundary this endpoint's response always carries: every
     result includes an explicit `disclaimer` field stating this is a
     schematic visualization aid, not a licensed engineer's calculated
-    design — never omit or soften that disclaimer when displaying this."""
+    design — never omit or soften that disclaimer when displaying this.
+    Every discrete element additionally carries a `spec` field with a
+    published reference dimension (see discipline_overlays.py's own
+    sourcing comment) — uniform per element type, never fabricated per
+    specific element, and always paired with the same "not calculated
+    for this building" qualifier as the top-level disclaimer.
+
+    `total_floors` is the building's REAL total floor count (not just
+    this one floor's row count) — it picks which published G+1/G+2/G+3
+    reference column size to quote for the structural overlay; ignored
+    for plumbing/electrical."""
     if request.plot_length_ft <= 0 or request.plot_width_ft <= 0:
         raise HTTPException(status_code=400, detail="plot_length_ft and plot_width_ft must both be greater than zero.")
+    if request.total_floors <= 0:
+        raise HTTPException(status_code=400, detail="total_floors must be greater than zero.")
 
     discipline = (discipline or "").strip().lower()
     if discipline == "structural":
-        return compute_structural_overlay(request.rooms, request.plot_length_ft, request.plot_width_ft)
+        return compute_structural_overlay(request.rooms, request.plot_length_ft, request.plot_width_ft, request.total_floors)
     if discipline == "plumbing":
         return compute_plumbing_overlay(request.rooms, request.plot_length_ft, request.plot_width_ft)
     if discipline == "electrical":
