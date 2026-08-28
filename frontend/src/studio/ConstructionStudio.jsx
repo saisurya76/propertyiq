@@ -2083,6 +2083,41 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 </span>
               </div>
 
+              {result.discipline_breakdown && result.discipline_breakdown.length > 0 && (
+                <div className="cs-discipline-breakdown">
+                  <h4>Design & Materials by Discipline</h4>
+                  <p className="studio-subtext" style={{ marginTop: -8, marginBottom: 14 }}>
+                    The same total above, broken down by what it actually covers — structural, plumbing,
+                    electrical, and the rest — rather than one mixed list.
+                  </p>
+                  {result.discipline_breakdown.map((section) => (
+                    <div key={section.discipline} className="cs-discipline-section">
+                      <div className="cs-discipline-section-header">
+                        <h5>{section.label}</h5>
+                        <span className="cs-discipline-subtotal">
+                          {plot.currency} {section.subtotal_converted.toLocaleString()}
+                        </span>
+                      </div>
+                      <table className="cs-discipline-table">
+                        <tbody>
+                          {section.line_items.map((item, i) => (
+                            <tr key={i}>
+                              <td className="cs-discipline-item-name">
+                                {item.name}
+                                {item.kind === "labor" && <span className="cs-discipline-item-labor-tag">Labor</span>}
+                              </td>
+                              <td className="cs-discipline-item-cost">
+                                {plot.currency} {item.line_total_converted.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="cs-compliance-title-row">
                 <h4>{result.vastu_result.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
                 <ComplianceInfoIcon tradition={result.vastu_result.scope?.startsWith("thai_") ? "thai" : "vastu"} />

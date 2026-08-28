@@ -2188,3 +2188,73 @@
   color: #4a4160;
   margin: 0;
 }
+
+.cs-discipline-breakdown {
+  margin-bottom: 24px;
+}
+
+.cs-discipline-breakdown > h4 {
+  margin-bottom: 4px;
+  color: #2c1f47;
+}
+
+.cs-discipline-section {
+  margin-bottom: 14px;
+  border: 1px solid #ede4fc;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.cs-discipline-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #faf7ff;
+}
+
+.cs-discipline-section-header h5 {
+  margin: 0;
+  font-size: 14px;
+  color: #2c1f47;
+}
+
+.cs-discipline-subtotal {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7c5cbf;
+}
+
+.cs-discipline-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cs-discipline-table td {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-top: 1px solid #f3eefc;
+}
+
+.cs-discipline-item-name {
+  color: #4a4160;
+}
+
+.cs-discipline-item-labor-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ede4fc;
+  color: #7c5cbf;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cs-discipline-item-cost {
+  text-align: right;
+  color: #2c1f47;
+  font-weight: 600;
+  white-space: nowrap;
+}
