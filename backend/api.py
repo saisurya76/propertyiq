@@ -66,6 +66,7 @@ from backend.thai_traditional_engine import (
 
 from backend.compliance_rules import get_vastu_rules, get_thai_rules
 from backend.design_disciplines import group_by_discipline
+from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
 
 from backend.adjacency_engine import (
     evaluate_adjacency,
@@ -1873,6 +1874,38 @@ def construction_materials(region: str = "global", user_email: str = Depends(get
         "categories": get_catalog(effective_region),
         "labor_categories": get_labor_catalog(effective_region),
     }
+
+
+class DisciplineOverlayRequest(BaseModel):
+    rooms: list[dict[str, Any]]
+    plot_length_ft: float
+    plot_width_ft: float
+
+
+@app.post("/api/construction-studio/discipline-overlay")
+def discipline_overlay(request: DisciplineOverlayRequest, discipline: str):
+    """Computes a schematic Structural/Plumbing/Electrical overlay drawn
+    over the exact same room footprint as the live floor plan preview.
+    Deliberately public (no auth) — this is a pure, stateless geometric
+    computation over data the caller already has (their own current room
+    layout), not a gated feature or anything specific to a saved design.
+
+    See discipline_overlays.py's own module docstring for the critical
+    honesty boundary this endpoint's response always carries: every
+    result includes an explicit `disclaimer` field stating this is a
+    schematic visualization aid, not a licensed engineer's calculated
+    design — never omit or soften that disclaimer when displaying this."""
+    if request.plot_length_ft <= 0 or request.plot_width_ft <= 0:
+        raise HTTPException(status_code=400, detail="plot_length_ft and plot_width_ft must both be greater than zero.")
+
+    discipline = (discipline or "").strip().lower()
+    if discipline == "structural":
+        return compute_structural_overlay(request.rooms, request.plot_length_ft, request.plot_width_ft)
+    if discipline == "plumbing":
+        return compute_plumbing_overlay(request.rooms, request.plot_length_ft, request.plot_width_ft)
+    if discipline == "electrical":
+        return compute_electrical_overlay(request.rooms, request.plot_length_ft, request.plot_width_ft)
+    raise HTTPException(status_code=400, detail="discipline must be 'structural', 'plumbing', or 'electrical'.")
 
 
 @app.get("/api/construction-studio/compliance-rules")
