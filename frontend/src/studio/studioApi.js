@@ -201,4 +201,10 @@ export const studioApi = {
 
   getComplianceRules: (tradition) =>
     apiFetch(`/api/construction-studio/compliance-rules?tradition=${encodeURIComponent(tradition)}`),
+
+  getDisciplineOverlay: (discipline, rooms, plotLengthFt, plotWidthFt) =>
+    apiFetch(`/api/construction-studio/discipline-overlay?discipline=${encodeURIComponent(discipline)}`, {
+      method: "POST",
+      body: JSON.stringify({ rooms, plot_length_ft: plotLengthFt, plot_width_ft: plotWidthFt }),
+    }),
 };

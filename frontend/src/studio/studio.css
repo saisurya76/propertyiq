@@ -2258,3 +2258,58 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+.cs-discipline-layouts {
+  margin-bottom: 24px;
+}
+
+.cs-discipline-layouts > h4 {
+  margin-bottom: 4px;
+  color: #2c1f47;
+}
+
+.discipline-overlay-view {
+  border: 1px solid #ede4fc;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.discipline-overlay-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.discipline-overlay-toggle-btn {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid #7c5cbf;
+  background: white;
+  color: #7c5cbf;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discipline-overlay-toggle-active {
+  background: #7c5cbf;
+  color: white;
+}
+
+.discipline-overlay-svg {
+  width: 100%;
+  max-height: 420px;
+  background: #fdfcff;
+  border-radius: 8px;
+}
+
+.discipline-overlay-disclaimer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #9a3412;
+  line-height: 1.5;
+}

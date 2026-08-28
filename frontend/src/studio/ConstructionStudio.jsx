@@ -3,6 +3,7 @@ import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
 import { evaluateAdjacency, ARCHITECTURAL_STYLE_LABELS } from "./adjacencyEngine";
 import ComplianceInfoIcon from "./ComplianceInfoIcon";
+import DisciplineOverlayView from "./DisciplineOverlayView";
 
 const RoomCanvas = lazy(() => import("./RoomCanvas"));
 
@@ -2117,6 +2118,18 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                   ))}
                 </div>
               )}
+
+              <div className="cs-discipline-layouts">
+                <h4>Structural, Plumbing & Electrical Layouts</h4>
+                <p className="studio-subtext" style={{ marginTop: -8, marginBottom: 14 }}>
+                  Three separate, transparent overlays drawn over this floor plan's exact footprint.
+                </p>
+                <DisciplineOverlayView
+                  plotLengthFt={plot.plot_length_ft}
+                  plotWidthFt={plot.plot_width_ft}
+                  rooms={rooms}
+                />
+              </div>
 
               <div className="cs-compliance-title-row">
                 <h4>{result.vastu_result.scope?.startsWith("thai_") ? "Traditional Building Compliance" : "Vastu Compliance"}</h4>
