@@ -160,3 +160,29 @@ def test_endpoint_passes_location_through_for_display():
     assert without_location.json()["location"] is None
     # Same underlying score either way -- location is display-only
     assert with_location.json()["score"] == without_location.json()["score"]
+
+
+def test_endpoint_rejects_empty_or_whitespace_city():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    for bad_city in ["", "   "]:
+        r = client.post("/api/instant-score", json={
+            "price": 9500000, "city": bad_city, "property_type": "Apartment", "area_value": 1200,
+        })
+        assert r.status_code == 400
+        assert r.json()["detail"] == "City is required."
+
+
+def test_endpoint_rejects_empty_or_whitespace_property_type():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    for bad_type in ["", "   "]:
+        r = client.post("/api/instant-score", json={
+            "price": 9500000, "city": "Hyderabad", "property_type": bad_type, "area_value": 1200,
+        })
+        assert r.status_code == 400
+        assert r.json()["detail"] == "Property type is required."

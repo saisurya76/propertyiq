@@ -83,6 +83,10 @@ def create_price_watch(
         raise ValueError("area_unit must be 'sqft' or 'sqm'.")
     if "@" not in email:
         raise ValueError("A valid email is required to be notified.")
+    if not city or not city.strip():
+        raise ValueError("City is required.")
+    if not property_type or not property_type.strip():
+        raise ValueError("Property type is required.")
 
     watch_id = uuid.uuid4().hex[:10]
     now = datetime.now(timezone.utc).isoformat()

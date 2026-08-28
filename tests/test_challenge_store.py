@@ -147,3 +147,17 @@ def test_endpoint_creates_and_reveals_challenge_with_location():
 
     guess_resp = client.post(f"/api/challenges/{challenge_id}/guess", json={"guessed_price": 8500000})
     assert guess_resp.json()["challenge"]["location"] == "Gachibowli"
+
+
+def test_rejects_empty_or_whitespace_city():
+    initialize_challenge_store()
+    for bad_city in ["", "   "]:
+        with pytest.raises(ValueError, match="City is required"):
+            create_challenge(price=5000000, city=bad_city, property_type="Apartment", area_value=1200)
+
+
+def test_rejects_empty_or_whitespace_property_type():
+    initialize_challenge_store()
+    for bad_type in ["", "   "]:
+        with pytest.raises(ValueError, match="Property type is required"):
+            create_challenge(price=5000000, city="Hyderabad", property_type=bad_type, area_value=1200)

@@ -64,6 +64,10 @@ def create_challenge(
         raise ValueError("Price and area must both be greater than zero.")
     if area_unit not in ("sqft", "sqm"):
         raise ValueError("area_unit must be 'sqft' or 'sqm'.")
+    if not city or not city.strip():
+        raise ValueError("City is required.")
+    if not property_type or not property_type.strip():
+        raise ValueError("Property type is required.")
 
     challenge_id = uuid.uuid4().hex[:10]
     now = datetime.now(timezone.utc).isoformat()

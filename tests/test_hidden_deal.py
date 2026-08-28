@@ -114,3 +114,15 @@ def test_endpoint_passes_location_through_for_display():
         "area_value": 1200, "location": "Gachibowli",
     })
     assert r.json()["location"] == "Gachibowli"
+
+
+def test_endpoint_rejects_empty_city():
+    from fastapi.testclient import TestClient
+    from backend.api import app
+
+    client = TestClient(app)
+    r = client.post("/api/hidden-deal", json={
+        "price": 9500000, "city": "", "property_type": "Apartment", "area_value": 1200,
+    })
+    assert r.status_code == 400
+    assert r.json()["detail"] == "City is required."

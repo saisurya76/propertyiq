@@ -1461,6 +1461,10 @@ def instant_score(request: InstantScoreRequest):
         raise HTTPException(status_code=400, detail="Price and area must both be greater than zero.")
     if request.area_unit not in ("sqft", "sqm"):
         raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
+    if not request.city or not request.city.strip():
+        raise HTTPException(status_code=400, detail="City is required.")
+    if not request.property_type or not request.property_type.strip():
+        raise HTTPException(status_code=400, detail="Property type is required.")
 
     return compute_instant_score(
         price=request.price,
@@ -1486,6 +1490,10 @@ def hidden_deal(request: InstantScoreRequest):
         raise HTTPException(status_code=400, detail="Price and area must both be greater than zero.")
     if request.area_unit not in ("sqft", "sqm"):
         raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
+    if not request.city or not request.city.strip():
+        raise HTTPException(status_code=400, detail="City is required.")
+    if not request.property_type or not request.property_type.strip():
+        raise HTTPException(status_code=400, detail="Property type is required.")
 
     return find_hidden_deal_insights(
         price=request.price,
@@ -1522,6 +1530,10 @@ def red_flag_hunt(request: RedFlagGuessRequest):
         raise HTTPException(status_code=400, detail="Price and area must both be greater than zero.")
     if request.area_unit not in ("sqft", "sqm"):
         raise HTTPException(status_code=400, detail="area_unit must be 'sqft' or 'sqm'.")
+    if not request.city or not request.city.strip():
+        raise HTTPException(status_code=400, detail="City is required.")
+    if not request.property_type or not request.property_type.strip():
+        raise HTTPException(status_code=400, detail="Property type is required.")
     if request.guessed_category not in VALID_CATEGORIES:
         raise HTTPException(status_code=400, detail=f"guessed_category must be one of {VALID_CATEGORIES}.")
 

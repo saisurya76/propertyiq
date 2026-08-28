@@ -471,3 +471,17 @@ def test_endpoint_prefers_manual_location_over_url_extraction():
             }, headers=headers)
         assert r.status_code == 200
         assert r.json()["location"] == "Manually Entered Location"
+
+
+def test_rejects_empty_or_whitespace_city():
+    initialize_price_watch_store()
+    for bad_city in ["", "   "]:
+        with pytest.raises(ValueError, match="City is required"):
+            create_price_watch(email="a@b.com", price=5000000, city=bad_city, property_type="Apartment", area_value=1200, target_price=4000000)
+
+
+def test_rejects_empty_or_whitespace_property_type():
+    initialize_price_watch_store()
+    for bad_type in ["", "   "]:
+        with pytest.raises(ValueError, match="Property type is required"):
+            create_price_watch(email="a@b.com", price=5000000, city="Hyderabad", property_type=bad_type, area_value=1200, target_price=4000000)
