@@ -37,6 +37,7 @@ matters directly given that constraint — not just a nice-to-have."""
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -49,6 +50,14 @@ from backend.config_store import get_app_setting, set_app_setting
 logger = logging.getLogger(__name__)
 
 CACHE_HOURS = 24
+
+# Matches AccidentIQ's own real pattern for this exact setting
+# (lib/aiProviderClient.js: `process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'`)
+# — an env var override lets the model be changed directly in Render
+# without a code change/redeploy, useful while diagnosing the real,
+# external Search-grounding quota-routing issue this module works
+# around (see CACHING note above and this module's own docstring).
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 INFRASTRUCTURE_DISCLAIMER = (
     "AI-generated summary of general city-level news, using real web search — not verified as being "
@@ -129,18 +138,18 @@ Do not use markdown formatting other than a plain "- " prefix for each bullet po
         client = genai.Client(api_key=api_key)
         grounding_tool = types.Tool(google_search=types.GoogleSearch())
         response = client.models.generate_content(
-            # Matches AccidentIQ's own confirmed-working model exactly
-            # (gemini-3.5-flash-lite, verified directly from that repo's
-            # actual lib/aiProviderClient.js) — a real, concrete
-            # difference from this module's original "gemini-flash-latest"
-            # worth testing directly, since different models can have
-            # different quota routing/allocation for Search grounding.
-            # AccidentIQ's own calls never use grounding at all (plain
-            # generateContent, no tools), so this alone isn't guaranteed
-            # to resolve the quota-routing issue — but it's the most
-            # concrete, honesty-neutral change available: it changes
-            # nothing about the grounding safeguard itself.
-            model="gemini-3.5-flash-lite",
+            # Defaults to gemini-3.5-flash-lite — AccidentIQ's own
+            # confirmed-working model (verified directly from that
+            # repo's actual lib/aiProviderClient.js) — but overridable
+            # via the GEMINI_MODEL env var (see that constant's own
+            # comment) so a different model can be tried directly in
+            # Render while diagnosing the real, external Search-
+            # grounding quota-routing issue, without needing a code
+            # change. AccidentIQ's own calls never use grounding at all
+            # (plain generateContent, no tools), so matching its model
+            # alone isn't guaranteed to resolve this — but changes
+            # nothing about the grounding safeguard itself either way.
+            model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(tools=[grounding_tool]),
         )

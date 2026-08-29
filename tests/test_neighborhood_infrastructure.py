@@ -251,3 +251,27 @@ def test_uses_the_same_model_confirmed_working_in_accidentiq():
     # Grounding must still be enabled -- confirms this is a model swap,
     # not a quiet removal of the real-search safeguard.
     assert call_kwargs["config"].tools[0].google_search is not None
+
+
+def test_gemini_model_env_var_overrides_the_default(monkeypatch):
+    """Matches AccidentIQ's own real pattern for this exact setting
+    (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite') -- confirms
+    the model actually used in the real API call reflects whatever
+    GEMINI_MODEL is set to, so it can genuinely be changed via Render's
+    environment without a code change, useful while diagnosing the
+    external quota-routing issue this module works around. Patches the
+    module-level GEMINI_MODEL constant directly (rather than the env
+    var + a module reload) so this stays isolated to this one test and
+    can't leak stale module state into any other test file that also
+    imports from neighborhood_infrastructure."""
+    fake_response = _mock_grounded_response("- Real project", [("Source", "https://example.com")])
+    with patch("backend.neighborhood_infrastructure.GEMINI_MODEL", "gemini-2.5-flash"), \
+         patch("backend.neighborhood_infrastructure.get_app_setting", return_value=None), \
+         patch("backend.neighborhood_infrastructure.set_app_setting"), \
+         patch("backend.neighborhood_infrastructure.get_gemini_api_key", return_value="fake_key"), \
+         patch("backend.neighborhood_infrastructure.genai.Client") as mock_client_cls:
+        mock_client_cls.return_value.models.generate_content.return_value = fake_response
+        get_infrastructure_summary("TestCity_model_env_override")
+
+    call_kwargs = mock_client_cls.return_value.models.generate_content.call_args.kwargs
+    assert call_kwargs["model"] == "gemini-2.5-flash"
