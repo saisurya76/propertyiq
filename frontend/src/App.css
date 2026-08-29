@@ -2206,6 +2206,150 @@ body {
   font-weight: 600;
 }
 
+.ni-chip-btn {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ni-chip-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.ni-chip-active {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
+}
+
+.ni-chip-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ni-autocomplete-field {
+  position: relative;
+}
+
+.ni-autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e2e5eb;
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 6px 16px rgba(11, 37, 69, 0.12);
+}
+
+.ni-autocomplete-item {
+  padding: 9px 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ni-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.ni-autocomplete-item:hover {
+  background: #ecfdf5;
+}
+
+.ni-leaflet-map {
+  width: 100%;
+  height: 320px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  z-index: 1;
+}
+
+.ni-poi-details {
+  background: #f8fafc;
+  border: 1px solid #e2e5eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.ni-poi-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #0b2545;
+  font-size: 14px;
+}
+
+.ni-poi-details-close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b5f85;
+}
+
+.ni-poi-details-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ni-poi-details-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #e2e5eb;
+  font-size: 13.5px;
+}
+
+.ni-poi-details-list li:last-child {
+  border-bottom: none;
+}
+
+.ni-poi-details-list a {
+  color: #059669;
+  font-weight: 600;
+  font-size: 12.5px;
+  text-decoration: none;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.ni-poi-fallback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ni-fallback-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e5eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b2545;
+  text-decoration: none;
+}
+
+.ni-fallback-btn:hover {
+  border-color: #059669;
+  color: #059669;
+}
+
 .ni-map-placeholder {
   background: #f8fafc;
   border: 1.5px dashed #cbd5e1;

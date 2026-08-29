@@ -1459,6 +1459,66 @@ class NeighborhoodResaleSignalResponse(BaseModel):
     data_source: str
 
 
+# Same LocationIQ service AccidentIQ's own Travel Safety page uses for
+# autocomplete/nearby-place search (confirmed directly from that page's
+# real source, not assumed) — proxied through this backend rather than
+# called directly from the browser for a real, necessary reason: a
+# direct client-side fetch() to LocationIQ's API from this app's own
+# domain gets blocked by LocationIQ's CORS policy (confirmed directly —
+# the request reaches their server and gets a response, just without
+# an Access-Control-Allow-Origin header covering this origin). A
+# server-to-server request from this backend isn't subject to browser
+# CORS at all, which is what actually fixes it. The key itself is read
+# from an env var, never hardcoded here.
+LOCATIONIQ_API_KEY = os.environ.get("LOCATIONIQ_API_KEY", "")
+LOCATIONIQ_BASE = "https://us1.locationiq.com/v1"
+
+
+@app.get("/api/neighborhood-insights/autocomplete")
+def neighborhood_autocomplete(q: str):
+    """Proxies LocationIQ's /autocomplete endpoint for the Neighborhood
+    Insights address field. Public (no auth) — same reasoning as the
+    resale-signal endpoint just below: a free, no-signup entry point."""
+    if not LOCATIONIQ_API_KEY:
+        raise HTTPException(status_code=503, detail="Address lookup isn't configured yet — LOCATIONIQ_API_KEY is not set.")
+    if not q or len(q.strip()) < 3:
+        return []
+    try:
+        resp = requests.get(
+            f"{LOCATIONIQ_BASE}/autocomplete",
+            params={"key": LOCATIONIQ_API_KEY, "q": q, "limit": 6, "countrycodes": "in", "format": "json"},
+            timeout=6,
+        )
+        if resp.status_code != 200:
+            return []
+        return resp.json()
+    except requests.RequestException:
+        return []
+
+
+@app.get("/api/neighborhood-insights/nearby")
+def neighborhood_nearby(lat: float, lon: float, tag: str, radius: int = 2000):
+    """Proxies LocationIQ's /nearby endpoint for the Neighborhood
+    Insights POI map. `tag` is an OSM-style "key:value" string (e.g.
+    "amenity:hospital"), same format LocationIQ's own API and
+    AccidentIQ's real POI_CATEGORIES use. Public (no auth), same
+    reasoning as autocomplete above."""
+    if not LOCATIONIQ_API_KEY:
+        raise HTTPException(status_code=503, detail="Nearby-places lookup isn't configured yet — LOCATIONIQ_API_KEY is not set.")
+    try:
+        resp = requests.get(
+            f"{LOCATIONIQ_BASE}/nearby",
+            params={"key": LOCATIONIQ_API_KEY, "lat": lat, "lon": lon, "tag": tag, "radius": radius, "format": "json"},
+            timeout=6,
+        )
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+        return data if isinstance(data, list) else []
+    except requests.RequestException:
+        return []
+
+
 @app.get("/api/neighborhood-insights/resale-signal")
 def neighborhood_resale_signal(city: str, property_type: str = "Apartment") -> NeighborhoodResaleSignalResponse:
     """Powers the Neighborhood Insights page's "resale liquidity" card —
