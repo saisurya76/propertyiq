@@ -528,7 +528,10 @@ function NeighborhoodInsights() {
             {infraState === "done" && infraData && !infraData.has_data && infraData.reason === "no_api_key" && (
               <p className="ni-coming-soon">This feature isn't fully set up yet on the backend (missing configuration) — please let the site admin know.</p>
             )}
-            {infraState === "done" && infraData && !infraData.has_data && infraData.reason !== "no_api_key" && (
+            {infraState === "done" && infraData && !infraData.has_data && infraData.reason === "quota_exceeded" && (
+              <p className="ni-coming-soon">This feature is temporarily unavailable due to high demand — please try again in a little while. (This isn't about {city} specifically — it's a shared limit across the whole site.)</p>
+            )}
+            {infraState === "done" && infraData && !infraData.has_data && infraData.reason !== "no_api_key" && infraData.reason !== "quota_exceeded" && (
               <p className="ni-coming-soon">No reliable, current infrastructure information found for {city} — try checking your city's municipal or urban development authority website directly.</p>
             )}
           </div>

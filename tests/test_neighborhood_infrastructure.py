@@ -136,3 +136,34 @@ def test_infrastructure_endpoint_is_genuinely_public_no_auth_required():
     with patch("backend.api.get_infrastructure_summary", return_value={"has_data": False, "summary": "", "sources": [], "disclaimer": INFRASTRUCTURE_DISCLAIMER}):
         r = client.get("/api/neighborhood-insights/infrastructure?city=Hyderabad")
     assert r.status_code == 200
+
+
+def test_a_gemini_quota_error_is_distinguished_from_a_generic_api_error():
+    """The exact real bug the user hit: a 429 RESOURCE_EXHAUSTED quota
+    error (confirmed directly from real Render logs, not a hypothetical)
+    was previously indistinguishable from both a genuine "no news for
+    this city" result and any other API failure. Confirms it now gets
+    its own distinct reason code, so the frontend can tell the user this
+    is a temporary, site-wide limit rather than implying the city itself
+    has no infrastructure news."""
+    real_quota_error_text = (
+        "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, "
+        "please check your plan and billing details.', 'status': 'RESOURCE_EXHAUSTED'}}"
+    )
+    with patch("backend.neighborhood_infrastructure.get_gemini_api_key", return_value="fake_key"):
+        with patch("backend.neighborhood_infrastructure.genai.Client") as mock_client_cls:
+            mock_client_cls.return_value.models.generate_content.side_effect = Exception(real_quota_error_text)
+            result = get_infrastructure_summary("hyderabad")
+
+    assert result["has_data"] is False
+    assert result["reason"] == "quota_exceeded"
+    assert "RESOURCE_EXHAUSTED" in result["error_detail"]
+
+
+def test_a_non_quota_api_error_still_gets_the_generic_api_error_reason():
+    with patch("backend.neighborhood_infrastructure.get_gemini_api_key", return_value="fake_key"):
+        with patch("backend.neighborhood_infrastructure.genai.Client") as mock_client_cls:
+            mock_client_cls.return_value.models.generate_content.side_effect = Exception("500 Internal Server Error")
+            result = get_infrastructure_summary("hyderabad")
+
+    assert result["reason"] == "api_error"

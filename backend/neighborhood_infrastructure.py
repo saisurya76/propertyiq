@@ -89,8 +89,21 @@ Do not use markdown formatting other than a plain "- " prefix for each bullet po
         # from an honest "nothing found" — logged here specifically so
         # this exact situation is diagnosable server-side, not silently
         # identical to every other no-data case.
+        #
+        # Quota exhaustion is detected specifically (not lumped into the
+        # generic api_error bucket) because it's a real, distinct, and
+        # confirmed-common case for Gemini's Search grounding — free-tier
+        # keys often have a genuinely low daily/per-minute request
+        # ceiling shared across every feature using the same key, and
+        # this can be hit from normal testing traffic alone, not just
+        # heavy production load. Telling the user "temporarily
+        # unavailable, try again shortly" is honest and actionable here,
+        # whereas the generic "no reliable information found for this
+        # city" would wrongly imply the city itself lacks real news.
+        exc_text = str(exc)
+        is_quota_error = "RESOURCE_EXHAUSTED" in exc_text or "429" in exc_text
         logger.error(f"neighborhood_infrastructure: Gemini API call failed for city={city!r}: {exc}")
-        return _no_data("api_error", error_detail=str(exc))
+        return _no_data("quota_exceeded" if is_quota_error else "api_error", error_detail=exc_text)
 
     summary = (response.text or "").strip()
 
