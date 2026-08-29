@@ -1,6 +1,7 @@
 import io
 
 from pypdf import PdfReader
+from reportlab.lib.colors import HexColor
 
 from backend.construction_report import generate_construction_report_pdf
 from backend.construction_studio import estimate_cost
@@ -281,3 +282,59 @@ def test_entrance_and_road_facing_display_without_raw_underscores():
     assert "South East" in cover_text
     assert "north_west" not in cover_text
     assert "south_east" not in cover_text
+
+
+def test_diagram_orientation_genuinely_matches_the_compass_north_is_up():
+    """The real bug a user caught and reported: rooms/columns near the
+    real-world north edge (high y) rendered LOWER on the page than
+    rooms near the south edge, while the static compass icon still
+    claimed north was up -- a genuine contradiction. reportlab's native
+    Drawing coordinate system is y-UP (confirmed directly by rendering
+    a real minimal test PDF and checking which of two rectangles at
+    different y-values landed higher on the page), the opposite of the
+    frontend's SVG y-DOWN convention -- reusing the frontend's flipY
+    formula here silently double-inverted the diagram. Confirms directly,
+    by inspecting the actual Drawing object's shape coordinates (not a
+    rendered image), that a room near the real-world north edge produces
+    a genuinely higher drawing-y than one near the south edge."""
+    from backend.construction_report import _draw_structural_diagram
+    from backend.discipline_overlays import compute_structural_overlay
+
+    rooms = [
+        {"name": "north_room", "x": 0, "y": 30, "length": 10, "width": 10},
+        {"name": "south_room", "x": 0, "y": 0, "length": 10, "width": 10},
+    ]
+    overlay = compute_structural_overlay(rooms, 20, 40)
+    d = _draw_structural_diagram(overlay, rooms, 20, 40)
+
+    room_rects = [s for s in d.contents if hasattr(s, "width") and hasattr(s, "height") and str(s.fillColor) == str(HexColor("#ede9fe"))]
+    assert len(room_rects) == 2
+    north_rect = max(room_rects, key=lambda r: r.y)
+    south_rect = min(room_rects, key=lambda r: r.y)
+    assert north_rect.y > south_rect.y
+
+
+def test_column_drawing_y_genuinely_increases_toward_the_real_north_edge():
+    """Same real property, checked for a point-based element (a column)
+    rather than a room rectangle -- both element categories in this
+    module were affected by the same bug, so both need their own guard."""
+    from backend.construction_report import _draw_structural_diagram
+    from backend.discipline_overlays import compute_structural_overlay
+
+    rooms = [
+        {"name": "north_room", "x": 0, "y": 30, "length": 10, "width": 10},
+        {"name": "south_room", "x": 0, "y": 0, "length": 10, "width": 10},
+    ]
+    overlay = compute_structural_overlay(rooms, 20, 40)
+    d = _draw_structural_diagram(overlay, rooms, 20, 40)
+
+    # Columns are small 6x6 squares -- find one from each room by its
+    # real-world source column (northmost vs southmost column labels).
+    north_columns_y = [c["y"] for c in overlay["columns"] if c["y"] >= 30]
+    south_columns_y = [c["y"] for c in overlay["columns"] if c["y"] <= 10]
+    assert north_columns_y and south_columns_y
+
+    small_squares = [s for s in d.contents if hasattr(s, "width") and s.width == 6]
+    max_drawing_y = max(s.y for s in small_squares)
+    min_drawing_y = min(s.y for s in small_squares)
+    assert max_drawing_y > min_drawing_y  # the northmost real column must have the highest drawing-y

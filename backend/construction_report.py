@@ -220,10 +220,6 @@ def _legend_color(legend: list[dict[str, Any]], key: str) -> str:
     return next((e["color"] for e in legend if e["key"] == key), "#6b7280")
 
 
-def _flip_y(y: float, width_ft: float) -> float:
-    return width_ft - y
-
-
 def _draw_compass(d: Drawing, cx: float, cy: float, radius: float = 16) -> None:
     """The same static N/E/S/W compass shown in the in-app overlay view
     and RoomCanvas — north is always "up" in this app's plot coordinate
@@ -241,12 +237,29 @@ def _draw_room_backdrop(d: Drawing, rooms: list[dict[str, Any]], scale: float, p
     must show the actual room footprint (fill + name), the same
     faded backdrop the in-app SVG view draws every discipline over —
     without this, the area between wall lines was blank white space,
-    which is what prompted this fix."""
+    which is what prompted this fix.
+
+    NO y-flip here (unlike PlotPreview.jsx/DisciplineOverlayView.jsx's
+    own flipY helper) — deliberately, not an oversight. Those are SVG
+    coordinate systems, where y grows DOWNWARD, so a flip is needed to
+    put north (large real-world y) at the top of the screen. reportlab's
+    Drawing/graphics.shapes coordinate system is the opposite: y grows
+    UPWARD natively (confirmed directly by rendering a real test PDF and
+    checking which of two rectangles at different y-values landed higher
+    on the page) — the same convention as this app's own real-world plot
+    data (south=0, north=+). Reusing the SVG flip formula here was a
+    real bug: it silently double-inverted the diagram, putting south at
+    the top and north at the bottom while the compass icon (drawn from
+    fixed shapes, not real data) still correctly showed "N" up — exactly
+    the contradiction a user spotted and reported. room["y"] is already
+    the room's south edge, which is exactly the bottom-left corner
+    reportlab's own Rect(x, y, ...) wants for its y parameter — used
+    directly, with no flip and no "+ width" adjustment."""
     for room in rooms:
         if not room.get("name", "").strip() or room.get("length", 0) <= 0 or room.get("width", 0) <= 0:
             continue
         x = room["x"] * scale + 10
-        y = _flip_y(room["y"] + room["width"], plot_width_ft) * scale + 10
+        y = room["y"] * scale + 10
         w = room["length"] * scale
         h = room["width"] * scale
         d.add(Rect(x, y, w, h, fillColor=HexColor("#ede9fe"), strokeColor=HexColor("#c4b5fd"), strokeWidth=0.5))
@@ -260,7 +273,10 @@ def _draw_structural_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]
     """Native reportlab drawing — not an SVG conversion — using the same
     x/y feet coordinates discipline_overlays.py already computed, scaled
     to fit a fixed-size drawing area. Colors come from overlay['legend'],
-    the same single source of truth the in-app view reads from."""
+    the same single source of truth the in-app view reads from. See
+    _draw_room_backdrop's own docstring for why there is deliberately no
+    y-flip anywhere in this module — reportlab's native y-up coordinate
+    system already matches this app's own south=0/north=+ convention."""
     scale = min(440 / plot_length_ft, 280 / plot_width_ft)
     d = Drawing(plot_length_ft * scale + 20, plot_width_ft * scale + 20)
 
@@ -269,21 +285,21 @@ def _draw_structural_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]
     for wall in overlay["walls"]:
         color = _legend_color(overlay["legend"], "perimeter_wall" if wall["kind"] == "perimeter" else "partition_wall")
         x = wall["x"] * scale + 10
-        y = _flip_y(wall["y"] + wall["width"], plot_width_ft) * scale + 10
+        y = wall["y"] * scale + 10
         d.add(Rect(x, y, wall["length"] * scale, wall["width"] * scale, fillColor=None, strokeColor=HexColor(color), strokeWidth=1))
 
     beam_color = _legend_color(overlay["legend"], "beam")
     for beam in overlay["beams"]:
         d.add(Line(
-            beam["x"] * scale + 10, _flip_y(beam["y"], plot_width_ft) * scale + 10,
-            beam["x2"] * scale + 10, _flip_y(beam["y2"], plot_width_ft) * scale + 10,
+            beam["x"] * scale + 10, beam["y"] * scale + 10,
+            beam["x2"] * scale + 10, beam["y2"] * scale + 10,
             strokeColor=HexColor(beam_color), strokeWidth=1, strokeDashArray=[3, 2],
         ))
 
     col_color = _legend_color(overlay["legend"], "column")
     for col in overlay["columns"]:
         cx = col["x"] * scale + 10
-        cy = _flip_y(col["y"], plot_width_ft) * scale + 10
+        cy = col["y"] * scale + 10
         d.add(Rect(cx - 3, cy - 3, 6, 6, fillColor=HexColor(col_color), strokeColor=None))
         d.add(String(cx + 4, cy + 2, col["label"], fontSize=6, fillColor=HexColor("#1f2937")))
 
@@ -301,21 +317,21 @@ def _draw_plumbing_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]],
     pipe_color = _legend_color(overlay["legend"], "pipe_run")
     for run in overlay["pipe_runs"]:
         d.add(Line(
-            run["from"]["x"] * scale + 10, _flip_y(run["from"]["y"], plot_width_ft) * scale + 10,
-            run["to"]["x"] * scale + 10, _flip_y(run["to"]["y"], plot_width_ft) * scale + 10,
+            run["from"]["x"] * scale + 10, run["from"]["y"] * scale + 10,
+            run["to"]["x"] * scale + 10, run["to"]["y"] * scale + 10,
             strokeColor=HexColor(pipe_color), strokeWidth=1, strokeDashArray=[3, 2],
         ))
 
     fixture_color = _legend_color(overlay["legend"], "fixture")
     for f in overlay["fixtures"]:
-        cx, cy = f["x"] * scale + 10, _flip_y(f["y"], plot_width_ft) * scale + 10
+        cx, cy = f["x"] * scale + 10, f["y"] * scale + 10
         d.add(Circle(cx, cy, 3, fillColor=HexColor(fixture_color), strokeColor=None))
         d.add(String(cx + 4, cy + 2, f["label"], fontSize=6, fillColor=HexColor("#1f2937")))
 
     if overlay["main_riser"]:
         riser = overlay["main_riser"]
         riser_color = _legend_color(overlay["legend"], "main_riser")
-        cx, cy = riser["x"] * scale + 10, _flip_y(riser["y"], plot_width_ft) * scale + 10
+        cx, cy = riser["x"] * scale + 10, riser["y"] * scale + 10
         d.add(Rect(cx - 3.5, cy - 3.5, 7, 7, fillColor=HexColor(riser_color), strokeColor=None))
         d.add(String(cx + 4, cy + 2, riser["label"], fontSize=6, fillColor=HexColor("#1f2937")))
 
@@ -332,25 +348,25 @@ def _draw_electrical_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]
 
     socket_color = _legend_color(overlay["legend"], "socket")
     for s in overlay["sockets"]:
-        cx, cy = s["x"] * scale + 10, _flip_y(s["y"], plot_width_ft) * scale + 10
+        cx, cy = s["x"] * scale + 10, s["y"] * scale + 10
         d.add(Rect(cx - 2, cy - 2, 4, 4, fillColor=HexColor(socket_color), strokeColor=None))
         d.add(String(cx + 3, cy + 2, s["label"], fontSize=5.5, fillColor=HexColor("#1f2937")))
 
     switch_color = _legend_color(overlay["legend"], "switch")
     for s in overlay["switches"]:
-        cx, cy = s["x"] * scale + 10, _flip_y(s["y"], plot_width_ft) * scale + 10
+        cx, cy = s["x"] * scale + 10, s["y"] * scale + 10
         d.add(Rect(cx - 2.5, cy - 2.5, 5, 5, fillColor=HexColor(switch_color), strokeColor=None))
         d.add(String(cx + 3, cy + 2, s["label"], fontSize=5.5, fillColor=HexColor("#1f2937")))
 
     fan_color = _legend_color(overlay["legend"], "fan")
     for f in overlay["fans"]:
-        cx, cy = f["x"] * scale + 10, _flip_y(f["y"], plot_width_ft) * scale + 10
+        cx, cy = f["x"] * scale + 10, f["y"] * scale + 10
         d.add(Circle(cx, cy, 3.5, fillColor=None, strokeColor=HexColor(fan_color), strokeWidth=0.75))
         d.add(String(cx + 4, cy + 2, f["label"], fontSize=5.5, fillColor=HexColor("#1f2937")))
 
     light_color = _legend_color(overlay["legend"], "light")
     for l in overlay["lights"]:
-        cx, cy = l["x"] * scale + 10, _flip_y(l["y"], plot_width_ft) * scale + 10
+        cx, cy = l["x"] * scale + 10, l["y"] * scale + 10
         d.add(Circle(cx, cy, 2.2, fillColor=None, strokeColor=HexColor(light_color), strokeWidth=0.75))
         d.add(String(cx + 3, cy + 2, l["label"], fontSize=5.5, fillColor=HexColor("#1f2937")))
 
