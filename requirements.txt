@@ -11,3 +11,4 @@ psycopg2-binary==2.9.10
 google-genai==2.19.0
 beautifulsoup4==4.13.4
 pypdf==5.9.0
+tavily-python==0.8.0
