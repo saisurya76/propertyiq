@@ -129,7 +129,18 @@ Do not use markdown formatting other than a plain "- " prefix for each bullet po
         client = genai.Client(api_key=api_key)
         grounding_tool = types.Tool(google_search=types.GoogleSearch())
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            # Matches AccidentIQ's own confirmed-working model exactly
+            # (gemini-3.5-flash-lite, verified directly from that repo's
+            # actual lib/aiProviderClient.js) — a real, concrete
+            # difference from this module's original "gemini-flash-latest"
+            # worth testing directly, since different models can have
+            # different quota routing/allocation for Search grounding.
+            # AccidentIQ's own calls never use grounding at all (plain
+            # generateContent, no tools), so this alone isn't guaranteed
+            # to resolve the quota-routing issue — but it's the most
+            # concrete, honesty-neutral change available: it changes
+            # nothing about the grounding safeguard itself.
+            model="gemini-3.5-flash-lite",
             contents=prompt,
             config=types.GenerateContentConfig(tools=[grounding_tool]),
         )

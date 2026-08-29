@@ -227,3 +227,27 @@ def test_a_quota_exceeded_result_is_never_cached():
         get_infrastructure_summary("TestCity_no_cache_on_quota_error")
 
     mock_set.assert_not_called()
+
+
+def test_uses_the_same_model_confirmed_working_in_accidentiq():
+    """gemini-flash-latest (this module's original model) was swapped
+    for gemini-3.5-flash-lite -- the exact model confirmed directly from
+    AccidentIQ's own real source (lib/aiProviderClient.js) to work
+    without hitting the Search-grounding quota-routing issue. Grounding
+    itself stays enabled here (unlike AccidentIQ's own calls, which
+    never use it at all) -- this fixes the concrete, testable model
+    difference without dropping the real-search safeguard this feature
+    exists for."""
+    fake_response = _mock_grounded_response("- Real project", [("Source", "https://example.com")])
+    with patch("backend.neighborhood_infrastructure.get_app_setting", return_value=None), \
+         patch("backend.neighborhood_infrastructure.set_app_setting"), \
+         patch("backend.neighborhood_infrastructure.get_gemini_api_key", return_value="fake_key"), \
+         patch("backend.neighborhood_infrastructure.genai.Client") as mock_client_cls:
+        mock_client_cls.return_value.models.generate_content.return_value = fake_response
+        get_infrastructure_summary("TestCity_model_check")
+
+    call_kwargs = mock_client_cls.return_value.models.generate_content.call_args.kwargs
+    assert call_kwargs["model"] == "gemini-3.5-flash-lite"
+    # Grounding must still be enabled -- confirms this is a model swap,
+    # not a quiet removal of the real-search safeguard.
+    assert call_kwargs["config"].tools[0].google_search is not None
