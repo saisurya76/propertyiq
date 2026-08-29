@@ -2137,6 +2137,20 @@ body {
   margin-bottom: 6px;
 }
 
+.ni-optional-tag {
+  text-transform: none;
+  font-weight: 500;
+  color: #94a3b8;
+  letter-spacing: normal;
+}
+
+.ni-field-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
 .ni-form-field input,
 .ni-form-field select {
   border: 1.5px solid #e2e5eb;

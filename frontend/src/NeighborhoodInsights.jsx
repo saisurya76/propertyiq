@@ -77,6 +77,11 @@ function gmapsPlaceLink(name, lat, lon) {
 // actual source, not guessed) rather than the Google Places API
 // originally (and wrongly) assumed before that source was shared.
 function NeighborhoodInsights() {
+  // Deliberately separate from the geocoded search below: a property's
+  // own name/label is never required to exist in any map database (a
+  // brand-new, not-yet-built project genuinely won't), so it's plain
+  // free text here — purely for display, never sent to LocationIQ.
+  const [propertyName, setPropertyName] = useState("");
   const [addressQuery, setAddressQuery] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [selectedPlace, setSelectedPlace] = useState(null); // { label, lat, lon }
@@ -128,7 +133,7 @@ function NeighborhoodInsights() {
 
   const handleShowInsights = async () => {
     if (!selectedPlace || !city.trim()) {
-      setValidationError("Please select a property address from the suggestions, and enter a city, to see neighborhood insights.");
+      setValidationError("Please select a nearby known address/locality from the suggestions (even for a brand-new project, search the closest main road or area name), and enter a city, to see neighborhood insights.");
       return;
     }
     setValidationError("");
@@ -160,7 +165,8 @@ function NeighborhoodInsights() {
       mapRef.current.setView([selectedPlace.lat, selectedPlace.lon], 15);
     }
 
-    L.marker([selectedPlace.lat, selectedPlace.lon]).addTo(mapRef.current).bindPopup(`<b>This property</b><br>${selectedPlace.label}`);
+    const markerLabel = propertyName.trim() || selectedPlace.label;
+    L.marker([selectedPlace.lat, selectedPlace.lon]).addTo(mapRef.current).bindPopup(`<b>${markerLabel}</b><br>${selectedPlace.label}`);
 
     let cancelled = false;
 
@@ -213,6 +219,7 @@ function NeighborhoodInsights() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- propertyName is intentionally excluded: it only affects the marker popup's label text, and adding it here would re-run the entire map/POI-loading sequence (a fresh round of nearby-place API calls) just because the user edited a display label, not the actual location being searched
   }, [submitted, selectedPlace]);
 
   const resetHighlighting = () => {
@@ -247,7 +254,9 @@ function NeighborhoodInsights() {
   const googleMapsUrl = selectedPlace
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedPlace.label)}`
     : "#";
-  const shareText = `Check out this neighborhood insights tool before buying a property: https://propertyiqweb.com/neighborhood-insights.html`;
+  const shareText = propertyName.trim()
+    ? `Check out the neighborhood insights for ${propertyName.trim()} before buying: https://propertyiqweb.com/neighborhood-insights.html`
+    : `Check out this neighborhood insights tool before buying a property: https://propertyiqweb.com/neighborhood-insights.html`;
   const activeCat = POI_CATEGORIES.find((c) => c.key === activeCategory);
   const activePlaces = activeCategory ? poiDataByCat[activeCategory] || [] : [];
 
@@ -275,9 +284,16 @@ function NeighborhoodInsights() {
 
       <div className="ni-form-card">
         <div className="ni-form-row">
+          <div className="ni-form-field">
+            <label>Property / project name <span className="ni-optional-tag">(optional)</span></label>
+            <input value={propertyName} onChange={(e) => setPropertyName(e.target.value)} placeholder="e.g. Prestige Skyline (fine even if it's a new launch, not yet mapped)" />
+          </div>
+        </div>
+        <div className="ni-form-row">
           <div className="ni-form-field ni-autocomplete-field">
-            <label>Property address or locality</label>
-            <input value={addressQuery} onChange={(e) => handleAddressInput(e.target.value)} placeholder="e.g. Banjara Hills, Road No. 12" autoComplete="off" />
+            <label>Nearest known address, road, or locality</label>
+            <input value={addressQuery} onChange={(e) => handleAddressInput(e.target.value)} placeholder="e.g. Kompally, or the nearest main road" autoComplete="off" />
+            <p className="ni-field-hint">For a brand-new project not yet on the map, search the closest known area or road instead — insights are about the surrounding neighborhood either way.</p>
             {addressSuggestions.length > 0 && (
               <div className="ni-autocomplete-list">
                 {addressSuggestions.map((s, i) => (
