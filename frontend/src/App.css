@@ -2025,3 +2025,313 @@ body {
   margin-bottom: 8px;
   font-weight: 600;
 }
+
+/* ===== Neighborhood Insights standalone page =====
+   Mirrors the sibling AccidentIQ product's Travel Safety page layout
+   exactly, per explicit design direction, with PropertyIQ's own
+   navy header (matching the main hero's #0b2545) and an emerald accent
+   in place of AccidentIQ's amber/orange. */
+
+.ni-page {
+  max-width: 900px;
+  margin: 0 auto;
+  font-family: inherit;
+  color: var(--text-body, #4b3f66);
+  padding-bottom: 40px;
+}
+
+.ni-top-banner {
+  background: #059669;
+  color: #ffffff;
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ni-top-banner a {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.ni-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid #e2e5eb;
+}
+
+.ni-nav-brand {
+  font-weight: 700;
+  color: #0b2545;
+  font-size: 14px;
+}
+
+.ni-nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.ni-nav-links a {
+  color: #059669;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.ni-nav-links a:hover {
+  text-decoration: underline;
+}
+
+.ni-hero {
+  background: #0b2545;
+  color: #ffffff;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.ni-hero h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 14px;
+  color: #ffffff;
+}
+
+.ni-hero p {
+  font-size: 16px;
+  color: #dbeafe;
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.ni-form-card {
+  background: #ffffff;
+  border: 1px solid #e2e5eb;
+  border-radius: 14px;
+  padding: 24px;
+  margin: -28px 24px 24px;
+  box-shadow: 0 6px 20px rgba(11, 37, 69, 0.08);
+  position: relative;
+}
+
+.ni-form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.ni-form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ni-form-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b5f85;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.ni-form-field input,
+.ni-form-field select {
+  border: 1.5px solid #e2e5eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.ni-primary-btn {
+  display: inline-block;
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ni-primary-btn:hover {
+  background: #047857;
+}
+
+.ni-card,
+.ni-map-card,
+.ni-cta-card,
+.ni-share-card {
+  background: #ffffff;
+  border: 1px solid #e2e5eb;
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin: 0 24px 20px;
+}
+
+.ni-card h3,
+.ni-map-card h3,
+.ni-cta-card h3,
+.ni-share-card h3 {
+  color: #0b2545;
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.ni-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ni-chip {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ni-map-placeholder {
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 32px 20px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.ni-map-placeholder p:first-child {
+  font-size: 16px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.ni-map-placeholder-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.ni-text-link {
+  color: #059669;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.ni-text-link:hover {
+  text-decoration: underline;
+}
+
+.ni-coming-soon {
+  color: #94a3b8;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.ni-resale-result {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.ni-resale-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.ni-resale-number {
+  font-size: 28px;
+  font-weight: 800;
+  color: #059669;
+}
+
+.ni-resale-label {
+  font-size: 13px;
+  color: #6b5f85;
+  max-width: 220px;
+}
+
+.ni-checklist,
+.ni-contact-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ni-checklist li,
+.ni-contact-list li {
+  margin-bottom: 8px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.ni-cta-card {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.ni-cta-card ul {
+  margin: 12px 0 16px;
+  padding-left: 20px;
+}
+
+.ni-cta-card li {
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.ni-cta-btn {
+  margin-top: 4px;
+}
+
+.ni-share-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ni-share-btn {
+  background: #f8fafc;
+  border: 1.5px solid #e2e5eb;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b2545;
+  text-decoration: none;
+}
+
+.ni-share-btn:hover {
+  border-color: #059669;
+  color: #059669;
+}
+
+.ni-footer {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 24px;
+}
+
+@media (max-width: 640px) {
+  .ni-form-row {
+    flex-direction: column;
+  }
+  .ni-nav {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ni-hero h1 {
+    font-size: 24px;
+  }
+}

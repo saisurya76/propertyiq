@@ -67,6 +67,7 @@ from backend.thai_traditional_engine import (
 from backend.compliance_rules import get_vastu_rules, get_thai_rules
 from backend.design_disciplines import group_by_discipline
 from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
+from backend.comparables import get_comparables, average_price_per_sqft
 from backend.construction_report import generate_construction_report_pdf
 
 from backend.adjacency_engine import (
@@ -1448,6 +1449,43 @@ class InstantScoreRequest(BaseModel):
     area_value: float
     area_unit: str = "sqft"
     location: Optional[str] = None
+
+
+class NeighborhoodResaleSignalResponse(BaseModel):
+    has_data: bool
+    comparable_count: int
+    average_price_per_sqft: float
+    currency: str
+    data_source: str
+
+
+@app.get("/api/neighborhood-insights/resale-signal")
+def neighborhood_resale_signal(city: str, property_type: str = "Apartment") -> NeighborhoodResaleSignalResponse:
+    """Powers the Neighborhood Insights page's "resale liquidity" card —
+    a genuinely real signal (how many comparable projects/listings exist
+    for this city+property type, and their average price/sqft), reusing
+    comparables.py's own existing data rather than fabricating anything
+    new. Deliberately public (no auth), same reasoning as instant_score
+    just below: a free, no-signup entry point, not a gated feature.
+
+    Honestly reports has_data=False (rather than a fabricated zero or a
+    misleading empty success) for any city/property-type combination
+    comparables.py doesn't actually cover — this app has real data for
+    a genuine subset of cities, not all of them, and the caller must be
+    able to tell the difference."""
+    comps = get_comparables(city, property_type)
+    if not comps:
+        return NeighborhoodResaleSignalResponse(
+            has_data=False, comparable_count=0, average_price_per_sqft=0, currency="INR", data_source="none",
+        )
+    is_live = len(comps) == 1 and comps[0].developer == "Live market data"
+    return NeighborhoodResaleSignalResponse(
+        has_data=True,
+        comparable_count=len(comps),
+        average_price_per_sqft=average_price_per_sqft(comps),
+        currency="INR",
+        data_source="live" if is_live else "static_snapshot",
+    )
 
 
 @app.post("/api/instant-score")
