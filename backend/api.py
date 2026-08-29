@@ -2286,7 +2286,7 @@ def download_construction_report(design_id: str, request: ConstructionReportRequ
     if not request.floors:
         raise HTTPException(status_code=400, detail="floors must include at least one floor.")
 
-    pdf_bytes = generate_construction_report_pdf(design, request.floors, request.property_name)
+    pdf_bytes = generate_construction_report_pdf(design, request.floors, request.property_name, design_id)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

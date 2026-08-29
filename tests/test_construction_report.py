@@ -210,3 +210,74 @@ def test_report_endpoint_rejects_empty_floors():
 
     r = client.post(f"/api/construction-studio/design/{design_id}/report", json={"floors": []})
     assert r.status_code == 400
+
+
+def test_report_shows_the_real_room_names_inside_the_discipline_diagrams():
+    """The exact, real bug the user reported: the structural/plumbing/
+    electrical diagrams showed blank space where the room layout should
+    be. Confirms the actual room names now appear as extractable text
+    (meaning they're genuinely drawn, not just present in the room-
+    summary table elsewhere in the report)."""
+    pdf_bytes = generate_construction_report_pdf(_sample_design(), [{"floor_label": "Ground Floor", "rooms": SAMPLE_ROOMS}])
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    # The structural diagram page specifically (not just the room-summary
+    # table page) must contain the room names as drawn text.
+    structural_page_text = next(p.extract_text() for p in reader.pages if "Ground Floor — Structural" in p.extract_text())
+    assert "kitchen" in structural_page_text.lower() or "Kitchen" in structural_page_text
+
+
+def test_report_property_name_is_shown_prominently_even_though_header_shows_the_brand():
+    """The header always shows the PropertyIQ brand name (matching the
+    reference report's own convention of the product name, not a
+    per-report title) -- confirms the user's own property name is still
+    shown clearly elsewhere, not lost entirely."""
+    pdf_bytes = generate_construction_report_pdf(_sample_design(), [{"floor_label": "Ground Floor", "rooms": SAMPLE_ROOMS}], property_name="My Dream Home")
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    cover_text = reader.pages[0].extract_text()
+    assert "PropertyIQ" in cover_text
+    assert "My Dream Home" in cover_text
+
+
+def test_report_uses_a_real_report_id_derived_from_design_id():
+    pdf_bytes = generate_construction_report_pdf(_sample_design(), [{"floor_label": "Ground Floor", "rooms": SAMPLE_ROOMS}], design_id="16163735-46ee-4bfc-91ee-536d7a3dc7c5")
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    cover_text = reader.pages[0].extract_text()
+    assert "PIQ-16163735" in cover_text
+    # Every page's footer must show the same report ID, not just the cover
+    last_page_text = reader.pages[-1].extract_text()
+    assert "PIQ-16163735" in last_page_text
+
+
+def test_report_shows_genuine_page_x_of_y_numbering():
+    pdf_bytes = generate_construction_report_pdf(_sample_design(), [{"floor_label": "Ground Floor", "rooms": SAMPLE_ROOMS}])
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    total_pages = len(reader.pages)
+    first_page_text = reader.pages[0].extract_text()
+    last_page_text = reader.pages[-1].extract_text()
+    assert f"Page 1 of {total_pages}" in first_page_text
+    assert f"Page {total_pages} of {total_pages}" in last_page_text
+
+
+def test_report_footer_includes_privacy_and_terms_links_on_every_page():
+    pdf_bytes = generate_construction_report_pdf(_sample_design(), [{"floor_label": "Ground Floor", "rooms": SAMPLE_ROOMS}])
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    for page in reader.pages:
+        text = page.extract_text()
+        assert "Privacy Policy" in text
+        assert "Terms of Service" in text
+
+
+def test_entrance_and_road_facing_display_without_raw_underscores():
+    """A real polish bug caught during visual review: an entrance
+    direction like 'north_west' displayed with a literal underscore
+    instead of a space -- confirms it's now formatted properly."""
+    design = _sample_design()
+    design["plot_spec"]["entrance_direction"] = "north_west"
+    design["plot_spec"]["road_facing_side"] = "south_east"
+    pdf_bytes = generate_construction_report_pdf(design, [{"floor_label": "Ground Floor", "rooms": SAMPLE_ROOMS}])
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    cover_text = reader.pages[0].extract_text()
+    assert "North West" in cover_text
+    assert "South East" in cover_text
+    assert "north_west" not in cover_text
+    assert "south_east" not in cover_text

@@ -16,6 +16,12 @@ draws from: the schematic diagrams and their reference specs are a
 visualization/planning aid, not a licensed engineer's calculated
 design. The report's cover page and every discipline section restate
 this — never state it once and let a later section imply otherwise.
+
+VISUAL DESIGN: matches the look and feel (dark navy header, amber/
+orange accent banner, numbered section badges, bordered content cards,
+footer with report ID/page numbers/policy links) established by the
+sibling AccidentIQ report, per explicit user request to align the two
+products' report styling.
 """
 
 import io
@@ -26,8 +32,10 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_RIGHT
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table,
+    SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, KeepTogether,
 )
 from reportlab.graphics.shapes import Drawing, Rect, Line, Circle, String
 
@@ -37,24 +45,37 @@ from backend.discipline_overlays import (
 )
 from backend.compliance_rules import get_vastu_rules, get_thai_rules
 
+# ---- Brand palette, matched to the sibling AccidentIQ report's own colors ----
+_NAVY = "#0A121F"
+_AMBER = "#C97906"
+_AMBER_TEXT = "#D1932E"
+_CARD_BG = "#F8FDFF"
+_BORDER_GRAY = "#E2E8F0"
+_TEXT_DARK = "#111827"
+_TEXT_MUTED = "#6B7280"
+
 _STYLES = getSampleStyleSheet()
-_TITLE_STYLE = ParagraphStyle("ReportTitle", parent=_STYLES["Title"], fontSize=22, spaceAfter=6)
-_SUBTITLE_STYLE = ParagraphStyle("ReportSubtitle", parent=_STYLES["Normal"], fontSize=11, textColor=HexColor("#6b5f85"))
-_H1_STYLE = ParagraphStyle("H1", parent=_STYLES["Heading1"], fontSize=15, spaceBefore=14, spaceAfter=6, textColor=HexColor("#2c1f47"))
-_H2_STYLE = ParagraphStyle("H2", parent=_STYLES["Heading2"], fontSize=12, spaceBefore=10, spaceAfter=4, textColor=HexColor("#4c1d95"))
-_BODY_STYLE = ParagraphStyle("Body", parent=_STYLES["Normal"], fontSize=9.5, leading=13)
+_TITLE_STYLE = ParagraphStyle("ReportTitle", parent=_STYLES["Title"], fontSize=22, textColor=HexColor("#FFFFFF"), alignment=0)
+_SUBTITLE_STYLE = ParagraphStyle("ReportSubtitle", parent=_STYLES["Normal"], fontSize=9, textColor=HexColor("#9CA3AF"))
+_HEADER_ID_STYLE = ParagraphStyle("HeaderId", parent=_STYLES["Normal"], fontSize=11, textColor=HexColor(_AMBER_TEXT), alignment=TA_RIGHT, fontName="Helvetica-Bold")
+_HEADER_DATE_STYLE = ParagraphStyle("HeaderDate", parent=_STYLES["Normal"], fontSize=8, textColor=HexColor("#9CA3AF"), alignment=TA_RIGHT)
+_BANNER_STYLE = ParagraphStyle("Banner", parent=_STYLES["Normal"], fontSize=9, textColor=HexColor("#FFFFFF"), fontName="Helvetica-Bold")
+_H2_STYLE = ParagraphStyle("H2", parent=_STYLES["Heading2"], fontSize=12, spaceBefore=10, spaceAfter=4, textColor=HexColor(_NAVY))
+_BODY_STYLE = ParagraphStyle("Body", parent=_STYLES["Normal"], fontSize=9.5, leading=13, textColor=HexColor(_TEXT_DARK))
 _DISCLAIMER_STYLE = ParagraphStyle(
     "Disclaimer", parent=_STYLES["Normal"], fontSize=8.5, leading=12,
     textColor=HexColor("#9a3412"), backColor=HexColor("#fff7ed"), borderPadding=8,
 )
 _SPEC_STYLE = ParagraphStyle("Spec", parent=_STYLES["Normal"], fontSize=7.5, leading=10)
+_FOOTER_STYLE = ParagraphStyle("Footer", parent=_STYLES["Normal"], fontSize=7, textColor=HexColor(_TEXT_MUTED), leading=10)
+_FOOTER_LINK_STYLE = ParagraphStyle("FooterLink", parent=_STYLES["Normal"], fontSize=7.5, textColor=HexColor(_NAVY), leading=10)
 
 _TABLE_HEADER_STYLE = [
-    ("BACKGROUND", (0, 0), (-1, 0), HexColor("#faf7ff")),
-    ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#4c1d95")),
+    ("BACKGROUND", (0, 0), (-1, 0), HexColor(_NAVY)),
+    ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
     ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-    ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#ede4fc")),
+    ("GRID", (0, 0), (-1, -1), 0.5, HexColor(_BORDER_GRAY)),
     ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ("LEFTPADDING", (0, 0), (-1, -1), 6),
     ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -72,6 +93,129 @@ _TOP_LEVEL_DISCLAIMER = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Page chrome: header (cover page only), footer + page numbers (every page)
+# ---------------------------------------------------------------------------
+
+class _NumberedCanvas(Canvas):
+    """Standard reportlab two-pass pattern for a genuine 'Page X of Y' —
+    the total page count isn't known until the whole document has been
+    laid out once, so every page's drawing is buffered and replayed
+    once the final count is available."""
+
+    def __init__(self, *args, **kwargs):
+        Canvas.__init__(self, *args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self._draw_footer(total_pages)
+            Canvas.showPage(self)
+        Canvas.save(self)
+
+    def _draw_footer(self, total_pages: int) -> None:
+        width, _ = letter
+        report_id = getattr(self, "_report_id", "")
+        self.setFillColor(HexColor(_TEXT_MUTED))
+        self.setFont("Helvetica", 7.5)
+        self.drawRightString(width - 0.6 * inch, 0.62 * inch, report_id)
+        self.drawRightString(width - 0.6 * inch, 0.5 * inch, f"Page {self._pageNumber} of {total_pages}")
+
+        self.setFont("Helvetica-Oblique", 7)
+        self.setFillColor(HexColor("#9a3412"))
+        self.drawString(0.6 * inch, 0.62 * inch, "This is an AI-generated planning aid. Any alteration invalidates this report.")
+
+        self.setFont("Helvetica", 7.5)
+        self.setFillColor(HexColor(_NAVY))
+        self.drawString(0.6 * inch, 0.5 * inch, "Privacy Policy · Terms of Service")
+        self.setStrokeColor(HexColor(_NAVY))
+        self.setLineWidth(0.4)
+        self.line(0.6 * inch, 0.485 * inch, 0.6 * inch + 1.35 * inch, 0.485 * inch)
+
+
+def _make_canvas_factory(report_id: str):
+    def factory(*args, **kwargs):
+        c = _NumberedCanvas(*args, **kwargs)
+        c._report_id = report_id
+        return c
+    return factory
+
+
+def _draw_cover_header(canvas_obj: Canvas, doc, report_id: str, generated_at: str) -> None:
+    """The dark navy header + amber banner, drawn directly on the
+    canvas — cover page only, matching the reference report's own
+    header appearing once, not repeated on every page."""
+    width, height = letter
+
+    canvas_obj.saveState()
+    canvas_obj.setFillColor(HexColor(_NAVY))
+    canvas_obj.rect(0, height - 1.05 * inch, width, 1.05 * inch, fill=1, stroke=0)
+
+    canvas_obj.setFillColor(HexColor("#FFFFFF"))
+    canvas_obj.setFont("Helvetica-Bold", 20)
+    canvas_obj.drawString(0.6 * inch, height - 0.55 * inch, "PropertyIQ")
+    canvas_obj.setFont("Helvetica", 8.5)
+    canvas_obj.setFillColor(HexColor("#9CA3AF"))
+    canvas_obj.drawString(0.6 * inch, height - 0.75 * inch, "CONSTRUCTION STUDIO REPORT")
+
+    canvas_obj.setFont("Helvetica-Bold", 11)
+    canvas_obj.setFillColor(HexColor(_AMBER_TEXT))
+    canvas_obj.drawRightString(width - 0.6 * inch, height - 0.5 * inch, report_id)
+    canvas_obj.setFont("Helvetica", 8)
+    canvas_obj.setFillColor(HexColor("#9CA3AF"))
+    canvas_obj.drawRightString(width - 0.6 * inch, height - 0.65 * inch, generated_at)
+
+    canvas_obj.setFillColor(HexColor(_AMBER))
+    canvas_obj.rect(0, height - 1.35 * inch, width, 0.3 * inch, fill=1, stroke=0)
+    canvas_obj.setFillColor(HexColor("#FFFFFF"))
+    canvas_obj.setFont("Helvetica-Bold", 9)
+    canvas_obj.drawString(0.6 * inch, height - 1.27 * inch, "PLANNING & VISUALIZATION REPORT")
+    canvas_obj.restoreState()
+
+
+def _section_badge(number: int, title: str) -> Table:
+    """A small navy square containing a white number, next to the
+    section title, with a rule underneath — the same numbered-section
+    convention as the reference report, rather than a plain heading."""
+    badge = Table([[str(number)]], colWidths=[16], rowHeights=[16], style=[
+        ("BACKGROUND", (0, 0), (0, 0), HexColor(_NAVY)),
+        ("TEXTCOLOR", (0, 0), (0, 0), HexColor("#FFFFFF")),
+        ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (0, 0), 9),
+        ("ALIGN", (0, 0), (0, 0), "CENTER"),
+        ("VALIGN", (0, 0), (0, 0), "MIDDLE"),
+    ])
+    heading = Paragraph(title, ParagraphStyle("SectionTitle", parent=_STYLES["Heading1"], fontSize=14, textColor=HexColor(_NAVY), spaceAfter=0))
+    row = Table([[badge, heading]], colWidths=[24, 470], style=[
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ])
+    rule = Table([[""]], colWidths=[494], rowHeights=[1.2], style=[("BACKGROUND", (0, 0), (0, 0), HexColor(_NAVY))])
+    return KeepTogether([Spacer(1, 12), row, rule, Spacer(1, 8)])
+
+
+def _card(flowables: list) -> Table:
+    """A bordered, padded content card — the same look the reference
+    report uses for grouped content (vehicle cards, damage assessment,
+    etc), applied here to the metadata block and diagram sections."""
+    inner = Table([[f] for f in flowables], colWidths=[490], style=[
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor(_CARD_BG)),
+        ("BOX", (0, 0), (-1, -1), 0.75, HexColor(_BORDER_GRAY)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+        ("TOPPADDING", (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+    ])
+    return inner
+
+
 def _legend_color(legend: list[dict[str, Any]], key: str) -> str:
     return next((e["color"] for e in legend if e["key"] == key), "#6b7280")
 
@@ -80,13 +224,47 @@ def _flip_y(y: float, width_ft: float) -> float:
     return width_ft - y
 
 
-def _draw_structural_diagram(overlay: dict[str, Any], plot_length_ft: float, plot_width_ft: float) -> Drawing:
+def _draw_compass(d: Drawing, cx: float, cy: float, radius: float = 16) -> None:
+    """The same static N/E/S/W compass shown in the in-app overlay view
+    and RoomCanvas — north is always "up" in this app's plot coordinate
+    convention, so it's never rotated to match anything. A genuinely
+    missing element in the original diagrams, added here to match."""
+    d.add(Circle(cx, cy, radius, fillColor=HexColor("#FFFFFF"), strokeColor=HexColor("#d1d5db"), strokeWidth=1))
+    d.add(String(cx - 2.5, cy + radius - 8, "N", fontSize=7, fontName="Helvetica-Bold", fillColor=HexColor("#111827")))
+    d.add(String(cx + radius - 8, cy - 2, "E", fontSize=6, fillColor=HexColor("#6b7280")))
+    d.add(String(cx - 2, cy - radius + 4, "S", fontSize=6, fillColor=HexColor("#6b7280")))
+    d.add(String(cx - radius + 3, cy - 2, "W", fontSize=6, fillColor=HexColor("#6b7280")))
+
+
+def _draw_room_backdrop(d: Drawing, rooms: list[dict[str, Any]], scale: float, plot_width_ft: float) -> None:
+    """The real, previously-missing piece: every discipline diagram
+    must show the actual room footprint (fill + name), the same
+    faded backdrop the in-app SVG view draws every discipline over —
+    without this, the area between wall lines was blank white space,
+    which is what prompted this fix."""
+    for room in rooms:
+        if not room.get("name", "").strip() or room.get("length", 0) <= 0 or room.get("width", 0) <= 0:
+            continue
+        x = room["x"] * scale + 10
+        y = _flip_y(room["y"] + room["width"], plot_width_ft) * scale + 10
+        w = room["length"] * scale
+        h = room["width"] * scale
+        d.add(Rect(x, y, w, h, fillColor=HexColor("#ede9fe"), strokeColor=HexColor("#c4b5fd"), strokeWidth=0.5))
+        font_size = min(7, w / 8, h / 3)
+        if font_size >= 4:
+            d.add(String(x + w / 2 - len(room["name"]) * font_size * 0.28, y + h / 2, room["name"],
+                          fontSize=font_size, fillColor=HexColor("#6b5f85")))
+
+
+def _draw_structural_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]], plot_length_ft: float, plot_width_ft: float) -> Drawing:
     """Native reportlab drawing — not an SVG conversion — using the same
     x/y feet coordinates discipline_overlays.py already computed, scaled
     to fit a fixed-size drawing area. Colors come from overlay['legend'],
     the same single source of truth the in-app view reads from."""
     scale = min(440 / plot_length_ft, 280 / plot_width_ft)
     d = Drawing(plot_length_ft * scale + 20, plot_width_ft * scale + 20)
+
+    _draw_room_backdrop(d, rooms, scale, plot_width_ft)
 
     for wall in overlay["walls"]:
         color = _legend_color(overlay["legend"], "perimeter_wall" if wall["kind"] == "perimeter" else "partition_wall")
@@ -109,14 +287,16 @@ def _draw_structural_diagram(overlay: dict[str, Any], plot_length_ft: float, plo
         d.add(Rect(cx - 3, cy - 3, 6, 6, fillColor=HexColor(col_color), strokeColor=None))
         d.add(String(cx + 4, cy + 2, col["label"], fontSize=6, fillColor=HexColor("#1f2937")))
 
+    _draw_compass(d, d.width - 20, d.height - 20)
     return d
 
 
-def _draw_plumbing_diagram(overlay: dict[str, Any], plot_length_ft: float, plot_width_ft: float) -> Drawing:
+def _draw_plumbing_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]], plot_length_ft: float, plot_width_ft: float) -> Drawing:
     scale = min(440 / plot_length_ft, 280 / plot_width_ft)
     d = Drawing(plot_length_ft * scale + 20, plot_width_ft * scale + 20)
 
     d.add(Rect(10, 10, plot_length_ft * scale, plot_width_ft * scale, fillColor=None, strokeColor=HexColor("#c4b5fd"), strokeWidth=0.5))
+    _draw_room_backdrop(d, rooms, scale, plot_width_ft)
 
     pipe_color = _legend_color(overlay["legend"], "pipe_run")
     for run in overlay["pipe_runs"]:
@@ -139,14 +319,16 @@ def _draw_plumbing_diagram(overlay: dict[str, Any], plot_length_ft: float, plot_
         d.add(Rect(cx - 3.5, cy - 3.5, 7, 7, fillColor=HexColor(riser_color), strokeColor=None))
         d.add(String(cx + 4, cy + 2, riser["label"], fontSize=6, fillColor=HexColor("#1f2937")))
 
+    _draw_compass(d, d.width - 20, d.height - 20)
     return d
 
 
-def _draw_electrical_diagram(overlay: dict[str, Any], plot_length_ft: float, plot_width_ft: float) -> Drawing:
+def _draw_electrical_diagram(overlay: dict[str, Any], rooms: list[dict[str, Any]], plot_length_ft: float, plot_width_ft: float) -> Drawing:
     scale = min(440 / plot_length_ft, 280 / plot_width_ft)
     d = Drawing(plot_length_ft * scale + 20, plot_width_ft * scale + 20)
 
     d.add(Rect(10, 10, plot_length_ft * scale, plot_width_ft * scale, fillColor=None, strokeColor=HexColor("#c4b5fd"), strokeWidth=0.5))
+    _draw_room_backdrop(d, rooms, scale, plot_width_ft)
 
     socket_color = _legend_color(overlay["legend"], "socket")
     for s in overlay["sockets"]:
@@ -172,18 +354,17 @@ def _draw_electrical_diagram(overlay: dict[str, Any], plot_length_ft: float, plo
         d.add(Circle(cx, cy, 2.2, fillColor=None, strokeColor=HexColor(light_color), strokeWidth=0.75))
         d.add(String(cx + 3, cy + 2, l["label"], fontSize=5.5, fillColor=HexColor("#1f2937")))
 
+    _draw_compass(d, d.width - 20, d.height - 20)
     return d
 
 
 def _legend_flowable(legend: list[dict[str, Any]]) -> Table:
-    cells = []
     row = []
     for entry in legend:
         swatch = Drawing(10, 10)
         swatch.add(Rect(0, 0, 10, 10, fillColor=HexColor(entry["color"]), strokeColor=None))
         row.append(Table([[swatch, Paragraph(entry["label"], _BODY_STYLE)]], colWidths=[14, 110], style=[("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-    cells.append(row)
-    return Table(cells, style=[("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 10)])
+    return Table([row], style=[("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 10)])
 
 
 def _elements_spec_table(elements: list[dict[str, Any]]) -> Table:
@@ -197,38 +378,54 @@ def generate_construction_report_pdf(
     design: dict[str, Any],
     floors: list[dict[str, Any]],
     property_name: str = "",
+    design_id: str = "",
 ) -> bytes:
     """`design` is the saved design dict from construction_store.get_design
     (plot_spec, selections, cost_estimate, vastu_result, risks). `floors`
     is [{"floor_label": str, "rooms": [...]}, ...] — supplied separately
     since room layout isn't persisted with the saved design (see this
-    module's own docstring)."""
+    module's own docstring). `design_id` is shown in the header/footer as
+    the report's own reference ID, matching the sibling AccidentIQ
+    report's own convention."""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.6 * inch, bottomMargin=0.6 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch)
+    generated_at_full = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    report_id_display = f"PIQ-{design_id[:8].upper()}" if design_id else "PIQ-DRAFT"
+
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=1.55 * inch, bottomMargin=0.85 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch,
+    )
     story = []
 
     plot_spec = design["plot_spec"]
     currency = design.get("currency", "USD")
-    generated_at = datetime.now(timezone.utc).strftime("%d %b %Y")
 
-    # --- Cover ---
-    story.append(Paragraph(property_name or "Construction Studio Report", _TITLE_STYLE))
-    story.append(Paragraph(f"Generated {generated_at} · PropertyIQ Construction Studio", _SUBTITLE_STYLE))
-    story.append(Spacer(1, 14))
+    # --- Property name, shown prominently since the header itself always
+    # shows the PropertyIQ brand name, not the user's own property name ---
+    if property_name:
+        story.append(Paragraph(property_name, ParagraphStyle("PropertyName", parent=_STYLES["Heading1"], fontSize=17, textColor=HexColor(_NAVY), spaceAfter=10)))
+
+    # --- Metadata card (cover page) ---
+    meta_rows = [[
+        Paragraph(f"<font size=7 color='{_TEXT_MUTED}'>PLOT SIZE</font><br/><b>{plot_spec.get('plot_length_ft', '-')} ft × {plot_spec.get('plot_width_ft', '-')} ft</b>", _BODY_STYLE),
+        Paragraph(f"<font size=7 color='{_TEXT_MUTED}'>ENTRANCE</font><br/><b>{str(plot_spec.get('entrance_direction', '-')).replace('_', ' ').title()}</b>", _BODY_STYLE),
+        Paragraph(f"<font size=7 color='{_TEXT_MUTED}'>ROAD-FACING SIDE</font><br/><b>{str(plot_spec.get('road_facing_side', '-')).replace('_', ' ').title()}</b>", _BODY_STYLE),
+        Paragraph(f"<font size=7 color='{_TEXT_MUTED}'>REGION</font><br/><b>{str(design.get('region', '-')).title()}</b>", _BODY_STYLE),
+        Paragraph(f"<font size=7 color='{_TEXT_MUTED}'>TOTAL COST</font><br/><b>{currency} {design['cost_estimate'].get('grand_total_converted', 0):,.0f}</b>", _BODY_STYLE),
+    ]]
+    story.append(Table(meta_rows, colWidths=[98] * 5, style=[
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor(_CARD_BG)),
+        ("BOX", (0, 0), (-1, -1), 0.75, HexColor(_BORDER_GRAY)),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story.append(Spacer(1, 4))
     story.append(Paragraph(_TOP_LEVEL_DISCLAIMER, _DISCLAIMER_STYLE))
-    story.append(Spacer(1, 16))
-
-    story.append(Paragraph("Plot Summary", _H1_STYLE))
-    plot_rows = [
-        ["Plot size", f"{plot_spec.get('plot_length_ft', '-')} ft × {plot_spec.get('plot_width_ft', '-')} ft"],
-        ["Entrance direction", str(plot_spec.get("entrance_direction", "-")).title()],
-        ["Road-facing side", str(plot_spec.get("road_facing_side", "-")).title()],
-        ["Region", str(design.get("region", "-")).title()],
-    ]
-    story.append(Table(plot_rows, colWidths=[160, 340], style=_TABLE_HEADER_STYLE))
 
     # --- Room summary, per floor ---
-    story.append(Paragraph("Room Layout", _H1_STYLE))
+    story.append(_section_badge(1, "Room Layout"))
     for floor in floors:
         rooms = [r for r in floor.get("rooms", []) if r.get("name", "").strip() and r.get("length", 0) > 0 and r.get("width", 0) > 0]
         story.append(Paragraph(floor.get("floor_label", "Floor"), _H2_STYLE))
@@ -243,7 +440,7 @@ def generate_construction_report_pdf(
 
     # --- Cost by discipline ---
     story.append(PageBreak())
-    story.append(Paragraph("Cost Estimate by Discipline", _H1_STYLE))
+    story.append(_section_badge(2, "Cost Estimate by Discipline"))
     story.append(Paragraph(f"Total: {currency} {design['cost_estimate'].get('grand_total_converted', 0):,.0f}", _H2_STYLE))
     sections = group_by_discipline(design["cost_estimate"].get("line_items", []))
     for section in sections:
@@ -256,11 +453,13 @@ def generate_construction_report_pdf(
         story.append(Spacer(1, 6))
 
     # --- Compliance ---
-    story.append(PageBreak())
+    section_num = 3
     vastu_result = design.get("vastu_result")
     if vastu_result and vastu_result.get("scope") != "no_specific_tradition":
+        story.append(PageBreak())
         is_thai = str(vastu_result.get("scope", "")).startswith("thai_")
-        story.append(Paragraph("Traditional Building Compliance" if is_thai else "Vastu Compliance", _H1_STYLE))
+        story.append(_section_badge(section_num, "Traditional Building Compliance" if is_thai else "Vastu Compliance"))
+        section_num += 1
         story.append(Paragraph(f"Result: {'Compliant' if vastu_result.get('compliant') else 'Some items flagged'}", _H2_STYLE))
         for note in vastu_result.get("notes", []):
             text = note if isinstance(note, str) else note.get("text", "")
@@ -279,11 +478,12 @@ def generate_construction_report_pdf(
         plot_width_ft = plot_spec.get("plot_width_ft", 1)
 
         story.append(PageBreak())
-        story.append(Paragraph(f"{floor.get('floor_label', 'Floor')} — Structural", _H1_STYLE))
+        story.append(_section_badge(section_num, f"{floor.get('floor_label', 'Floor')} — Structural"))
+        section_num += 1
         structural = compute_structural_overlay(rooms, plot_length_ft, plot_width_ft, total_floors=len(floors))
         story.append(Paragraph(structural["disclaimer"], _DISCLAIMER_STYLE))
         story.append(Spacer(1, 6))
-        story.append(_draw_structural_diagram(structural, plot_length_ft, plot_width_ft))
+        story.append(_card([_draw_structural_diagram(structural, rooms, plot_length_ft, plot_width_ft)]))
         story.append(Spacer(1, 6))
         story.append(_legend_flowable(structural["legend"]))
         story.append(Spacer(1, 8))
@@ -294,11 +494,12 @@ def generate_construction_report_pdf(
         story.append(_elements_spec_table(structural["beams"]))
 
         story.append(PageBreak())
-        story.append(Paragraph(f"{floor.get('floor_label', 'Floor')} — Plumbing", _H1_STYLE))
+        story.append(_section_badge(section_num, f"{floor.get('floor_label', 'Floor')} — Plumbing"))
+        section_num += 1
         plumbing = compute_plumbing_overlay(rooms, plot_length_ft, plot_width_ft)
         story.append(Paragraph(plumbing["disclaimer"], _DISCLAIMER_STYLE))
         story.append(Spacer(1, 6))
-        story.append(_draw_plumbing_diagram(plumbing, plot_length_ft, plot_width_ft))
+        story.append(_card([_draw_plumbing_diagram(plumbing, rooms, plot_length_ft, plot_width_ft)]))
         story.append(Spacer(1, 6))
         story.append(_legend_flowable(plumbing["legend"]))
         story.append(Spacer(1, 8))
@@ -312,11 +513,12 @@ def generate_construction_report_pdf(
             story.append(Paragraph("No bathroom/kitchen/utility rooms on this floor — no plumbing fixtures placed.", _BODY_STYLE))
 
         story.append(PageBreak())
-        story.append(Paragraph(f"{floor.get('floor_label', 'Floor')} — Electrical", _H1_STYLE))
+        story.append(_section_badge(section_num, f"{floor.get('floor_label', 'Floor')} — Electrical"))
+        section_num += 1
         electrical = compute_electrical_overlay(rooms, plot_length_ft, plot_width_ft)
         story.append(Paragraph(electrical["disclaimer"], _DISCLAIMER_STYLE))
         story.append(Spacer(1, 6))
-        story.append(_draw_electrical_diagram(electrical, plot_length_ft, plot_width_ft))
+        story.append(_card([_draw_electrical_diagram(electrical, rooms, plot_length_ft, plot_width_ft)]))
         story.append(Spacer(1, 6))
         story.append(_legend_flowable(electrical["legend"]))
         story.append(Spacer(1, 8))
@@ -334,8 +536,16 @@ def generate_construction_report_pdf(
 
     # --- Final disclaimer ---
     story.append(PageBreak())
-    story.append(Paragraph("Important Notice", _H1_STYLE))
+    story.append(_section_badge(section_num, "Important Notice"))
     story.append(Paragraph(_TOP_LEVEL_DISCLAIMER, _DISCLAIMER_STYLE))
 
-    doc.build(story)
+    def _on_first_page(canvas_obj, doc_obj):
+        _draw_cover_header(canvas_obj, doc_obj, report_id_display, generated_at_full)
+
+    doc.build(
+        story,
+        onFirstPage=_on_first_page,
+        onLaterPages=lambda c, d: None,
+        canvasmaker=_make_canvas_factory(report_id_display),
+    )
     return buffer.getvalue()
