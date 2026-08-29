@@ -45,9 +45,14 @@ function NeighborhoodInsights() {
   const [submitted, setSubmitted] = useState(false);
   const [resaleSignal, setResaleSignal] = useState(null);
   const [resaleState, setResaleState] = useState("idle"); // "idle" | "loading" | "done" | "error"
+  const [validationError, setValidationError] = useState("");
 
   const handleShowInsights = async () => {
-    if (!address.trim() || !city.trim()) return;
+    if (!address.trim() || !city.trim()) {
+      setValidationError("Please enter both a property address/locality and a city to see neighborhood insights.");
+      return;
+    }
+    setValidationError("");
     setSubmitted(true);
     setResaleState("loading");
     try {
@@ -107,6 +112,7 @@ function NeighborhoodInsights() {
           </div>
         </div>
         <button className="ni-primary-btn" onClick={handleShowInsights}>Show neighborhood insights</button>
+        {validationError && <p className="ni-validation-error">{validationError}</p>}
       </div>
 
       {submitted && (
