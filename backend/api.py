@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from typing import Any, Optional
 from pydantic import BaseModel
 
@@ -67,6 +67,7 @@ from backend.thai_traditional_engine import (
 from backend.compliance_rules import get_vastu_rules, get_thai_rules
 from backend.design_disciplines import group_by_discipline
 from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
+from backend.construction_report import generate_construction_report_pdf
 
 from backend.adjacency_engine import (
     evaluate_adjacency,
@@ -2254,6 +2255,42 @@ def download_construction_dxf(design_id: str):
         path=design["dxf_path"],
         media_type="application/dxf",
         filename=f"PropertyIQ_ConstructionStudio_{design_id}.dxf",
+    )
+
+
+class ConstructionReportRequest(BaseModel):
+    floors: list[dict[str, Any]]
+    property_name: str = ""
+
+
+@app.post("/api/construction-studio/design/{design_id}/report")
+def download_construction_report(design_id: str, request: ConstructionReportRequest):
+    """Generates and returns the complete PDF report for a saved design
+    (plot summary, room layout, cost by discipline, compliance, and
+    Structural/Plumbing/Electrical schematics with legends and specs
+    for every floor). `floors` is required in the request body — room
+    layout isn't persisted with the saved design record itself (see
+    construction_store.py's own schema), so the caller supplies it
+    directly from what it already has in memory, same pattern as the
+    stateless discipline-overlay endpoint above.
+
+    Deliberately does not require auth beyond a design existing: the
+    design itself was already created by an authenticated, tier-gated
+    request, and this endpoint only re-renders that already-computed
+    result as a PDF — no new computation a free-riding caller could
+    exploit, same reasoning as the existing DXF download endpoint just
+    above having no separate auth check either."""
+    design = get_design(design_id)
+    if design is None:
+        raise HTTPException(status_code=404, detail="Design not found")
+    if not request.floors:
+        raise HTTPException(status_code=400, detail="floors must include at least one floor.")
+
+    pdf_bytes = generate_construction_report_pdf(design, request.floors, request.property_name)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="PropertyIQ_ConstructionStudio_Report_{design_id}.pdf"'},
     )
 
 
