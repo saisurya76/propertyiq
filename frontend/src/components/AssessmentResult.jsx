@@ -1,164 +1,30 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
-import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
-import { studioApi, getSession } from "../studio/studioApi";
 
 function AssessmentResult({
   result,
   formData,
   reportId,
-  onLaunchStudio,
-  scrollToRecommendationSignal
+  onLaunchStudio
 }) {
   const [reportLoading, setReportLoading] = useState(false);
 
-  // Backs a real, reported gap: there was no obvious link between
-  // generating a report and buying the Insight Add-on at all — the
-  // only path was a collapsed "Similar Property Insights" panel further
-  // down the page that, once expanded and clicked, routed to the
-  // generic Studio pricing page rather than starting checkout directly.
-  // This checks unlock status on load (silently, via getSession — no
-  // error shown if not signed in, since that's a normal state here, not
-  // a failure) so the purchase button doesn't show for a report that's
-  // already unlocked.
-  const [insightState, setInsightState] = useState("checking"); // "checking" | "unlocked" | "not_unlocked" | "starting_checkout" | "error"
-  const [insightPriceUsd, setInsightPriceUsd] = useState(null);
-  // Backs the new admin-toggleable insight_addon "mode" setting — a
-  // real, reported gap this closes: the Similar Property Insights
-  // panel was always visible (as a locked teaser) regardless of
-  // purchase status. Defaults to "paid" (current/prior behavior) until
-  // the real value loads, so there's no flash of free-mode content
-  // before the actual setting is known.
-  const [insightMode, setInsightMode] = useState("paid");
-
-  useEffect(() => {
-    studioApi.getTiers()
-      .then((tiers) => {
-        setInsightPriceUsd(tiers.insight_addon?.price_usd ?? null);
-        setInsightMode(tiers.insight_addon?.mode ?? "paid");
-      })
-      .catch(() => {}); // price/mode display is a nice-to-have, not critical path
-  }, []);
-
-  useEffect(() => {
-    if (!reportId) {
-      setTimeout(() => setInsightState("not_unlocked"), 0);
-      return;
-    }
-    if (!getSession()) {
-      setTimeout(() => setInsightState("not_unlocked"), 0); // not signed in yet — button still shows, prompts sign-in when clicked
-      return;
-    }
-    let cancelled = false;
-    studioApi.getInsightStatus(reportId)
-      .then((res) => {
-        if (!cancelled) setInsightState(res.unlocked ? "unlocked" : "not_unlocked");
-      })
-      .catch(() => {
-        if (!cancelled) setInsightState("not_unlocked"); // fails open to showing the button, not a hard error state
-      });
-    return () => { cancelled = true; };
-  }, [reportId]);
-
-  const handleBuyInsight = async () => {
-    if (!getSession()) {
-      onLaunchStudio(); // routes to sign-in first
-      return;
-    }
-    setInsightState("starting_checkout");
-    try {
-      const res = await studioApi.insightCheckout(reportId);
-      if (res.checkout_url) {
-        // Backs a real, deliberate fix: without this, the report
-        // (which only ever lived in React state, never persisted
-        // server-side — reportId itself is a client-generated UUID,
-        // not something the backend can look up) was lost entirely on
-        // the full-page-reload checkout redirect requires, leaving the
-        // user on the plain homepage with only a message telling them
-        // to re-enter the whole property form again just to see what
-        // they'd paid for. Persisting it here lets the app restore the
-        // exact same report automatically on return, already unlocked
-        // — no redundant "go redo this" message needed at all.
-        sessionStorage.setItem("propertyiq_pending_report", JSON.stringify({ result, formData, reportId }));
-        window.location.href = res.checkout_url;
-        return;
-      }
-      // Beta-bypass path (no real checkout_url returned) — access was granted immediately
-      setInsightState("unlocked");
-    } catch (err) {
-      console.warn("Couldn't start Insight Add-on checkout:", err);
-      setInsightState("error");
-    }
-  };
-
-  // Scrolls back to the Final Recommendation card (where the "✅
-  // unlocked" confirmation lives) once a report is restored after an
-  // Insight Add-on purchase — without this, the user lands at the top
-  // of a long report page with no visual indication their purchase
-  // actually did anything, even though it worked correctly underneath.
-  // Guarded on a truthy, non-zero signal specifically so this never
-  // fires on a normal first page load (the signal starts at 0 in
-  // App.jsx and is only ever incremented after a genuine restore).
-  useEffect(() => {
-    if (!scrollToRecommendationSignal) return;
-    const el = document.getElementById("final-recommendation-card");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [scrollToRecommendationSignal]);
-
   if (!result) return null;
 
-  // The report's currency should reflect the PROPERTY's country (what
-  // the assessment is actually about), not the visitor's own location —
-  // someone assessing an Indian property from the US should still see
-  // Indian Rupee pricing, not USD. Was previously 100% hardcoded to INR
-  // regardless of the property's actual country — a real gap for any
-  // non-Indian property (e.g. Thailand, seeded via /th).
-  const CURRENCY_BY_COUNTRY = {
-    "india": { code: "INR", symbol: "₹", locale: "en-IN" },
-    "thailand": { code: "THB", symbol: "฿", locale: "th-TH" },
-    "usa": { code: "USD", symbol: "$", locale: "en-US" },
-    "united states": { code: "USD", symbol: "$", locale: "en-US" },
-    "philippines": { code: "PHP", symbol: "₱", locale: "en-PH" },
-    "vietnam": { code: "VND", symbol: "₫", locale: "vi-VN" },
-    "indonesia": { code: "IDR", symbol: "Rp", locale: "id-ID" },
-  };
-  const currencyInfo = CURRENCY_BY_COUNTRY[(formData.country || "").trim().toLowerCase()]
-    || { code: "USD", symbol: "$", locale: "en-US" };
-
-  const governmentValueLabel = getGovernmentValueLabel(formData.country);
-
-  const formatCurrency = (value) => {
-    if (value === null || value === undefined || isNaN(value)) return `${currencyInfo.symbol}0`;
-
-    // India keeps its own genuinely standard crore/lakh convention —
-    // not applicable anywhere else, so only INR uses it. Every other
-    // currency uses the widely-understood M/K (million/thousand)
-    // abbreviation instead of inventing a India-specific one for them.
-    if (currencyInfo.code === "INR") {
-      if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)} Cr`;
-      if (value >= 100000) return `₹${(value / 100000).toFixed(2)} L`;
-      return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
+  const formatIndianCurrency = (value) => {
+    if (value >= 10000000) {
+      return `₹${(value / 10000000).toFixed(2)} Cr`;
     }
 
-    if (value >= 1000000) return `${currencyInfo.symbol}${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `${currencyInfo.symbol}${(value / 1000).toFixed(1)}K`;
-    return `${currencyInfo.symbol}${new Intl.NumberFormat(currencyInfo.locale).format(value)}`;
-  };
+    if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(2)} L`;
+    }
 
-  const formatPerSqft = (value) => {
-    if (value === null || value === undefined || isNaN(value)) return `${currencyInfo.symbol}0 / sqft`;
-    return `${currencyInfo.symbol}${value.toLocaleString(currencyInfo.locale)} / sqft`;
+    return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
   };
-
-  // Kept as an alias so any call site not yet updated below still works
-  // correctly rather than throwing — genuinely currency-aware now,
-  // despite the India-specific name staying for now to limit the size
-  // of this change (a rename sweep can happen separately, unrelated to
-  // the actual bug this fixes).
-  const formatIndianCurrency = formatCurrency;
 
   const downloadReport = async () => {
     if (reportLoading) return;
@@ -286,7 +152,6 @@ function AssessmentResult({
   };
 
   return (
-    <CollapsiblePanel title="Your PropertyIQ Report" defaultOpen={true} color="violet">
     <div className="card result-card">
 
       <div className="score-section">
@@ -474,7 +339,7 @@ function AssessmentResult({
           <div className="finding-item">
             <strong>Quoted Price / sqft</strong>
             <p>
-              {formatPerSqft(result.quotedPricePerSqft)}
+              ₹{result.quotedPricePerSqft?.toLocaleString("en-IN")} / sqft
             </p>
           </div>
 
@@ -486,21 +351,21 @@ function AssessmentResult({
           <div className="finding-item">
             <strong>Fair Value / sqft</strong>
             <p>
-              {formatPerSqft(result.fairValuePerSqft)}
+              ₹{result.fairValuePerSqft?.toLocaleString("en-IN")} / sqft
             </p>
           </div>
 
           <div className="finding-item">
             <strong>City Comparable Benchmark</strong>
             <p>
-              {formatPerSqft(result.marketAveragePricePerSqft)}
+              ₹{result.marketAveragePricePerSqft?.toLocaleString("en-IN")} / sqft
             </p>
           </div>
 
           <div className="finding-item">
-            <strong>{governmentValueLabel.shortLabel}</strong>
+            <strong>Government Guidance</strong>
             <p>
-              {formatPerSqft(result.governmentRatePerUnit)}
+              ₹{result.governmentRatePerUnit?.toLocaleString("en-IN")} / sqft
             </p>
           </div>
 
@@ -626,9 +491,9 @@ function AssessmentResult({
         </div>
 
         <div className="finding-item">
-          <strong>{governmentValueLabel.label}</strong>
+          <strong>Government Guidance Rate</strong>
           <p>
-            {formatPerSqft(result.governmentRatePerUnit)}
+            ₹{result.governmentRatePerUnit?.toLocaleString("en-IN")} / sqft
           </p>
         </div>
 
@@ -968,7 +833,7 @@ function AssessmentResult({
 
     <p>
       {result.marketAveragePricePerSqft > 0
-        ? formatPerSqft(result.marketAveragePricePerSqft)
+        ? `₹${result.marketAveragePricePerSqft.toLocaleString("en-IN")} / sqft`
         : "Not Available"}
     </p>
 
@@ -1022,7 +887,7 @@ function AssessmentResult({
         <p>
           {project.developer}
           <br />
-          {formatPerSqft(project.pricePerSqft)}
+          ₹{project.pricePerSqft.toLocaleString("en-IN")} / sqft
         </p>
 
       </div>
@@ -1040,7 +905,7 @@ function AssessmentResult({
 
     PropertyIQ Fair Value is derived using the user-provided market average together with 
     applicable valuation models such as rental yield when sufficient 
-    evidence is available. {governmentValueLabel.shortLabel} is reported separately as regulatory 
+    evidence is available. Government Guidance is reported separately as regulatory 
     reference information and is not used to determine Fair Value.
 
     <br /><br />
@@ -1201,7 +1066,7 @@ function AssessmentResult({
 
       </div>
 
-      <div className="recommendation-card" id="final-recommendation-card">
+      <div className="recommendation-card">
 
         <div className="recommendation-title">
           FINAL RECOMMENDATION
@@ -1215,15 +1080,10 @@ function AssessmentResult({
           {result.findings?.overall}
         </div>
 
-        {/* Hidden, not removed — per explicit instruction, the button
-            and its underlying logic (downloadReport, reportLoading)
-            stay fully intact for whenever this feature is ready to
-            re-enable, just not shown to users right now. */}
         <button
           className="download-report-btn"
           onClick={downloadReport}
           disabled={true}
-          style={{ display: "none" }}
         >
           {reportLoading && (
             <span className="spinner"></span>
@@ -1234,51 +1094,20 @@ function AssessmentResult({
             : "Download PropertyIQ Report"}
         </button>
 
-        {insightMode === "free" ? (
-          <p className="recommendation-insight-unlocked">
-            ✅ Similar-property insights are included for everyone — see them further down the page.
-          </p>
-        ) : insightState === "unlocked" ? (
-          <p className="recommendation-insight-unlocked">
-            ✅ Similar-property insights are unlocked for this report — see them further down the page.
-          </p>
-        ) : (
-          <div className="recommendation-insight-cta">
-            <p className="recommendation-insight-desc">
-              See how this property's price compares to similar ones nearby, with real
-              comparable pricing from actual listings{insightPriceUsd != null ? ` — one-time $${insightPriceUsd}` : ""}.
-            </p>
-            <button
-              className="download-report-btn recommendation-insight-btn"
-              onClick={handleBuyInsight}
-              disabled={insightState === "starting_checkout"}
-            >
-              {insightState === "starting_checkout" && <span className="spinner"></span>}
-              {insightState === "starting_checkout"
-                ? "Starting checkout..."
-                : `Buy & Unlock Similar-Property Insights${insightPriceUsd != null ? ` ($${insightPriceUsd})` : ""}`}
-            </button>
-          </div>
-        )}
-        {insightMode === "paid" && insightState === "error" && (
-          <p className="recommendation-insight-error">
-            Couldn't start checkout — please try again in a moment.
-          </p>
-        )}
-
       </div>
 
 
-      {(insightMode === "free" || insightState === "unlocked") && (
-        <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
-          <SimilarPropertiesWidget
-            reportId={reportId}
-            city={formData.city}
-            propertyType={formData.propertyType}
-            subjectPricePerSqft={result.quotedPricePerSqft}
-          />
-        </CollapsiblePanel>
-      )}
+      <div className="report-sections-grid">
+
+      <CollapsiblePanel title="Similar Property Insights" defaultOpen={false} color="blue">
+        <SimilarPropertiesWidget
+          reportId={reportId}
+          city={formData.city}
+          propertyType={formData.propertyType}
+          subjectPricePerSqft={result.quotedPricePerSqft}
+          onNeedAccess={onLaunchStudio}
+        />
+      </CollapsiblePanel>
 
       <CollapsiblePanel title="PropertyIQ Studio" defaultOpen={false} color="purple">
         <StudioPromoCard onLaunch={onLaunchStudio} />
@@ -1288,8 +1117,9 @@ function AssessmentResult({
         <FraudIntelligenceStatic />
       </CollapsiblePanel>
 
+      </div>
+
     </div>
-    </CollapsiblePanel>
   );
 }
 
