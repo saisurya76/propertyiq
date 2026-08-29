@@ -54,6 +54,7 @@ def test_honestly_reports_no_data_when_grounding_returns_no_sources():
     assert result["has_data"] is False
     assert result["summary"] == ""
     assert result["sources"] == []
+    assert result["reason"] == "no_grounded_sources"
 
 
 def test_returns_no_data_when_gemini_key_is_not_configured():
@@ -64,6 +65,7 @@ def test_returns_no_data_when_gemini_key_is_not_configured():
     assert result["summary"] == ""
     assert result["sources"] == []
     assert result["disclaimer"] == INFRASTRUCTURE_DISCLAIMER
+    assert result["reason"] == "no_api_key"
 
 
 def test_returns_no_data_for_an_empty_city_without_calling_gemini_at_all():
@@ -83,6 +85,31 @@ def test_degrades_gracefully_to_no_data_on_a_gemini_api_failure_not_a_crash():
 
     assert result["has_data"] is False
     assert result["summary"] == ""
+    assert result["reason"] == "api_error"
+
+
+def test_a_real_api_failure_is_distinguishable_from_a_missing_key_via_reason_and_error_detail():
+    """The exact real bug this fixes: a missing GEMINI_API_KEY and a
+    genuine Gemini API exception previously both produced the identical
+    no-data response, making a real misconfiguration indistinguishable
+    from an honest empty result. Confirms these two cases now carry
+    different `reason` codes, and the real exception text is preserved
+    in `error_detail` for the api_error case specifically (never
+    fabricated, never present on the no_api_key case, which has no
+    real exception to report)."""
+    with patch("backend.neighborhood_infrastructure.get_gemini_api_key", return_value=""):
+        no_key_result = get_infrastructure_summary("Hyderabad")
+    assert no_key_result["reason"] == "no_api_key"
+    assert no_key_result["error_detail"] == ""
+
+    with patch("backend.neighborhood_infrastructure.get_gemini_api_key", return_value="fake_key"):
+        with patch("backend.neighborhood_infrastructure.genai.Client") as mock_client_cls:
+            mock_client_cls.return_value.models.generate_content.side_effect = Exception("401 Unauthorized: invalid API key")
+            api_error_result = get_infrastructure_summary("Hyderabad")
+    assert api_error_result["reason"] == "api_error"
+    assert "401 Unauthorized" in api_error_result["error_detail"]
+
+    assert no_key_result["reason"] != api_error_result["reason"]
 
 
 def test_every_result_always_carries_the_disclaimer_regardless_of_outcome():

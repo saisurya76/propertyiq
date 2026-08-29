@@ -195,7 +195,9 @@ function NeighborhoodInsights() {
   useEffect(() => {
     if (!submitted || !selectedPlace) return;
 
+    let justCreated = false;
     if (!mapRef.current) {
+      justCreated = true;
       mapRef.current = L.map(mapContainerRef.current).setView([selectedPlace.lat, selectedPlace.lon], 15);
       L.tileLayer(`https://{s}-tiles.locationiq.com/v3/streets/r/{z}/{x}/{y}.png?key=${LOCATIONIQ_TILE_KEY}`, {
         attribution: '&copy; <a href="https://locationiq.com">LocationIQ</a> &copy; OpenStreetMap contributors',
@@ -204,6 +206,41 @@ function NeighborhoodInsights() {
     } else {
       mapRef.current.setView([selectedPlace.lat, selectedPlace.lon], 15);
     }
+
+    if (justCreated) {
+      // A real, well-known Leaflet issue, not a guess: a map created the
+      // instant its container is mounted often measures that container
+      // as zero-size (the browser hasn't finished laying it out yet),
+      // which is what "loads broken/partial until you interact with it"
+      // actually is. invalidateSize() forces Leaflet to re-measure and
+      // redraw against the container's real, final dimensions. Called
+      // once immediately and once after a short delay to also catch the
+      // results section's own scroll-into-view, which can still be
+      // settling the layout a beat later.
+      mapRef.current.invalidateSize();
+      setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 300);
+    }
+
+    // A real, separate bug from the container-sizing one above: every
+    // circleMarker from a PREVIOUS search was left on the map forever —
+    // never removed — when a new location was searched. They don't
+    // visually disappear (still added to mapRef.current), they just end
+    // up far outside the newly-panned-to viewport, invisible but still
+    // present and still occupying their category's slot in
+    // markersByCatRef until that category's own batch reloads. Combined
+    // with the progressive per-batch merge below, this is what could
+    // make a fresh search briefly show stale-but-invisible markers
+    // instead of the new location's real ones. Explicitly removing
+    // every previous marker from the map AND resetting the ref to
+    // empty, before starting the new search, is the actual fix.
+    Object.values(markersByCatRef.current).forEach((markers) => {
+      markers.forEach((m) => m.removeFrom(mapRef.current));
+    });
+    markersByCatRef.current = {};
+    Promise.resolve().then(() => {
+      setPoiDataByCat({});
+      setFailedCategories([]);
+    });
 
     const markerLabel = propertyName.trim() || selectedPlace.label;
     L.marker([selectedPlace.lat, selectedPlace.lon]).addTo(mapRef.current).bindPopup(`<b>${markerLabel}</b><br>${selectedPlace.label}`);
@@ -217,10 +254,9 @@ function NeighborhoodInsights() {
       const newDataByCat = {};
       const newFailed = [];
 
-      for (const cat of POI_CATEGORIES) {
+      const loadOneCategory = async (cat) => {
         newMarkersByCat[cat.key] = [];
         newDataByCat[cat.key] = [];
-        let succeeded = false;
         try {
           const url = `${API_BASE}/api/neighborhood-insights/nearby?lat=${selectedPlace.lat}&lon=${selectedPlace.lon}&tag=${encodeURIComponent(cat.tag)}&radius=2000`;
           const res = await timeoutFetch(url, 6000);
@@ -235,21 +271,41 @@ function NeighborhoodInsights() {
                 newDataByCat[cat.key].push({ name: place.name || cat.label, lat: parseFloat(place.lat), lon: parseFloat(place.lon) });
               }
             });
-            succeeded = true;
+            return true;
           }
+          return false;
         } catch {
-          // falls through to the fallback link below
+          return false;
         }
-        if (!succeeded) newFailed.push(cat.key);
-        // Same rate-limit pacing as AccidentIQ's own loadPOIs — without
-        // this, 7 categories fired back-to-back can get 429'd on
-        // LocationIQ's free tier even though the map itself is fine.
-        await sleep(550);
+      };
+
+      // LocationIQ's free tier allows roughly 2 requests/second (same
+      // limit AccidentIQ's own loadPOIs paces against) — fetching 2
+      // categories at once, then pausing, respects that same real
+      // constraint while roughly halving the previous fully-sequential
+      // wait (7 categories x 550ms was several real seconds on its own,
+      // before any network time — a genuine, reported slowness this
+      // batching directly addresses). Markers appear on the map after
+      // each batch, not only once all 7 finish, so the map visibly does
+      // something well before the whole sequence completes.
+      const BATCH_SIZE = 2;
+      for (let i = 0; i < POI_CATEGORIES.length; i += BATCH_SIZE) {
+        const batch = POI_CATEGORIES.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(batch.map(loadOneCategory));
+        batch.forEach((cat, idx) => {
+          if (!results[idx]) newFailed.push(cat.key);
+        });
+        if (cancelled) return;
+        // Progressive update so the map/legend reflect what's loaded so
+        // far, not just the final state once every category is done —
+        // safe now that old markers are explicitly cleared above at the
+        // start of every new search, rather than silently accumulating.
+        markersByCatRef.current = { ...markersByCatRef.current, ...newMarkersByCat };
+        setPoiDataByCat((prev) => ({ ...prev, ...newDataByCat }));
+        if (i + BATCH_SIZE < POI_CATEGORIES.length) await sleep(550);
       }
 
       if (cancelled) return;
-      markersByCatRef.current = newMarkersByCat;
-      setPoiDataByCat(newDataByCat);
       setFailedCategories(newFailed);
       setPoiState("done");
     };
@@ -469,7 +525,10 @@ function NeighborhoodInsights() {
                 <p className="ni-disclaimer-box">⚠️ {infraData.disclaimer}</p>
               </>
             )}
-            {infraState === "done" && infraData && !infraData.has_data && (
+            {infraState === "done" && infraData && !infraData.has_data && infraData.reason === "no_api_key" && (
+              <p className="ni-coming-soon">This feature isn't fully set up yet on the backend (missing configuration) — please let the site admin know.</p>
+            )}
+            {infraState === "done" && infraData && !infraData.has_data && infraData.reason !== "no_api_key" && (
               <p className="ni-coming-soon">No reliable, current infrastructure information found for {city} — try checking your city's municipal or urban development authority website directly.</p>
             )}
           </div>
