@@ -97,6 +97,11 @@ function NeighborhoodInsights() {
   const [failedCategories, setFailedCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
 
+  const [waterState, setWaterState] = useState("idle"); // "idle" | "loading" | "done" | "error"
+  const [waterBodies, setWaterBodies] = useState([]);
+  const [infraState, setInfraState] = useState("idle"); // "idle" | "loading" | "done" | "error"
+  const [infraData, setInfraData] = useState(null);
+
   const mapRef = useRef(null);
   const mapContainerRef = useRef(null);
   const markersByCatRef = useRef({});
@@ -138,6 +143,7 @@ function NeighborhoodInsights() {
     }
     setValidationError("");
     setSubmitted(true);
+
     setResaleState("loading");
     try {
       const res = await fetch(`${API_BASE}/api/neighborhood-insights/resale-signal?city=${encodeURIComponent(city)}&property_type=${encodeURIComponent(propertyType)}`);
@@ -147,6 +153,40 @@ function NeighborhoodInsights() {
     } catch {
       setResaleState("error");
     }
+
+    // Nearby water bodies (rivers/lakes/canals) — a real, honest partial
+    // signal for the Flood & waterlogging card, never a fabricated risk
+    // score. See the JSX below for why an empty result still shows a
+    // disclaimer, not a false "no risk" implication.
+    setWaterState("loading");
+    try {
+      const [riverRes, waterRes] = await Promise.all([
+        timeoutFetch(`${API_BASE}/api/neighborhood-insights/nearby?lat=${selectedPlace.lat}&lon=${selectedPlace.lon}&tag=${encodeURIComponent("waterway:river")}&radius=2000`, 6000),
+        timeoutFetch(`${API_BASE}/api/neighborhood-insights/nearby?lat=${selectedPlace.lat}&lon=${selectedPlace.lon}&tag=${encodeURIComponent("natural:water")}&radius=2000`, 6000),
+      ]);
+      const [riverData, waterData] = await Promise.all([riverRes.json(), waterRes.json()]);
+      const combined = [...(Array.isArray(riverData) ? riverData : []), ...(Array.isArray(waterData) ? waterData : [])]
+        .filter((p) => p.lat && p.lon)
+        .slice(0, 6);
+      setWaterBodies(combined);
+      setWaterState("done");
+    } catch {
+      setWaterState("error");
+    }
+
+    // Search-grounded infrastructure summary — city-level, not verified
+    // proximity to this exact address. See neighborhood_infrastructure.py's
+    // own docstring for why this requires real grounding sources to
+    // count as "has data" at all.
+    setInfraState("loading");
+    try {
+      const res = await fetch(`${API_BASE}/api/neighborhood-insights/infrastructure?city=${encodeURIComponent(city)}`);
+      const data = await res.json();
+      setInfraData(data);
+      setInfraState("done");
+    } catch {
+      setInfraState("error");
+    }
   };
 
   // Loads the map + all category markers once a place has been submitted
@@ -155,9 +195,7 @@ function NeighborhoodInsights() {
   useEffect(() => {
     if (!submitted || !selectedPlace) return;
 
-    let justCreated = false;
     if (!mapRef.current) {
-      justCreated = true;
       mapRef.current = L.map(mapContainerRef.current).setView([selectedPlace.lat, selectedPlace.lon], 15);
       L.tileLayer(`https://{s}-tiles.locationiq.com/v3/streets/r/{z}/{x}/{y}.png?key=${LOCATIONIQ_TILE_KEY}`, {
         attribution: '&copy; <a href="https://locationiq.com">LocationIQ</a> &copy; OpenStreetMap contributors',
@@ -165,20 +203,6 @@ function NeighborhoodInsights() {
       }).addTo(mapRef.current);
     } else {
       mapRef.current.setView([selectedPlace.lat, selectedPlace.lon], 15);
-    }
-
-    if (justCreated) {
-      // A real, well-known Leaflet issue, not a guess: a map created the
-      // instant its container is mounted often measures that container
-      // as zero-size (the browser hasn't finished laying it out yet),
-      // which is what "loads broken/partial until you interact with it"
-      // actually is. invalidateSize() forces Leaflet to re-measure and
-      // redraw against the container's real, final dimensions. Called
-      // once immediately and once after a short delay to also catch the
-      // results section's own scroll-into-view, which can still be
-      // settling the layout a beat later.
-      mapRef.current.invalidateSize();
-      setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 300);
     }
 
     const markerLabel = propertyName.trim() || selectedPlace.label;
@@ -193,9 +217,10 @@ function NeighborhoodInsights() {
       const newDataByCat = {};
       const newFailed = [];
 
-      const loadOneCategory = async (cat) => {
+      for (const cat of POI_CATEGORIES) {
         newMarkersByCat[cat.key] = [];
         newDataByCat[cat.key] = [];
+        let succeeded = false;
         try {
           const url = `${API_BASE}/api/neighborhood-insights/nearby?lat=${selectedPlace.lat}&lon=${selectedPlace.lon}&tag=${encodeURIComponent(cat.tag)}&radius=2000`;
           const res = await timeoutFetch(url, 6000);
@@ -210,39 +235,21 @@ function NeighborhoodInsights() {
                 newDataByCat[cat.key].push({ name: place.name || cat.label, lat: parseFloat(place.lat), lon: parseFloat(place.lon) });
               }
             });
-            return true;
+            succeeded = true;
           }
-          return false;
         } catch {
-          return false;
+          // falls through to the fallback link below
         }
-      };
-
-      // LocationIQ's free tier allows roughly 2 requests/second (same
-      // limit AccidentIQ's own loadPOIs paces against) — fetching 2
-      // categories at once, then pausing, respects that same real
-      // constraint while roughly halving the previous fully-sequential
-      // wait (7 categories x 550ms was several real seconds on its own,
-      // before any network time — a genuine, reported slowness this
-      // batching directly addresses). Markers appear on the map after
-      // each batch, not only once all 7 finish, so the map visibly does
-      // something well before the whole sequence completes.
-      const BATCH_SIZE = 2;
-      for (let i = 0; i < POI_CATEGORIES.length; i += BATCH_SIZE) {
-        const batch = POI_CATEGORIES.slice(i, i + BATCH_SIZE);
-        const results = await Promise.all(batch.map(loadOneCategory));
-        batch.forEach((cat, idx) => {
-          if (!results[idx]) newFailed.push(cat.key);
-        });
-        if (cancelled) return;
-        // Progressive update so the map/legend reflect what's loaded so
-        // far, not just the final state once every category is done.
-        markersByCatRef.current = { ...markersByCatRef.current, ...newMarkersByCat };
-        setPoiDataByCat((prev) => ({ ...prev, ...newDataByCat }));
-        if (i + BATCH_SIZE < POI_CATEGORIES.length) await sleep(550);
+        if (!succeeded) newFailed.push(cat.key);
+        // Same rate-limit pacing as AccidentIQ's own loadPOIs — without
+        // this, 7 categories fired back-to-back can get 429'd on
+        // LocationIQ's free tier even though the map itself is fine.
+        await sleep(550);
       }
 
       if (cancelled) return;
+      markersByCatRef.current = newMarkersByCat;
+      setPoiDataByCat(newDataByCat);
       setFailedCategories(newFailed);
       setPoiState("done");
     };
@@ -417,12 +424,54 @@ function NeighborhoodInsights() {
 
           <div className="ni-card">
             <h3>☔ Flood & waterlogging risk</h3>
-            <p className="ni-coming-soon">Coming soon — this needs a municipal drainage/flood-history data source this app doesn't have connected yet.</p>
+            {waterState === "loading" && <p>Checking for nearby water bodies...</p>}
+            {waterState === "error" && <p className="ni-coming-soon">Couldn't check this right now — please try again.</p>}
+            {waterState === "done" && (
+              <>
+                {waterBodies.length > 0 ? (
+                  <>
+                    <p>Found {waterBodies.length} river/lake/canal{waterBodies.length === 1 ? "" : "s"} within 2km:</p>
+                    <ul className="ni-water-list">
+                      {waterBodies.map((w, i) => <li key={i}>{w.name || "Unnamed water body"}</li>)}
+                    </ul>
+                  </>
+                ) : (
+                  <p>No mapped rivers, lakes, or canals found within 2km.</p>
+                )}
+                <p className="ni-disclaimer-box">
+                  ⚠️ This shows nearby water bodies only — one possible contributing factor, not a flood-risk
+                  assessment. It says nothing about elevation, drainage infrastructure, or historical waterlogging,
+                  and a property can flood with no water body nearby, or be perfectly safe next to one. Check your
+                  state disaster management authority's flood maps and ask neighbors/local residents about past
+                  monsoon flooding before deciding.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="ni-card">
             <h3>🏗️ Upcoming infrastructure</h3>
-            <p className="ni-coming-soon">Coming soon — metro lines, highways, and planned commercial development near this address, once a data source is connected.</p>
+            {infraState === "loading" && <p>Searching for current infrastructure news...</p>}
+            {infraState === "error" && <p className="ni-coming-soon">Couldn't load this right now — please try again.</p>}
+            {infraState === "done" && infraData && infraData.has_data && (
+              <>
+                <p className="ni-infra-summary">
+                  {infraData.summary.split("\n").filter((line) => line.trim()).map((line, i) => (
+                    <span key={i}>{line.replace(/^-\s*/, "")}<br /></span>
+                  ))}
+                </p>
+                <p className="ni-infra-sources-label">Sources:</p>
+                <ul className="ni-infra-sources">
+                  {infraData.sources.map((s, i) => (
+                    <li key={i}><a href={s.uri} target="_blank" rel="noopener noreferrer">{s.title}</a></li>
+                  ))}
+                </ul>
+                <p className="ni-disclaimer-box">⚠️ {infraData.disclaimer}</p>
+              </>
+            )}
+            {infraState === "done" && infraData && !infraData.has_data && (
+              <p className="ni-coming-soon">No reliable, current infrastructure information found for {city} — try checking your city's municipal or urban development authority website directly.</p>
+            )}
           </div>
 
           <div className="ni-card">

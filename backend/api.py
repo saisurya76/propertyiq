@@ -68,6 +68,7 @@ from backend.compliance_rules import get_vastu_rules, get_thai_rules
 from backend.design_disciplines import group_by_discipline
 from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
 from backend.comparables import get_comparables, average_price_per_sqft
+from backend.neighborhood_infrastructure import get_infrastructure_summary
 from backend.construction_report import generate_construction_report_pdf
 
 from backend.adjacency_engine import (
@@ -1517,6 +1518,19 @@ def neighborhood_nearby(lat: float, lon: float, tag: str, radius: int = 2000):
         return data if isinstance(data, list) else []
     except requests.RequestException:
         return []
+
+
+@app.get("/api/neighborhood-insights/infrastructure")
+def neighborhood_infrastructure(city: str):
+    """Search-grounded (real web search, not a plain guess) summary of
+    upcoming infrastructure for the Neighborhood Insights page. Public
+    (no auth), same reasoning as the other neighborhood-insights
+    endpoints — a free, no-signup entry point. See
+    neighborhood_infrastructure.py's own module docstring for the
+    critical honesty boundary: city-level general news, not verified
+    proximity to a specific address, always shown with real sources
+    and an explicit disclaimer."""
+    return get_infrastructure_summary(city)
 
 
 @app.get("/api/neighborhood-insights/resale-signal")
