@@ -1060,6 +1060,22 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
     window.open(url, "_blank", "noopener");
   };
 
+  const [reportDownloading, setReportDownloading] = useState(false);
+  const [reportError, setReportError] = useState("");
+
+  const downloadReport = async () => {
+    if (!result?.design_id) return;
+    setReportDownloading(true);
+    setReportError("");
+    try {
+      await studioApi.downloadConstructionReport(result.design_id, floors, propertyName);
+    } catch (err) {
+      setReportError(err.message || "Couldn't generate the report. Please try again.");
+    } finally {
+      setReportDownloading(false);
+    }
+  };
+
   // Downloads a plain array of objects as a CSV file via a Blob + temporary
   // link click — standard browser pattern, no extra dependency needed for
   // something this simple.
@@ -2171,6 +2187,16 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                   No DXF was generated — add at least one named room in the previous step to export a layout.
                 </p>
               )}
+
+              <button
+                className="cs-download-btn"
+                style={{ marginTop: 10 }}
+                onClick={downloadReport}
+                disabled={reportDownloading}
+              >
+                {reportDownloading ? "Generating report..." : "Download Complete Report (PDF)"}
+              </button>
+              {reportError && <p className="studio-subtext cs-report-error">{reportError}</p>}
             </>
           )}
         </div>

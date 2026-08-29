@@ -207,4 +207,42 @@ export const studioApi = {
       method: "POST",
       body: JSON.stringify({ rooms, plot_length_ft: plotLengthFt, plot_width_ft: plotWidthFt, total_floors: totalFloors }),
     }),
+
+  // Deliberately NOT built on apiFetch: apiFetch always calls
+  // response.json(), which would corrupt this endpoint's actual PDF
+  // bytes. Fetches the PDF as a blob and triggers a real browser
+  // download via a temporary <a> tag + object URL, the standard
+  // pattern for a fetch-based (rather than plain-link) file download —
+  // needed here because the request has a JSON body (floors) a plain
+  // <a href> download can't send.
+  downloadConstructionReport: async (designId, floors, propertyName) => {
+    const response = await fetch(`${API_BASE}/api/construction-studio/design/${encodeURIComponent(designId)}/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ floors, property_name: propertyName || "" }),
+    });
+
+    if (!response.ok) {
+      let message = `Request failed (${response.status})`;
+      try {
+        const errorBody = await response.json();
+        message = errorBody?.detail || message;
+      } catch {
+        // error response wasn't JSON either — fall back to the generic message
+      }
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `PropertyIQ_ConstructionStudio_Report_${designId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
 };
