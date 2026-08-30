@@ -5,8 +5,10 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 import os
+import json
 import uuid
 import asyncio
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import requests
 
@@ -100,6 +102,7 @@ from backend.config_store import (
     has_feature,
     ALL_FEATURES,
     set_app_setting,
+    get_app_setting,
 )
 
 from backend.subscription_store import (
@@ -1041,12 +1044,17 @@ def admin_overview(request: AdminAuthRequest):
         # "configured"/"not set" and a field to overwrite it, not the
         # current value.
         "gemini_api_key_configured": bool(get_gemini_api_key()),
+        # Current show/hide state for every Neighborhood Insights
+        # section, so the admin panel can render the real, current
+        # toggles rather than assuming everything defaults to visible.
+        "ni_section_visibility": get_ni_section_visibility(),
     }
 
 
 class AdminSettingsRequest(BaseModel):
     password: str
     gemini_api_key: Optional[str] = None
+    ni_section_visibility: Optional[dict[str, bool]] = None
 
 
 @app.post("/api/admin/settings")
@@ -1057,13 +1065,31 @@ def admin_settings(request: AdminSettingsRequest):
     configurable at runtime rather than only an env var, so it can be
     changed without a redeploy. Only ever accepts a new value to set;
     never returns the current one back (see admin_overview's
-    gemini_api_key_configured for the presence-only status check)."""
+    gemini_api_key_configured for the presence-only status check).
+
+    Also accepts ni_section_visibility: a real, explicit request to
+    make every Neighborhood Insights page section independently show/
+    hide-able from here, without a code change or redeploy for what's
+    fundamentally an operational decision, not a code one."""
     _require_admin_password(request.password)
 
     if request.gemini_api_key is not None:
         set_app_setting("gemini_api_key", request.gemini_api_key.strip())
 
-    return {"gemini_api_key_configured": bool(get_gemini_api_key())}
+    if request.ni_section_visibility is not None:
+        # Merge onto the existing saved map rather than overwrite it
+        # wholesale — the request may only include a subset of
+        # sections (e.g. toggling just one), and any section already
+        # correctly configured but not present in this particular
+        # request must not silently reset to its default.
+        current = get_ni_section_visibility()
+        current.update(request.ni_section_visibility)
+        set_app_setting(NI_VISIBILITY_SETTING_KEY, json.dumps(current))
+
+    return {
+        "gemini_api_key_configured": bool(get_gemini_api_key()),
+        "ni_section_visibility": get_ni_section_visibility(),
+    }
 
 
 @app.post("/api/subscribe/checkout")
@@ -1475,6 +1501,31 @@ LOCATIONIQ_API_KEY = os.environ.get("LOCATIONIQ_API_KEY", "")
 LOCATIONIQ_BASE = "https://us1.locationiq.com/v1"
 
 
+def _get_cached_json(cache_key: str, ttl_hours: int) -> Optional[Any]:
+    """Generic JSON cache read against the same get_app_setting/
+    set_app_setting key-value store neighborhood_infrastructure.py and
+    live_comparables.py already use for their own caching — a real,
+    deliberate cost-reduction measure, not a nice-to-have, for any
+    endpoint that would otherwise re-fetch identical external data on
+    every single call."""
+    raw = get_app_setting(cache_key)
+    if not raw:
+        return None
+    try:
+        cached = json.loads(raw)
+        fetched_at = datetime.fromisoformat(cached["fetched_at"])
+        age_hours = (datetime.now(timezone.utc) - fetched_at).total_seconds() / 3600
+        if age_hours < ttl_hours:
+            return cached["result"]
+    except (json.JSONDecodeError, KeyError, ValueError):
+        pass  # a corrupted/unexpected cache entry is treated as a cache miss, not an error
+    return None
+
+
+def _set_cached_json(cache_key: str, result: Any) -> None:
+    set_app_setting(cache_key, json.dumps({"result": result, "fetched_at": datetime.now(timezone.utc).isoformat()}))
+
+
 @app.get("/api/neighborhood-insights/autocomplete")
 def neighborhood_autocomplete(q: str):
     """Proxies LocationIQ's /autocomplete endpoint for the Neighborhood
@@ -1503,9 +1554,31 @@ def neighborhood_nearby(lat: float, lon: float, tag: str, radius: int = 2000):
     Insights POI map. `tag` is an OSM-style "key:value" string (e.g.
     "amenity:hospital"), same format LocationIQ's own API and
     AccidentIQ's real POI_CATEGORIES use. Public (no auth), same
-    reasoning as autocomplete above."""
+    reasoning as autocomplete above.
+
+    Cached by rounded coordinates for 7 days — a real, deliberate cost
+    fix: this endpoint fires 7 times per single form submission (once
+    per POI category, uncached before this), making it by far the
+    dominant driver of LocationIQ usage at any real scale — verified
+    directly against LocationIQ's own published pricing, where this one
+    endpoint's call volume alone determines which paid tier is needed.
+    Coordinates are rounded to 2 decimal places (~1.1km grid cells at
+    this latitude range) before building the cache key, so two
+    addresses within the same ~1km neighborhood share one cached
+    result — a reasonable trade-off given the search radius itself is
+    already 2km, meaning two points that close together would very
+    likely see near-identical nearby amenities anyway. 7-day TTL (much
+    longer than infrastructure's 24h) because real-world hospitals/
+    schools/banks don't meaningfully change day to day the way news
+    does."""
     if not LOCATIONIQ_API_KEY:
         raise HTTPException(status_code=503, detail="Nearby-places lookup isn't configured yet — LOCATIONIQ_API_KEY is not set.")
+
+    cache_key = f"nearby_{round(lat, 2)}_{round(lon, 2)}_{tag}_{radius}"
+    cached = _get_cached_json(cache_key, ttl_hours=168)
+    if cached is not None:
+        return cached
+
     try:
         resp = requests.get(
             f"{LOCATIONIQ_BASE}/nearby",
@@ -1515,9 +1588,17 @@ def neighborhood_nearby(lat: float, lon: float, tag: str, radius: int = 2000):
         if resp.status_code != 200:
             return []
         data = resp.json()
-        return data if isinstance(data, list) else []
+        result = data if isinstance(data, list) else []
     except requests.RequestException:
         return []
+
+    if result:
+        # Only cache a genuine, non-empty result — caching an empty
+        # list (a transient LocationIQ hiccup, a rate limit, etc) would
+        # mean a real neighborhood incorrectly shows "nothing found"
+        # for a full week.
+        _set_cached_json(cache_key, result)
+    return result
 
 
 @app.get("/api/neighborhood-insights/infrastructure")
@@ -1531,6 +1612,36 @@ def neighborhood_infrastructure(city: str):
     proximity to a specific address, always shown with real sources
     and an explicit disclaimer."""
     return get_infrastructure_summary(city)
+
+
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "checklist", "authority_contacts", "cross_sell", "share"]
+NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
+
+
+def get_ni_section_visibility() -> dict[str, bool]:
+    """All sections default to visible until an admin explicitly hides
+    one — a fresh install or a section added after this feature shipped
+    must never silently disappear just because it isn't in the saved
+    config yet."""
+    raw = get_app_setting(NI_VISIBILITY_SETTING_KEY)
+    saved = {}
+    if raw:
+        try:
+            saved = json.loads(raw)
+        except json.JSONDecodeError:
+            saved = {}
+    return {section: saved.get(section, True) for section in NI_SECTIONS}
+
+
+@app.get("/api/neighborhood-insights/section-visibility")
+def neighborhood_section_visibility():
+    """Public: which Neighborhood Insights sections should currently
+    render. Lets the whole page's section set be controlled from the
+    admin panel without a redeploy — e.g. temporarily hiding
+    Infrastructure while a quota issue is being sorted out, without
+    needing a code change for something that's really an operational,
+    not a code, decision."""
+    return get_ni_section_visibility()
 
 
 @app.get("/api/neighborhood-insights/resale-signal")

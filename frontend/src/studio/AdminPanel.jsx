@@ -17,6 +17,8 @@ function AdminPanel({ onBack }) {
   const [geminiKeyConfigured, setGeminiKeyConfigured] = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
   const [geminiSaveMessage, setGeminiSaveMessage] = useState("");
+  const [niSectionVisibility, setNiSectionVisibility] = useState(null);
+  const [niVisibilitySaveMessage, setNiVisibilitySaveMessage] = useState("");
 
   const login = async (e) => {
     e.preventDefault();
@@ -29,6 +31,7 @@ function AdminPanel({ onBack }) {
       setGrants(data.insight_grants);
       setAllFeatures(data.all_features || []);
       setGeminiKeyConfigured(!!data.gemini_api_key_configured);
+      setNiSectionVisibility(data.ni_section_visibility || null);
       setAuthed(true);
     } catch (err) {
       setError(err.message || "Incorrect password.");
@@ -109,6 +112,28 @@ function AdminPanel({ onBack }) {
       setGeminiSaveMessage("Gemini API key saved.");
     } catch (err) {
       setError(err.message || "Couldn't save the Gemini API key.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggling here only changes in-memory state — nothing takes effect
+  // on the live page until "Save" below actually persists it, same
+  // pattern as every other admin setting on this page.
+  const toggleNiSection = (section) => {
+    setNiSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const saveNiSectionVisibility = async () => {
+    setNiVisibilitySaveMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await studioApi.adminUpdateSettings(password, undefined, niSectionVisibility);
+      setNiSectionVisibility(res.ni_section_visibility || niSectionVisibility);
+      setNiVisibilitySaveMessage("Section visibility saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save section visibility.");
     } finally {
       setLoading(false);
     }
@@ -390,6 +415,42 @@ function AdminPanel({ onBack }) {
           </button>
         </div>
         {geminiSaveMessage && <div className="studio-status-banner">{geminiSaveMessage}</div>}
+      </div>
+
+      <div className="admin-section">
+        <h3>Neighborhood Insights — Page Sections</h3>
+        <p className="admin-section-note">
+          Show or hide any section of the public Neighborhood Insights page without a code change or
+          redeploy — useful for temporarily hiding a section (e.g. Infrastructure) while sorting out an
+          issue with it, without taking the whole page down.
+        </p>
+        {niSectionVisibility ? (
+          <>
+            <div className="admin-tier-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+              {[
+                { key: "map", label: "Neighborhood map (nearby places)" },
+                { key: "flood_risk", label: "Flood & waterlogging risk" },
+                { key: "infrastructure", label: "Upcoming infrastructure" },
+                { key: "resale_signal", label: "Resale demand signal" },
+                { key: "checklist", label: "Buyer's due-diligence checklist" },
+                { key: "authority_contacts", label: "Local authority contacts" },
+                { key: "cross_sell", label: "PropertyIQ cross-sell card" },
+                { key: "share", label: "Share this report" },
+              ].map(({ key, label }) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked={!!niSectionVisibility[key]} onChange={() => toggleNiSection(key)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 12 }} onClick={saveNiSectionVisibility} disabled={loading}>
+              {loading ? "Saving..." : "Save"}
+            </button>
+            {niVisibilitySaveMessage && <div className="studio-status-banner">{niVisibilitySaveMessage}</div>}
+          </>
+        ) : (
+          <p className="admin-empty-note">Loading...</p>
+        )}
       </div>
 
       <div className="admin-section admin-section-blue">

@@ -47,17 +47,65 @@ const CHECKLIST_ITEMS = [
   "Verify khata/mutation records reflect the current owner correctly",
 ];
 
-const AUTHORITY_CONTACTS = [
-  { label: "RERA (state) helpline", detail: "Varies by state — search \"[your state] RERA helpline\"" },
-  { label: "Sub-Registrar's Office", detail: "Handles registration and encumbrance certificates" },
-  { label: "Municipal Corporation / Panchayat", detail: "Property tax records, building plan approvals" },
-  { label: "State Consumer Helpline", detail: "1915" },
-];
+// Best-effort extraction of the state from LocationIQ's own
+// display_name string (e.g. "Kompally, Hyderabad, Telangana, India" ->
+// "Telangana") -- a real fix for a real bug: this previously showed
+// the literal, unfilled text "[your state]" verbatim instead of ever
+// substituting anything, since no state was ever actually collected
+// or derived from anywhere. LocationIQ's address components aren't
+// always in a perfectly consistent position, so this stays a
+// best-effort guess (second-to-last comma-separated segment before
+// "India") with an honest, non-templated fallback rather than a
+// guaranteed-correct lookup.
+function extractStateFromLabel(label) {
+  if (!label) return null;
+  const parts = label.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  const last = parts[parts.length - 1].toLowerCase();
+  if (last !== "india") return null;
+  return parts[parts.length - 2] || null;
+}
+
+function getAuthorityContacts(state) {
+  return [
+    {
+      label: "RERA helpline",
+      detail: state
+        ? `For ${state}: search "${state} RERA helpline" for the current number`
+        : "Search online for your state's RERA helpline",
+    },
+    { label: "Sub-Registrar's Office", detail: "Handles registration and encumbrance certificates" },
+    { label: "Municipal Corporation / Panchayat", detail: "Property tax records, building plan approvals" },
+    { label: "State Consumer Helpline", detail: "1915" },
+  ];
+}
 
 function timeoutFetch(url, ms = 6000) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), ms);
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(t));
+}
+
+// The real, likely cause of "resale signal randomly fails": it's the
+// very first backend call fired when the form is submitted, and
+// Render's free/starter web services spin down after 15 minutes of no
+// traffic — the first request after that can take 30-60+ seconds to
+// wake the service back up, well past a normal fetch timeout, while
+// every later call in the same burst hits an already-warm backend and
+// succeeds. A single retry with a generous timeout on just this first
+// call is a real, targeted fix for that specific pattern, not a
+// blanket "add retries everywhere" — repeating this on the 7 nearby-
+// category calls too would multiply, not fix, any real slowness.
+async function fetchWithRetry(url, { timeoutMs = 20000, retries = 1 } = {}) {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await timeoutFetch(url, timeoutMs);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 function sleep(ms) {
@@ -92,6 +140,22 @@ function NeighborhoodInsights() {
   const [resaleState, setResaleState] = useState("idle"); // "idle" | "loading" | "done" | "error"
   const [validationError, setValidationError] = useState("");
 
+  // Defaults to everything visible so the page renders normally even
+  // before this loads (or if the fetch fails) — an admin-configured
+  // hide is an explicit, positive action, so a slow/failed fetch must
+  // never accidentally hide a section nobody asked to hide.
+  const [sectionVisibility, setSectionVisibility] = useState({
+    map: true, flood_risk: true, infrastructure: true, resale_signal: true,
+    checklist: true, authority_contacts: true, cross_sell: true, share: true,
+  });
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/neighborhood-insights/section-visibility`)
+      .then((res) => res.json())
+      .then((data) => setSectionVisibility((prev) => ({ ...prev, ...data })))
+      .catch(() => {}); // keep the safe, all-visible default on any failure
+  }, []);
+
   const [poiState, setPoiState] = useState("idle"); // "idle" | "loading" | "done"
   const [poiDataByCat, setPoiDataByCat] = useState({});
   const [failedCategories, setFailedCategories] = useState([]);
@@ -105,6 +169,7 @@ function NeighborhoodInsights() {
   const mapRef = useRef(null);
   const mapContainerRef = useRef(null);
   const markersByCatRef = useRef({});
+  const propertyMarkerRef = useRef(null);
   const debounceRef = useRef(null);
 
   // Autocomplete against LocationIQ, same debounce/limit/countrycodes
@@ -146,7 +211,7 @@ function NeighborhoodInsights() {
 
     setResaleState("loading");
     try {
-      const res = await fetch(`${API_BASE}/api/neighborhood-insights/resale-signal?city=${encodeURIComponent(city)}&property_type=${encodeURIComponent(propertyType)}`);
+      const res = await fetchWithRetry(`${API_BASE}/api/neighborhood-insights/resale-signal?city=${encodeURIComponent(city)}&property_type=${encodeURIComponent(propertyType)}`);
       const data = await res.json();
       setResaleSignal(data);
       setResaleState("done");
@@ -199,8 +264,16 @@ function NeighborhoodInsights() {
     if (!mapRef.current) {
       justCreated = true;
       mapRef.current = L.map(mapContainerRef.current).setView([selectedPlace.lat, selectedPlace.lon], 15);
+      // Leaflet auto-adds its own "Leaflet" attribution link with no
+      // target="_blank" by default, alongside the custom LocationIQ/OSM
+      // attribution below (which already has one) -- removing the
+      // former via setPrefix(false) rather than leaving a second,
+      // un-target-blanked link on the page. Leaflet's own license
+      // doesn't require this credit; it's an opt-in convention, not
+      // an obligation.
+      mapRef.current.attributionControl.setPrefix(false);
       L.tileLayer(`https://{s}-tiles.locationiq.com/v3/streets/r/{z}/{x}/{y}.png?key=${LOCATIONIQ_TILE_KEY}`, {
-        attribution: '&copy; <a href="https://locationiq.com">LocationIQ</a> &copy; OpenStreetMap contributors',
+        attribution: '&copy; <a href="https://locationiq.com" target="_blank" rel="noopener noreferrer">LocationIQ</a> &copy; OpenStreetMap contributors',
         maxZoom: 19,
       }).addTo(mapRef.current);
     } else {
@@ -233,17 +306,34 @@ function NeighborhoodInsights() {
     // instead of the new location's real ones. Explicitly removing
     // every previous marker from the map AND resetting the ref to
     // empty, before starting the new search, is the actual fix.
+    //
+    // The real cause of "the map shows some unrendered names after
+    // changing location": the property marker itself (the single
+    // L.marker for the searched address, as opposed to the POI
+    // circleMarkers above) was NEVER tracked in a ref or removed at
+    // all — every new search added another one on top without ever
+    // clearing the previous search's marker or its bound popup text.
+    // Also explicitly closing any currently-open popup before removing
+    // anything: Leaflet's popup pane isn't strictly tied to its
+    // marker's own removeFrom() lifecycle, so a popup left open when
+    // the user searches again could otherwise linger as an orphaned
+    // label showing the previous location's name.
+    mapRef.current.closePopup();
     Object.values(markersByCatRef.current).forEach((markers) => {
       markers.forEach((m) => m.removeFrom(mapRef.current));
     });
     markersByCatRef.current = {};
+    if (propertyMarkerRef.current) {
+      propertyMarkerRef.current.removeFrom(mapRef.current);
+      propertyMarkerRef.current = null;
+    }
     Promise.resolve().then(() => {
       setPoiDataByCat({});
       setFailedCategories([]);
     });
 
     const markerLabel = propertyName.trim() || selectedPlace.label;
-    L.marker([selectedPlace.lat, selectedPlace.lon]).addTo(mapRef.current).bindPopup(`<b>${markerLabel}</b><br>${selectedPlace.label}`);
+    propertyMarkerRef.current = L.marker([selectedPlace.lat, selectedPlace.lon]).addTo(mapRef.current).bindPopup(`<b>${markerLabel}</b><br>${selectedPlace.label}`);
 
     let cancelled = false;
 
@@ -351,22 +441,22 @@ function NeighborhoodInsights() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedPlace.label)}`
     : "#";
   const shareText = propertyName.trim()
-    ? `Check out the neighborhood insights for ${propertyName.trim()} before buying: https://propertyiqweb.com/neighborhood-insights.html`
-    : `Check out this neighborhood insights tool before buying a property: https://propertyiqweb.com/neighborhood-insights.html`;
+    ? `Check out the neighborhood insights for ${propertyName.trim()} before buying: https://app.propertyiqweb.com/neighborhood-insights`
+    : `Check out this neighborhood insights tool before buying a property: https://app.propertyiqweb.com/neighborhood-insights`;
   const activeCat = POI_CATEGORIES.find((c) => c.key === activeCategory);
   const activePlaces = activeCategory ? poiDataByCat[activeCategory] || [] : [];
 
   return (
     <div className="ni-page">
       <div className="ni-top-banner">
-        🏠 Ready to buy? <a href="/">Get your free Instant Property Score with PropertyIQ →</a>
+        🏠 Ready to buy? <a href="/" target="_blank" rel="noopener noreferrer">Get your free Instant Property Score with PropertyIQ →</a>
       </div>
 
       <div className="ni-nav">
         <span className="ni-nav-brand">LivingIQ · Neighborhood Insights</span>
         <div className="ni-nav-links">
-          <a href="https://livingiqweb.com">← Back to LivingIQ</a>
-          <a href="/">PropertyIQ →</a>
+          <a href="https://livingiqweb.com" target="_blank" rel="noopener noreferrer">← Back to LivingIQ</a>
+          <a href="/" target="_blank" rel="noopener noreferrer">PropertyIQ →</a>
         </div>
       </div>
 
@@ -421,6 +511,7 @@ function NeighborhoodInsights() {
 
       {submitted && (
         <>
+          {sectionVisibility.map && (
           <div className="ni-map-card">
             <h3>Your neighborhood</h3>
             <div className="ni-category-chips">
@@ -477,7 +568,9 @@ function NeighborhoodInsights() {
 
             <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="ni-text-link">Open this location in Google Maps →</a>
           </div>
+          )}
 
+          {sectionVisibility.flood_risk && (
           <div className="ni-card">
             <h3>☔ Flood & waterlogging risk</h3>
             {waterState === "loading" && <p>Checking for nearby water bodies...</p>}
@@ -504,7 +597,9 @@ function NeighborhoodInsights() {
               </>
             )}
           </div>
+          )}
 
+          {sectionVisibility.infrastructure && (
           <div className="ni-card">
             <h3>🏗️ Upcoming infrastructure</h3>
             {infraState === "loading" && <p>Searching for current infrastructure news...</p>}
@@ -535,7 +630,9 @@ function NeighborhoodInsights() {
               <p className="ni-coming-soon">No reliable, current infrastructure information found for {city} — try checking your city's municipal or urban development authority website directly.</p>
             )}
           </div>
+          )}
 
+          {sectionVisibility.resale_signal && (
           <div className="ni-card">
             <h3>📈 Resale demand signal</h3>
             {resaleState === "loading" && <p>Checking comparable listings...</p>}
@@ -556,23 +653,29 @@ function NeighborhoodInsights() {
               <p className="ni-coming-soon">No comparable listing data for {city} yet — this app currently covers a growing set of cities, not all of them.</p>
             )}
           </div>
+          )}
 
+          {sectionVisibility.checklist && (
           <div className="ni-card">
             <h3>✅ Buyer's due-diligence checklist</h3>
             <ul className="ni-checklist">
               {CHECKLIST_ITEMS.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </div>
+          )}
 
+          {sectionVisibility.authority_contacts && (
           <div className="ni-card">
             <h3>📞 Local authority contacts</h3>
             <ul className="ni-contact-list">
-              {AUTHORITY_CONTACTS.map((c) => (
+              {getAuthorityContacts(extractStateFromLabel(selectedPlace?.label)).map((c) => (
                 <li key={c.label}><strong>{c.label}:</strong> {c.detail}</li>
               ))}
             </ul>
           </div>
+          )}
 
+          {sectionVisibility.cross_sell && (
           <div className="ni-cta-card">
             <h3>📋 PropertyIQ — Instant Property Score</h3>
             <p>Get a full price, location, and red-flag check on this property — free, no signup needed for the first check.</p>
@@ -581,17 +684,20 @@ function NeighborhoodInsights() {
               <li>🚩 Red flags checked against real comparable listings</li>
               <li>📊 Backed by the same data shown in this report</li>
             </ul>
-            <a href="/" className="ni-primary-btn ni-cta-btn">Try PropertyIQ →</a>
+            <a href="/" target="_blank" rel="noopener noreferrer" className="ni-primary-btn ni-cta-btn">Try PropertyIQ →</a>
           </div>
+          )}
 
+          {sectionVisibility.share && (
           <div className="ni-share-card">
             <h3>👨‍👩‍👧 Share this neighborhood report</h3>
             <p>Let your family or co-buyer see this before you decide — it takes 10 seconds.</p>
             <div className="ni-share-buttons">
               <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="ni-share-btn">Share via WhatsApp</a>
-              <a href={`sms:?body=${encodeURIComponent(shareText)}`} className="ni-share-btn">Share via SMS</a>
+              <a href={`sms:?body=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="ni-share-btn">Share via SMS</a>
             </div>
           </div>
+          )}
         </>
       )}
 

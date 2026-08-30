@@ -124,6 +124,8 @@ def test_nearby_proxies_locationiq_with_the_real_osm_tag_format(monkeypatch):
     tag (matching AccidentIQ's own POI_CATEGORIES format) unmodified."""
     import backend.api as api_module
     monkeypatch.setattr(api_module, "LOCATIONIQ_API_KEY", "pk.test_key_123")
+    monkeypatch.setattr(api_module, "get_app_setting", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "set_app_setting", lambda *a, **k: None)
 
     captured = {}
 
@@ -146,9 +148,18 @@ def test_nearby_gracefully_returns_empty_on_a_locationiq_failure_not_a_crash(mon
     """A real, important resilience property: if LocationIQ itself
     errors or times out, this must degrade to an empty result (letting
     the frontend fall back to its own Google Maps search link, same as
-    AccidentIQ's own loadPOIs does) rather than surface a raw 500."""
+    AccidentIQ's own loadPOIs does) rather than surface a raw 500.
+
+    Explicitly forces a cache miss (get_app_setting -> None) -- a real
+    test-isolation bug this fix closes: this test's own coordinates
+    round to the same cache key another test in this file uses for a
+    genuine success, and since caching now persists via the real,
+    shared database, that earlier success was silently short-circuiting
+    this test's mocked failure before it could ever be exercised."""
     import backend.api as api_module
     monkeypatch.setattr(api_module, "LOCATIONIQ_API_KEY", "pk.test_key_123")
+    monkeypatch.setattr(api_module, "get_app_setting", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "set_app_setting", lambda *a, **k: None)
 
     import requests as requests_module
 
@@ -173,9 +184,150 @@ def test_nearby_returns_503_when_key_is_not_configured(monkeypatch):
 def test_both_new_endpoints_are_genuinely_public_no_auth_required(monkeypatch):
     import backend.api as api_module
     monkeypatch.setattr(api_module, "LOCATIONIQ_API_KEY", "pk.test_key_123")
+    monkeypatch.setattr(api_module, "get_app_setting", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "set_app_setting", lambda *a, **k: None)
     monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: _FakeResponse(200, []))
 
     r1 = client.get("/api/neighborhood-insights/autocomplete?q=Test+Query")
     r2 = client.get("/api/neighborhood-insights/nearby?lat=17.41&lon=78.43&tag=amenity:hospital")
     assert r1.status_code == 200
     assert r2.status_code == 200
+
+
+from unittest.mock import patch, MagicMock
+
+
+def test_nearby_result_is_cached_by_rounded_coordinates_not_called_twice():
+    """The real, deliberate cost fix: this endpoint fires 7 times per
+    form submission, making it the dominant driver of LocationIQ usage
+    at scale (verified directly against LocationIQ's own published
+    pricing tiers). Confirms a second call for coordinates within the
+    same ~1km grid cell returns the cached result without a second
+    real LocationIQ request."""
+    fake_response = MagicMock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = [{"name": "Apollo Hospital", "lat": "17.41", "lon": "78.43"}]
+
+    with patch("backend.api.LOCATIONIQ_API_KEY", "fake_key"), \
+         patch("backend.api.get_app_setting", return_value=None), \
+         patch("backend.api.set_app_setting") as mock_set, \
+         patch("backend.api.requests.get", return_value=fake_response) as mock_get:
+        r1 = client.get("/api/neighborhood-insights/nearby?lat=17.4126&lon=78.4344&tag=amenity:hospital")
+        assert r1.status_code == 200
+        assert mock_get.call_count == 1
+        mock_set.assert_called_once()
+
+    # Second call, coordinates within the same ~1km grid cell (rounds
+    # to the same 2-decimal value) -- should hit the cache, not LocationIQ.
+    cached_json = mock_set.call_args[0][1]
+    with patch("backend.api.LOCATIONIQ_API_KEY", "fake_key"), \
+         patch("backend.api.get_app_setting", return_value=cached_json), \
+         patch("backend.api.requests.get") as mock_get2:
+        r2 = client.get("/api/neighborhood-insights/nearby?lat=17.4129&lon=78.4341&tag=amenity:hospital")
+        assert r2.status_code == 200
+        mock_get2.assert_not_called()
+        assert r2.json() == [{"name": "Apollo Hospital", "lat": "17.41", "lon": "78.43"}]
+
+
+def test_nearby_coordinates_far_apart_do_not_share_a_cache_entry():
+    """Confirms the cache is genuinely coordinate-scoped -- two
+    genuinely distant locations must not accidentally share results."""
+    fake_response = MagicMock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = [{"name": "Somewhere", "lat": "17.41", "lon": "78.43"}]
+
+    with patch("backend.api.LOCATIONIQ_API_KEY", "fake_key"), \
+         patch("backend.api.get_app_setting", return_value=None), \
+         patch("backend.api.set_app_setting"), \
+         patch("backend.api.requests.get", return_value=fake_response) as mock_get:
+        client.get("/api/neighborhood-insights/nearby?lat=17.4126&lon=78.4344&tag=amenity:hospital")
+        # A different city entirely -- get_app_setting is still mocked to
+        # return None (simulating a genuine cache miss for this different key)
+        client.get("/api/neighborhood-insights/nearby?lat=19.0760&lon=72.8777&tag=amenity:hospital")
+        assert mock_get.call_count == 2
+
+
+def test_an_empty_nearby_result_is_never_cached():
+    """A real, deliberate choice: caching an empty result (a transient
+    LocationIQ hiccup or rate limit) would mean a genuine neighborhood
+    incorrectly shows "nothing found" for a full week."""
+    fake_response = MagicMock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = []
+
+    with patch("backend.api.LOCATIONIQ_API_KEY", "fake_key"), \
+         patch("backend.api.get_app_setting", return_value=None), \
+         patch("backend.api.set_app_setting") as mock_set, \
+         patch("backend.api.requests.get", return_value=fake_response):
+        r = client.get("/api/neighborhood-insights/nearby?lat=17.4126&lon=78.4344&tag=amenity:hospital")
+        assert r.status_code == 200
+        assert r.json() == []
+
+    mock_set.assert_not_called()
+
+
+def test_section_visibility_defaults_all_sections_to_visible():
+    """A fresh install (or a section added after this feature shipped)
+    must never silently disappear just because it isn't yet in the
+    saved config -- everything defaults to visible until an admin
+    explicitly hides something."""
+    with patch("backend.api.get_app_setting", return_value=None):
+        r = client.get("/api/neighborhood-insights/section-visibility")
+    assert r.status_code == 200
+    data = r.json()
+    for section in ["map", "flood_risk", "infrastructure", "resale_signal", "checklist", "authority_contacts", "cross_sell", "share"]:
+        assert data[section] is True
+
+
+def test_admin_can_hide_a_specific_section_without_auth_required_on_read():
+    """The read endpoint stays public (matching every other
+    neighborhood-insights endpoint's own free/no-signup reasoning) --
+    only the write requires the admin password."""
+    import json as json_module
+    saved_state = {}
+
+    def fake_get_app_setting(key):
+        return json_module.dumps(saved_state.get(key)) if key in saved_state else None
+
+    def fake_set_app_setting(key, value):
+        saved_state[key] = json_module.loads(value)
+
+    with patch("backend.api.get_app_setting", side_effect=fake_get_app_setting), \
+         patch("backend.api.set_app_setting", side_effect=fake_set_app_setting), \
+         patch("backend.api._require_admin_password"):
+        r = client.post("/api/admin/settings", json={"password": "test", "ni_section_visibility": {"infrastructure": False}})
+        assert r.status_code == 200
+        assert r.json()["ni_section_visibility"]["infrastructure"] is False
+        assert r.json()["ni_section_visibility"]["map"] is True  # untouched sections stay at their default
+
+        # The public read endpoint reflects the same change, no auth needed
+        r2 = client.get("/api/neighborhood-insights/section-visibility")
+        assert r2.json()["infrastructure"] is False
+        assert r2.json()["map"] is True
+
+
+def test_admin_settings_requires_the_real_admin_password_to_change_visibility():
+    r = client.post("/api/admin/settings", json={"password": "definitely_wrong_password", "ni_section_visibility": {"map": False}})
+    assert r.status_code == 403
+
+
+def test_toggling_one_section_does_not_reset_a_previously_hidden_one():
+    """Confirms the merge behavior: an admin toggling section B off in
+    one request must not silently reset section A back to its default
+    if A was already hidden in an earlier request."""
+    import json as json_module
+    saved_state = {}
+
+    def fake_get_app_setting(key):
+        return json_module.dumps(saved_state.get(key)) if key in saved_state else None
+
+    def fake_set_app_setting(key, value):
+        saved_state[key] = json_module.loads(value)
+
+    with patch("backend.api.get_app_setting", side_effect=fake_get_app_setting), \
+         patch("backend.api.set_app_setting", side_effect=fake_set_app_setting), \
+         patch("backend.api._require_admin_password"):
+        client.post("/api/admin/settings", json={"password": "test", "ni_section_visibility": {"infrastructure": False}})
+        r = client.post("/api/admin/settings", json={"password": "test", "ni_section_visibility": {"share": False}})
+        assert r.json()["ni_section_visibility"]["infrastructure"] is False
+        assert r.json()["ni_section_visibility"]["share"] is False
