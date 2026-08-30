@@ -44,6 +44,31 @@ const POI_CATEGORIES = [
 // list -- researched per-country (property title/ownership systems,
 // the real regulator, and the real foreign-ownership constraint that
 // actually applies there), not assumed from the Indian version.
+// Same real mechanism App.jsx's own triggerGoogleTranslation uses —
+// drives the Google Translate widget's hidden .goog-te-combo <select>
+// programmatically, since Google Translate doesn't expose any other
+// public API for triggering a translation. Not exported/shared from
+// App.jsx directly (this page is a genuinely separate entry point,
+// see neighborhood-insights.html's own comment on why) so this is a
+// deliberate, exact copy rather than an import, kept identical
+// (including the "no early-return for a falsy/English language"
+// behavior) so this page's translation behavior matches the main
+// app's exactly, not a slightly different reimplementation.
+function triggerGoogleTranslation(languageCode) {
+  const apply = () => {
+    const select = document.querySelector(".goog-te-combo");
+    if (!select) return false;
+    select.value = languageCode;
+    select.dispatchEvent(new Event("change"));
+    return true;
+  };
+
+  if (!apply()) {
+    window.setTimeout(apply, 500);
+    window.setTimeout(apply, 1500);
+  }
+}
+
 const COUNTRY_CONFIG = {
   "": {
     name: "India", isoCode: "in", currency: "INR", currencySymbol: "₹",
@@ -66,7 +91,7 @@ const COUNTRY_CONFIG = {
     ],
   },
   th: {
-    name: "Thailand", isoCode: "th", currency: "THB", currencySymbol: "฿",
+    name: "Thailand", isoCode: "th", currency: "THB", currencySymbol: "฿", language: "th",
     localityExample: "Sukhumvit, or the nearest main road", cityExample: "Bangkok", homePath: "/th",
     checklist: [
       "Verify the title is a Chanote (Nor Sor 4 Jor) — the only Thai title conferring full, GPS-surveyed ownership; lower-grade titles (Nor Sor 3, Nor Sor 3 Gor, Sor Kor 1) do not",
@@ -99,7 +124,7 @@ const COUNTRY_CONFIG = {
     ],
   },
   vn: {
-    name: "Vietnam", isoCode: "vn", currency: "VND", currencySymbol: "₫",
+    name: "Vietnam", isoCode: "vn", currency: "VND", currencySymbol: "₫", language: "vi",
     localityExample: "District 1, or the nearest main road", cityExample: "Ho Chi Minh City", homePath: "/vn",
     checklist: [
       "Verify the seller's Pink Book (Sổ Hồng — Certificate of Land Use Rights and Ownership of Assets) is genuine and the named owner matches the seller",
@@ -115,7 +140,7 @@ const COUNTRY_CONFIG = {
     ],
   },
   id: {
-    name: "Indonesia", isoCode: "id", currency: "IDR", currencySymbol: "Rp",
+    name: "Indonesia", isoCode: "id", currency: "IDR", currencySymbol: "Rp", language: "id",
     localityExample: "Kuta, or the nearest main road", cityExample: "Jakarta", homePath: "/id",
     checklist: [
       "Confirm the certificate type — Hak Milik (freehold) is reserved for Indonesian citizens only; foreigners can hold Hak Pakai (right to use) or access Hak Guna Bangunan (right to build) via a PT PMA company",
@@ -255,6 +280,19 @@ function NeighborhoodInsights({ countryCode }) {
     }
     meta.setAttribute("content", `Free tool: see real hospitals, schools, markets, banks, and public transport near any property in ${country.name}, plus a buyer's due-diligence checklist and resale demand signal — before you decide.`);
   }, [country.name]);
+
+  // The real, direct fix for country-prefixed URLs (/th, /vn, /id)
+  // still rendering entirely in English: this page never triggered
+  // Google Translate at all, on top of neighborhood-insights.html
+  // itself never even loading the widget script (fixed alongside this).
+  // Deliberately still calls this for India/Philippines too (language
+  // is undefined for both) -- App.jsx's own triggerGoogleTranslation
+  // has no early-return for a falsy language either, so "en" is what
+  // actually runs, matching its own documented reasoning: reverting to
+  // English still needs the same explicit widget trigger, not silence.
+  useEffect(() => {
+    triggerGoogleTranslation(country.language || "en");
+  }, [country.language]);
 
   const [poiState, setPoiState] = useState("idle"); // "idle" | "loading" | "done"
   const [poiDataByCat, setPoiDataByCat] = useState({});

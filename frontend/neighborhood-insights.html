@@ -38,8 +38,28 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- Same Google Translate widget as index.html, needed for exactly
+    the same reason: App.jsx's own triggerGoogleTranslation() drives this
+    widget's hidden .goog-te-combo <select> programmatically for /th,
+    /vn, /id visitors — without this script and div present on THIS
+    page too, that mechanism has nothing to actually drive, which is
+    the real, direct cause of country-prefixed URLs still rendering in
+    English. This being a genuinely separate static HTML file (see the
+    comment above on why) means it never inherited index.html's own
+    copy of this — it needed its own. -->
+    <script>
+      window.googleTranslateElementInit = function () {
+        new google.translate.TranslateElement({
+          pageLanguage: "en",
+          includedLanguages: "af,am,ar,az,bg,bn,bs,ca,cs,cy,da,de,el,en,es,et,eu,fa,fi,fil,fr,ga,gl,gu,he,hi,hr,hu,hy,id,is,it,ja,ka,kk,km,kn,ko,lo,lt,lv,mk,ml,mn,mr,ms,my,ne,nl,no,or,pa,pl,pt,ro,ru,si,sk,sl,sq,sr,sv,sw,ta,te,th,tr,uk,ur,uz,vi,zh-CN,zh-TW,zu,xh",
+          autoDisplay: false
+        }, "google_translate_element");
+      };
+    </script>
+    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
   </head>
   <body>
+    <div id="google_translate_element" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
