@@ -3,11 +3,27 @@ import { studioApi } from "./studioApi";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
 
+// The menu items shown on the admin landing screen, matching
+// AccidentIQ's own real admin-dashboard.html pattern exactly: a
+// label, a short description, and a `screen` key the tile navigates
+// to on click — clean segregation into sections, each reached by
+// clicking its own tile, rather than one long page with everything
+// visible at once.
+const MENU_ITEMS = [
+  { screen: "overview", label: "Overview & Analytics", desc: "Subscription counts, insight purchases, and estimated revenue." },
+  { screen: "tiers", label: "Tier Configuration", desc: "Prices, quotas, and which features each tier includes." },
+  { screen: "gemini", label: "Property URL Import — Gemini API Key", desc: "The LLM fallback key used when free structured-data extraction isn't enough." },
+  { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
+  { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
+  { screen: "grants", label: "Insight Add-on Grants", desc: "Every Insight Add-on purchase and who it was granted to." },
+];
+
 function AdminPanel({ onBack }) {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [screen, setScreen] = useState("menu");
 
   const [tierConfig, setTierConfig] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -185,24 +201,26 @@ function AdminPanel({ onBack }) {
 
   if (!authed) {
     return (
-      <div className="studio-panel">
-        <h2>Admin Access</h2>
-        <p className="studio-subtext">Enter the admin password to manage tiers and view activity.</p>
-        <form onSubmit={login}>
-          {error && <div className="studio-error">{error}</div>}
-          <input
-            type="password"
-            placeholder="Admin password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-            required
-          />
-          <button className="studio-cta-btn" type="submit" disabled={loading} style={{ width: "100%" }}>
-            {loading ? "Checking..." : "Enter"}
-          </button>
-        </form>
-        <span className="studio-back-link" onClick={onBack}>← Back</span>
+      <div className="admin-login-wrap">
+        <div className="admin-login-card">
+          <h2>Admin Access</h2>
+          <p className="admin-login-subtitle">Enter the admin password to manage tiers and view activity.</p>
+          <form onSubmit={login}>
+            {error && <div className="admin-login-error">{error}</div>}
+            <input
+              type="password"
+              placeholder="Admin password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              required
+            />
+            <button className="admin-login-btn" type="submit" disabled={loading}>
+              {loading ? "Checking..." : "Enter"}
+            </button>
+          </form>
+          <span className="admin-login-back" onClick={onBack}>← Back</span>
+        </div>
       </div>
     );
   }
@@ -212,7 +230,7 @@ function AdminPanel({ onBack }) {
       <div className="admin-dashboard-header">
         <div>
           <div className="admin-dashboard-eyebrow">PropertyIQ Studio</div>
-          <h2>Admin Dashboard</h2>
+          <h2>{screen === "menu" ? "Admin Dashboard" : MENU_ITEMS.find((i) => i.screen === screen)?.label}</h2>
         </div>
         <span className="admin-refresh-btn" onClick={refresh}>⟳ Refresh</span>
       </div>
@@ -224,287 +242,343 @@ function AdminPanel({ onBack }) {
       )}
       {saveMessage && <div className="studio-status-banner">{saveMessage}</div>}
 
-      <div className="admin-stats-row">
-        <div className="admin-stat-card admin-stat-purple">
-          <div className="admin-stat-value">{activeSubCount}</div>
-          <div className="admin-stat-label">Active Subscriptions</div>
-        </div>
-        <div className="admin-stat-card admin-stat-blue">
-          <div className="admin-stat-value">{subscriptions.length}</div>
-          <div className="admin-stat-label">Total Subscription Records</div>
-        </div>
-        <div className="admin-stat-card admin-stat-green">
-          <div className="admin-stat-value">{grants.length}</div>
-          <div className="admin-stat-label">Insight Add-on Purchases</div>
-        </div>
-        <div className="admin-stat-card admin-stat-slate">
-          <div className="admin-stat-value">{TIER_ORDER.filter((id) => tierConfig?.[id]).length}</div>
-          <div className="admin-stat-label">Configured Tiers</div>
-        </div>
-      </div>
-
-      {revenueAnalytics && (
-        <div className="admin-section admin-section-amber">
-          <h3>Revenue Analytics</h3>
-          <p className="admin-empty-note" style={{ marginTop: -6, marginBottom: 16 }}>
-            Estimated from configured list prices × real counts — not live Dodo transaction
-            data, so this won't reflect discounts, refunds, or mid-cycle plan changes.
-          </p>
-
-          <div className="admin-stats-row" style={{ marginBottom: 20 }}>
-            <div className="admin-stat-card admin-stat-purple">
-              <div className="admin-stat-value">${revenueAnalytics.estimatedMrrUsd.toLocaleString()}</div>
-              <div className="admin-stat-label">Estimated MRR (subscriptions)</div>
-            </div>
-            <div className="admin-stat-card admin-stat-green">
-              <div className="admin-stat-value">${revenueAnalytics.insightRevenueUsd.toLocaleString()}</div>
-              <div className="admin-stat-label">Insight Add-on Revenue (one-time, all-time)</div>
-            </div>
+      {screen === "menu" && (
+        <>
+          <p className="admin-menu-subtitle">Choose a section.</p>
+          <div className="admin-menu-grid">
+            {MENU_ITEMS.map((item) => (
+              <div key={item.screen} className="menu-tile" onClick={() => setScreen(item.screen)}>
+                <div className="menu-tile-label">{item.label}</div>
+                <div className="menu-tile-desc">{item.desc}</div>
+              </div>
+            ))}
           </div>
-
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr><th>Tier</th><th>Active Subscribers</th><th>Price (USD/mo)</th><th>Subtotal (USD/mo)</th></tr>
-              </thead>
-              <tbody>
-                {revenueAnalytics.subscriptionTiers.map((t) => (
-                  <tr key={t.tierId}>
-                    <td>{t.label}</td>
-                    <td>{t.activeCount}</td>
-                    <td>${t.priceUsd}</td>
-                    <td>${t.subtotalUsd.toLocaleString()}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td><strong>Insight Add-on</strong></td>
-                  <td>{grants.length} purchase{grants.length === 1 ? "" : "s"}</td>
-                  <td>${revenueAnalytics.insightPriceUsd}</td>
-                  <td>${revenueAnalytics.insightRevenueUsd.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </>
       )}
 
-      <div className="admin-section admin-section-purple">
-        <h3>Tier Configuration</h3>
-        <div className="admin-tier-row admin-tier-row-header">
-          <span>Tier</span><span>Price (USD)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Max price watches (blank = unlimited)</span><span>Label</span>
-        </div>
-        {TIER_ORDER.filter((id) => tierConfig?.[id]).map((tierId) => {
-          const tier = tierConfig[tierId];
-          return (
-            <Fragment key={tierId}>
-              <div className="admin-tier-row">
-                <span className="admin-tier-row-name">{tierId}</span>
-                <input
-                  type="number"
-                  placeholder="Price (USD)"
-                  value={tier.price_usd}
-                  onChange={(e) => updateTierField(tierId, "price_usd", Number(e.target.value))}
-                />
-                <input
-                  type="number"
-                  value={tier.design_quota_per_month ?? ""}
-                  placeholder="unlimited"
-                  onChange={(e) =>
-                    updateTierField(tierId, "design_quota_per_month", e.target.value === "" ? null : Number(e.target.value))
-                  }
-                />
-                <input
-                  type="number"
-                  value={tier.saved_designs_limit ?? ""}
-                  placeholder="unlimited"
-                  onChange={(e) =>
-                    updateTierField(tierId, "saved_designs_limit", e.target.value === "" ? null : Number(e.target.value))
-                  }
-                />
-                <input
-                  type="number"
-                  value={tier.max_price_watches ?? ""}
-                  placeholder="unlimited watches"
-                  title="Max active Price Drop Alert watches this tier can have at once — leave blank for unlimited"
-                  onChange={(e) =>
-                    updateTierField(tierId, "max_price_watches", e.target.value === "" ? null : Number(e.target.value))
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder="Label"
-                  value={tier.label}
-                  onChange={(e) => updateTierField(tierId, "label", e.target.value)}
-                />
-              </div>
-              <div className="admin-tier-features-row">
-                <span className="admin-tier-features-label">Features:</span>
-                {allFeatures.map((feature) => (
-                  <label key={feature} className="admin-feature-checkbox" title={`Toggle ${feature} for this tier — takes effect immediately everywhere once saved`}>
-                    <input
-                      type="checkbox"
-                      checked={(tier.features || []).includes(feature)}
-                      onChange={() => toggleTierFeature(tierId, feature)}
-                    />
-                    {feature}
-                  </label>
-                ))}
-              </div>
-              {tierId === "insight_addon" && (
-                <div className="admin-tier-features-row" title="Free: similar-property suggestions are available to everyone, no purchase — the buy button disappears. Paid: the current behavior — a purchase or active subscription is required, and the panel stays hidden until unlocked.">
-                  <span className="admin-tier-features-label">Mode:</span>
-                  <label className="admin-feature-checkbox">
-                    <input
-                      type="radio"
-                      name="insight-addon-mode"
-                      checked={(tier.mode ?? "paid") === "paid"}
-                      onChange={() => updateTierField(tierId, "mode", "paid")}
-                    />
-                    Paid (default — requires purchase or subscription)
-                  </label>
-                  <label className="admin-feature-checkbox">
-                    <input
-                      type="radio"
-                      name="insight-addon-mode"
-                      checked={tier.mode === "free"}
-                      onChange={() => updateTierField(tierId, "mode", "free")}
-                    />
-                    Free (available to everyone, no purchase)
-                  </label>
+      {screen === "overview" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-stats-row">
+            <div className="admin-stat-card admin-stat-purple">
+              <div className="admin-stat-value">{activeSubCount}</div>
+              <div className="admin-stat-label">Active Subscriptions</div>
+            </div>
+            <div className="admin-stat-card admin-stat-blue">
+              <div className="admin-stat-value">{subscriptions.length}</div>
+              <div className="admin-stat-label">Total Subscription Records</div>
+            </div>
+            <div className="admin-stat-card admin-stat-green">
+              <div className="admin-stat-value">{grants.length}</div>
+              <div className="admin-stat-label">Insight Add-on Purchases</div>
+            </div>
+            <div className="admin-stat-card admin-stat-slate">
+              <div className="admin-stat-value">{TIER_ORDER.filter((id) => tierConfig?.[id]).length}</div>
+              <div className="admin-stat-label">Configured Tiers</div>
+            </div>
+          </div>
+
+          {revenueAnalytics && (
+            <div className="admin-section admin-section-amber">
+              <h3>Revenue Analytics</h3>
+              <p className="admin-empty-note" style={{ marginTop: -6, marginBottom: 16 }}>
+                Estimated from configured list prices × real counts — not live Dodo transaction
+                data, so this won't reflect discounts, refunds, or mid-cycle plan changes.
+              </p>
+
+              <div className="admin-stats-row" style={{ marginBottom: 20 }}>
+                <div className="admin-stat-card admin-stat-purple">
+                  <div className="admin-stat-value">${revenueAnalytics.estimatedMrrUsd.toLocaleString()}</div>
+                  <div className="admin-stat-label">Estimated MRR (subscriptions)</div>
                 </div>
-              )}
-            </Fragment>
-          );
-        })}
-        <div className="admin-tier-features-row" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #ede4fc" }}>
-          <span className="admin-tier-features-label">Hide from main page (all tiers):</span>
-          {allFeatures.map((feature) => (
-            <button
-              key={feature}
-              type="button"
-              className="admin-feature-hide-btn"
-              title={`Removes ${feature} from every tier at once, hiding it from the main page entirely — same as unchecking it above on each tier, just in one click. Requires Save Changes below to take effect.`}
-              onClick={() => hideFeatureEverywhere(feature)}
-            >
-              Hide {feature}
-            </button>
-          ))}
-        </div>
-        <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveTiers} disabled={loading}>
-          {loading ? "Saving..." : "Save Changes"}
-        </button>
-      </div>
+                <div className="admin-stat-card admin-stat-green">
+                  <div className="admin-stat-value">${revenueAnalytics.insightRevenueUsd.toLocaleString()}</div>
+                  <div className="admin-stat-label">Insight Add-on Revenue (one-time, all-time)</div>
+                </div>
+              </div>
 
-      <div className="admin-section admin-section-purple">
-        <h3>Property URL Import — Gemini API Key</h3>
-        <p className="admin-section-note">
-          Used only as a fallback when the free structured-data extraction path (schema.org / Open Graph
-          metadata already on the page) doesn't find enough — many imports cost nothing at all beyond this.
-          Status: <strong>{geminiKeyConfigured ? "Configured" : "Not set"}</strong> (the key itself is never
-          shown back once saved, for security).
-        </p>
-        <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto" }}>
-          <input
-            type="password"
-            placeholder={geminiKeyConfigured ? "Enter a new key to replace the current one" : "Enter your Gemini API key"}
-            value={geminiKeyInput}
-            onChange={(e) => setGeminiKeyInput(e.target.value)}
-          />
-          <button className="cs-nav-btn cs-nav-primary" onClick={saveGeminiKey} disabled={loading || !geminiKeyInput.trim()}>
-            {loading ? "Saving..." : "Save Key"}
-          </button>
-        </div>
-        {geminiSaveMessage && <div className="studio-status-banner">{geminiSaveMessage}</div>}
-      </div>
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr><th>Tier</th><th>Active Subscribers</th><th>Price (USD/mo)</th><th>Subtotal (USD/mo)</th></tr>
+                  </thead>
+                  <tbody>
+                    {revenueAnalytics.subscriptionTiers.map((t) => (
+                      <tr key={t.tierId}>
+                        <td>{t.label}</td>
+                        <td>{t.activeCount}</td>
+                        <td>${t.priceUsd}</td>
+                        <td>${t.subtotalUsd.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td><strong>Insight Add-on</strong></td>
+                      <td>{grants.length} purchase{grants.length === 1 ? "" : "s"}</td>
+                      <td>${revenueAnalytics.insightPriceUsd}</td>
+                      <td>${revenueAnalytics.insightRevenueUsd.toLocaleString()}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
-      <div className="admin-section">
-        <h3>Neighborhood Insights — Page Sections</h3>
-        <p className="admin-section-note">
-          Show or hide any section of the public Neighborhood Insights page without a code change or
-          redeploy — useful for temporarily hiding a section (e.g. Infrastructure) while sorting out an
-          issue with it, without taking the whole page down.
-        </p>
-        {niSectionVisibility ? (
-          <>
-            <div className="admin-tier-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-              {[
-                { key: "map", label: "Neighborhood map (nearby places)" },
-                { key: "flood_risk", label: "Flood & waterlogging risk" },
-                { key: "infrastructure", label: "Upcoming infrastructure" },
-                { key: "resale_signal", label: "Resale demand signal" },
-                { key: "checklist", label: "Buyer's due-diligence checklist" },
-                { key: "authority_contacts", label: "Local authority contacts" },
-                { key: "cross_sell", label: "PropertyIQ cross-sell card" },
-                { key: "share", label: "Share this report" },
-              ].map(({ key, label }) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input type="checkbox" checked={!!niSectionVisibility[key]} onChange={() => toggleNiSection(key)} />
-                  {label}
-                </label>
+      {screen === "tiers" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section admin-section-purple">
+            <h3>Tier Configuration</h3>
+            <div className="admin-tier-row admin-tier-row-header">
+              <span>Tier</span><span>Price (USD)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Max price watches (blank = unlimited)</span><span>Label</span>
+            </div>
+            {TIER_ORDER.filter((id) => tierConfig?.[id]).map((tierId) => {
+              const tier = tierConfig[tierId];
+              return (
+                <Fragment key={tierId}>
+                  <div className="admin-tier-row">
+                    <span className="admin-tier-row-name">{tierId}</span>
+                    <input
+                      type="number"
+                      placeholder="Price (USD)"
+                      value={tier.price_usd}
+                      onChange={(e) => updateTierField(tierId, "price_usd", Number(e.target.value))}
+                    />
+                    <input
+                      type="number"
+                      value={tier.design_quota_per_month ?? ""}
+                      placeholder="unlimited"
+                      onChange={(e) =>
+                        updateTierField(tierId, "design_quota_per_month", e.target.value === "" ? null : Number(e.target.value))
+                      }
+                    />
+                    <input
+                      type="number"
+                      value={tier.saved_designs_limit ?? ""}
+                      placeholder="unlimited"
+                      onChange={(e) =>
+                        updateTierField(tierId, "saved_designs_limit", e.target.value === "" ? null : Number(e.target.value))
+                      }
+                    />
+                    <input
+                      type="number"
+                      value={tier.max_price_watches ?? ""}
+                      placeholder="unlimited watches"
+                      title="Max active Price Drop Alert watches this tier can have at once — leave blank for unlimited"
+                      onChange={(e) =>
+                        updateTierField(tierId, "max_price_watches", e.target.value === "" ? null : Number(e.target.value))
+                      }
+                    />
+                    <input
+                      type="text"
+                      placeholder="Label"
+                      value={tier.label}
+                      onChange={(e) => updateTierField(tierId, "label", e.target.value)}
+                    />
+                  </div>
+                  <div className="admin-tier-features-row">
+                    <span className="admin-tier-features-label">Features:</span>
+                    {allFeatures.map((feature) => (
+                      <label key={feature} className="admin-feature-checkbox" title={`Toggle ${feature} for this tier — takes effect immediately everywhere once saved`}>
+                        <input
+                          type="checkbox"
+                          checked={(tier.features || []).includes(feature)}
+                          onChange={() => toggleTierFeature(tierId, feature)}
+                        />
+                        {feature}
+                      </label>
+                    ))}
+                  </div>
+                  {tierId === "insight_addon" && (
+                    <div className="admin-tier-features-row" title="Free: similar-property suggestions are available to everyone, no purchase — the buy button disappears. Paid: the current behavior — a purchase or active subscription is required, and the panel stays hidden until unlocked.">
+                      <span className="admin-tier-features-label">Mode:</span>
+                      <label className="admin-feature-checkbox">
+                        <input
+                          type="radio"
+                          name="insight-addon-mode"
+                          checked={(tier.mode ?? "paid") === "paid"}
+                          onChange={() => updateTierField(tierId, "mode", "paid")}
+                        />
+                        Paid (default — requires purchase or subscription)
+                      </label>
+                      <label className="admin-feature-checkbox">
+                        <input
+                          type="radio"
+                          name="insight-addon-mode"
+                          checked={tier.mode === "free"}
+                          onChange={() => updateTierField(tierId, "mode", "free")}
+                        />
+                        Free (available to everyone, no purchase)
+                      </label>
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
+            <div className="admin-tier-features-row" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--grey-200, #d6e4ec)" }}>
+              <span className="admin-tier-features-label">Hide from main page (all tiers):</span>
+              {allFeatures.map((feature) => (
+                <button
+                  key={feature}
+                  type="button"
+                  className="admin-feature-hide-btn"
+                  title={`Removes ${feature} from every tier at once, hiding it from the main page entirely — same as unchecking it above on each tier, just in one click. Requires Save Changes below to take effect.`}
+                  onClick={() => hideFeatureEverywhere(feature)}
+                >
+                  Hide {feature}
+                </button>
               ))}
             </div>
-            <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 12 }} onClick={saveNiSectionVisibility} disabled={loading}>
-              {loading ? "Saving..." : "Save"}
+            <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveTiers} disabled={loading}>
+              {loading ? "Saving..." : "Save Changes"}
             </button>
-            {niVisibilitySaveMessage && <div className="studio-status-banner">{niVisibilitySaveMessage}</div>}
-          </>
-        ) : (
-          <p className="admin-empty-note">Loading...</p>
-        )}
-      </div>
-
-      <div className="admin-section admin-section-blue">
-        <h3>Active Subscriptions ({subscriptions.length})</h3>
-        {subscriptions.length === 0 ? (
-          <p className="admin-empty-note">No subscriptions yet.</p>
-        ) : (
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr><th>Email</th><th>Tier</th><th>Status</th><th>Updated</th></tr>
-              </thead>
-              <tbody>
-                {subscriptions.map((s) => (
-                  <tr key={s.email}>
-                    <td>{s.email}</td>
-                    <td>{s.tier_id}</td>
-                    <td>
-                      <span className={`admin-status-badge ${s.status === "active" ? "admin-status-active" : "admin-status-other"}`}>
-                        {s.status}
-                      </span>
-                    </td>
-                    <td>{new Date(s.updated_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      <div className="admin-section admin-section-green">
-        <h3>Insight Add-on Grants ({grants.length})</h3>
-        {grants.length === 0 ? (
-          <p className="admin-empty-note">No Insight purchases yet.</p>
-        ) : (
-          <div className="admin-table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr><th>Report ID</th><th>Email</th><th>Granted</th></tr>
-              </thead>
-              <tbody>
-                {grants.map((g, i) => (
-                  <tr key={i}>
-                    <td>{g.report_id}</td>
-                    <td>{g.user_email}</td>
-                    <td>{new Date(g.granted_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {screen === "gemini" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section admin-section-purple">
+            <h3>Property URL Import — Gemini API Key</h3>
+            <p className="admin-section-note">
+              Used only as a fallback when the free structured-data extraction path (schema.org / Open Graph
+              metadata already on the page) doesn't find enough — many imports cost nothing at all beyond this.
+              Status: <strong>{geminiKeyConfigured ? "Configured" : "Not set"}</strong> (the key itself is never
+              shown back once saved, for security).
+            </p>
+            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto" }}>
+              <input
+                type="password"
+                placeholder={geminiKeyConfigured ? "Enter a new key to replace the current one" : "Enter your Gemini API key"}
+                value={geminiKeyInput}
+                onChange={(e) => setGeminiKeyInput(e.target.value)}
+              />
+              <button className="cs-nav-btn cs-nav-primary" onClick={saveGeminiKey} disabled={loading || !geminiKeyInput.trim()}>
+                {loading ? "Saving..." : "Save Key"}
+              </button>
+            </div>
+            {geminiSaveMessage && <div className="studio-status-banner">{geminiSaveMessage}</div>}
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {screen === "neighborhood" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section">
+            <h3>Neighborhood Insights — Page Sections</h3>
+            <p className="admin-section-note">
+              Show or hide any section of the public Neighborhood Insights page without a code change or
+              redeploy — useful for temporarily hiding a section (e.g. Infrastructure) while sorting out an
+              issue with it, without taking the whole page down.
+            </p>
+            {niSectionVisibility ? (
+              <>
+                {[
+                  { key: "map", label: "Neighborhood map (nearby places)" },
+                  { key: "flood_risk", label: "Flood & waterlogging risk" },
+                  { key: "infrastructure", label: "Upcoming infrastructure" },
+                  { key: "resale_signal", label: "Resale demand signal" },
+                  { key: "checklist", label: "Buyer's due-diligence checklist" },
+                  { key: "authority_contacts", label: "Local authority contacts" },
+                  { key: "cross_sell", label: "PropertyIQ cross-sell card" },
+                  { key: "share", label: "Share this report" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="admin-toggle-row">
+                    <label htmlFor={`ni-toggle-${key}`}>{label}</label>
+                    <span className="admin-switch">
+                      <input
+                        id={`ni-toggle-${key}`}
+                        type="checkbox"
+                        checked={!!niSectionVisibility[key]}
+                        onChange={() => toggleNiSection(key)}
+                      />
+                      <span className="admin-slider"></span>
+                    </span>
+                  </div>
+                ))}
+                <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveNiSectionVisibility} disabled={loading}>
+                  {loading ? "Saving..." : "Save"}
+                </button>
+                {niVisibilitySaveMessage && <div className="studio-status-banner">{niVisibilitySaveMessage}</div>}
+              </>
+            ) : (
+              <p className="admin-empty-note">Loading...</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "subscriptions" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section admin-section-blue">
+            <h3>Active Subscriptions ({subscriptions.length})</h3>
+            {subscriptions.length === 0 ? (
+              <p className="admin-empty-note">No subscriptions yet.</p>
+            ) : (
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr><th>Email</th><th>Tier</th><th>Status</th><th>Updated</th></tr>
+                  </thead>
+                  <tbody>
+                    {subscriptions.map((s) => (
+                      <tr key={s.email}>
+                        <td>{s.email}</td>
+                        <td>{s.tier_id}</td>
+                        <td>
+                          <span className={`admin-status-badge ${s.status === "active" ? "admin-status-active" : "admin-status-other"}`}>
+                            {s.status}
+                          </span>
+                        </td>
+                        <td>{new Date(s.updated_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "grants" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section admin-section-green">
+            <h3>Insight Add-on Grants ({grants.length})</h3>
+            {grants.length === 0 ? (
+              <p className="admin-empty-note">No Insight purchases yet.</p>
+            ) : (
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr><th>Report ID</th><th>Email</th><th>Granted</th></tr>
+                  </thead>
+                  <tbody>
+                    {grants.map((g, i) => (
+                      <tr key={i}>
+                        <td>{g.report_id}</td>
+                        <td>{g.user_email}</td>
+                        <td>{new Date(g.granted_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       <span className="studio-back-link" onClick={onBack}>← Back to site</span>
     </div>

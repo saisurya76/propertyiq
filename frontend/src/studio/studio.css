@@ -1377,21 +1377,34 @@
 .admin-dashboard {
   max-width: 1100px;
   margin: 0 auto;
+  --navy-950: #0a1220;
+  --navy-900: #0d1b2a;
+  --navy-800: #14283d;
+  --navy-700: #1b4f72;
+  --blue-500: #2e86c1;
+  --amber-500: #e8910a;
+  --red-600: #c0392b;
+  --green-600: #1e8449;
+  --grey-50: #f7f9fb;
+  --grey-100: #ebf5fb;
+  --grey-200: #d6e4ec;
+  --grey-400: #9fb1bd;
+  --grey-600: #5b6f7c;
 }
 
 .admin-dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  background: linear-gradient(135deg, #2c1f47 0%, #1e1b3a 100%);
-  border-radius: 20px;
+  background: linear-gradient(135deg, var(--navy-900) 0%, var(--navy-950) 100%);
+  border-radius: 12px;
   padding: 28px 32px;
   margin-bottom: 24px;
   color: white;
 }
 
 .admin-dashboard-eyebrow {
-  color: #c084fc;
+  color: var(--amber-500);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -1408,16 +1421,16 @@
 .admin-refresh-btn {
   font-size: 13px;
   font-weight: 700;
-  color: #c084fc;
+  color: var(--amber-500);
   cursor: pointer;
   padding: 8px 14px;
-  border: 1px solid rgba(192, 132, 252, 0.4);
-  border-radius: 10px;
+  border: 1px solid rgba(232, 145, 10, 0.4);
+  border-radius: 8px;
   white-space: nowrap;
 }
 
 .admin-refresh-btn:hover {
-  background: rgba(192, 132, 252, 0.1);
+  background: rgba(232, 145, 10, 0.12);
 }
 
 .admin-stats-row {
@@ -1428,57 +1441,57 @@
 }
 
 .admin-stat-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--grey-50);
+  border-radius: 10px;
   padding: 20px 22px;
-  border-left: 5px solid #d9c9f5;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08);
+  border: 1px solid var(--grey-200);
+  border-left: 4px solid var(--grey-400);
 }
 
 .admin-stat-value {
   font-size: 32px;
   font-weight: 800;
-  color: #2c1f47;
+  color: var(--navy-900);
   line-height: 1.1;
 }
 
 .admin-stat-label {
   margin-top: 4px;
   font-size: 13px;
-  color: #7a6f92;
+  color: var(--grey-600);
   font-weight: 600;
 }
 
-.admin-stat-purple { border-left-color: #7c3aed; }
-.admin-stat-blue { border-left-color: #3b82f6; }
-.admin-stat-green { border-left-color: #059669; }
-.admin-stat-slate { border-left-color: #a78bda; }
+.admin-stat-purple { border-left-color: var(--navy-700); }
+.admin-stat-blue { border-left-color: var(--blue-500); }
+.admin-stat-green { border-left-color: var(--green-600); }
+.admin-stat-slate { border-left-color: var(--grey-400); }
 
 .admin-section {
   background: white;
-  border-radius: 18px;
+  border-radius: 12px;
   padding: 26px;
-  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.1);
+  border: 1px solid var(--grey-200, #d6e4ec);
   margin-bottom: 24px;
-  border-top: 4px solid #d9c9f5;
+  border-top: 4px solid var(--grey-400, #9fb1bd);
 }
 
-.admin-section-purple { border-top-color: #7c3aed; }
-.admin-section-blue { border-top-color: #3b82f6; }
-.admin-section-green { border-top-color: #059669; }
+.admin-section-purple { border-top-color: var(--navy-700, #1b4f72); }
+.admin-section-blue { border-top-color: var(--blue-500, #2e86c1); }
+.admin-section-green { border-top-color: var(--green-600, #1e8449); }
 
 .admin-section-note {
   font-size: 13px;
-  color: #6b5f85;
+  color: var(--grey-600, #5b6f7c);
   margin-bottom: 14px;
   line-height: 1.5;
 }
-.admin-section-amber { border-top-color: #d97706; }
+.admin-section-amber { border-top-color: var(--amber-500, #e8910a); }
 
 .admin-section h3 {
   margin-top: 0;
   font-size: 17px;
-  color: #2c1f47;
+  color: var(--navy-900, #0d1b2a);
 }
 
 .admin-tier-row {
@@ -1487,7 +1500,7 @@
   gap: 10px;
   align-items: center;
   padding: 12px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .admin-tier-features-row {
@@ -1498,12 +1511,12 @@
   gap: 6px 14px;
   padding: 6px 10px 10px;
   font-size: 12px;
-  color: #6b5f85;
+  color: var(--grey-600, #5b6f7c);
 }
 
 .admin-tier-features-label {
   font-weight: 700;
-  color: #9285ab;
+  color: var(--grey-600, #5b6f7c);
 }
 
 .admin-feature-checkbox {
@@ -1524,43 +1537,43 @@
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 6px;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+  border: 1px solid #f5c6c1;
+  background: #fdecea;
+  color: var(--red-600, #c0392b);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .admin-feature-hide-btn:hover {
-  background: #fee2e2;
+  background: #fbdbd7;
 }
 
 .admin-tier-row:not(.admin-tier-row-header):hover {
-  background: #faf7ff;
+  background: var(--grey-50, #f7f9fb);
 }
 
 .admin-tier-row:first-child {
   border-top: none;
   font-size: 12px;
   font-weight: 700;
-  color: #9285ab;
+  color: var(--grey-600, #5b6f7c);
 }
 
 .admin-tier-row input {
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #ede4fc;
+  border: 1px solid var(--grey-200, #d6e4ec);
   width: 100%;
   box-sizing: border-box;
   font-size: 14px;
-  background: #faf7ff;
+  background: var(--grey-50, #f7f9fb);
 }
 
 .admin-tier-row input:focus {
   outline: none;
-  border-color: #7c3aed;
+  border-color: var(--blue-500, #2e86c1);
   background: white;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  box-shadow: 0 0 0 3px rgba(46, 134, 193, 0.15);
 }
 
 .admin-table {
@@ -1572,7 +1585,7 @@
 .admin-table th {
   text-align: left;
   color: white;
-  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, var(--navy-900, #0d1b2a) 0%, var(--navy-700, #1b4f72) 100%);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1585,20 +1598,20 @@
 
 .admin-table td {
   padding: 11px 12px;
-  border-bottom: 1px solid #f3ecff;
-  color: #4b3f66;
+  border-bottom: 1px solid var(--grey-100, #ebf5fb);
+  color: var(--navy-800, #14283d);
 }
 
 .admin-table tbody tr:hover {
-  background: #faf7ff;
+  background: var(--grey-50, #f7f9fb);
 }
 
 .admin-table tbody tr:nth-child(even) {
-  background: #faf7ff;
+  background: var(--grey-50, #f7f9fb);
 }
 
 .admin-table tbody tr:nth-child(even):hover {
-  background: #f3ecff;
+  background: var(--grey-100, #ebf5fb);
 }
 
 .admin-status-badge {
@@ -1610,17 +1623,17 @@
 }
 
 .admin-status-active {
-  background: #ecfdf5;
-  color: #065f46;
+  background: #eafaf1;
+  color: var(--green-600, #1e8449);
 }
 
 .admin-status-other {
-  background: #f3ecff;
-  color: #7a6f92;
+  background: var(--grey-100, #ebf5fb);
+  color: var(--grey-600, #5b6f7c);
 }
 
 .admin-empty-note {
-  color: #9285ab;
+  color: var(--grey-600, #5b6f7c);
   font-size: 14px;
   padding: 10px 0;
 }
@@ -1736,7 +1749,7 @@
 .cs-room-row-header,
 .admin-tier-row-header {
   font-size: 12px;
-  color: #9285ab;
+  color: var(--grey-600, #5b6f7c);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -1744,7 +1757,7 @@
 
 .admin-tier-row-name {
   font-weight: 700;
-  color: #2c1f47;
+  color: var(--navy-900, #0d1b2a);
   font-size: 13px;
 }
 
@@ -1755,6 +1768,227 @@
 
 .admin-table {
   min-width: 480px;
+}
+
+/* ---- Section-menu navigation, matching AccidentIQ's own admin
+   dashboard pattern exactly (confirmed from its real source,
+   admin-dashboard.html) — a landing screen of clickable tiles, each
+   navigating to one dedicated settings screen, instead of one long
+   page with everything visible at once. ---- */
+.admin-menu-subtitle {
+  color: var(--grey-600, #5b6f7c);
+  font-size: 14px;
+  margin: 0 0 20px;
+}
+
+.admin-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.menu-tile {
+  border: 1px solid var(--grey-200, #d6e4ec);
+  border-radius: 10px;
+  padding: 18px;
+  cursor: pointer;
+  transition: 0.1s;
+  background: white;
+}
+
+.menu-tile:hover {
+  border-color: var(--blue-500, #2e86c1);
+  background: var(--grey-50, #f7f9fb);
+}
+
+.menu-tile-label {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 4px;
+  color: var(--navy-900, #0d1b2a);
+}
+
+.menu-tile-desc {
+  font-size: 13px;
+  color: var(--grey-600, #5b6f7c);
+  line-height: 1.4;
+}
+
+.admin-subscreen-back {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--grey-600, #5b6f7c);
+  cursor: pointer;
+  margin-bottom: 16px;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.admin-subscreen-back:hover {
+  color: var(--navy-900, #0d1b2a);
+}
+
+/* ---- Real toggle switches for show/hide settings (Neighborhood
+   Insights sections), replacing plain checkboxes — matching
+   AccidentIQ's own .switch/.slider pattern exactly. ---- */
+.admin-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--grey-100, #ebf5fb);
+}
+
+.admin-toggle-row:last-child {
+  border-bottom: none;
+}
+
+.admin-toggle-row label {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  cursor: pointer;
+}
+
+.admin-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.admin-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.admin-switch .admin-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--grey-200, #d6e4ec);
+  border-radius: 24px;
+  transition: 0.15s;
+}
+
+.admin-switch .admin-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.15s;
+}
+
+.admin-switch input:checked + .admin-slider {
+  background: var(--green-600, #1e8449);
+}
+
+.admin-switch input:checked + .admin-slider::before {
+  transform: translateX(20px);
+}
+
+/* ---- Login screen, restyled to match AccidentIQ's own centered
+   .card look exactly, replacing PropertyIQ's own violet-themed
+   studio-panel for this one entry point specifically. ---- */
+.admin-login-wrap {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.admin-login-card {
+  background: #fff;
+  border: 1px solid var(--grey-200, #d6e4ec);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 4px 24px rgba(10, 18, 32, 0.08);
+  --navy-950: #0a1220;
+  --navy-900: #0d1b2a;
+  --navy-800: #14283d;
+  --blue-500: #2e86c1;
+  --grey-50: #f7f9fb;
+  --grey-200: #d6e4ec;
+  --grey-600: #5b6f7c;
+  --red-600: #c0392b;
+}
+
+.admin-login-card h2 {
+  font-size: 22px;
+  margin: 0 0 4px;
+  color: var(--navy-900);
+}
+
+.admin-login-card .admin-login-subtitle {
+  color: var(--grey-600);
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.admin-login-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--grey-200);
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--grey-50);
+  box-sizing: border-box;
+  margin-bottom: 16px;
+}
+
+.admin-login-card input:focus {
+  outline: none;
+  border-color: var(--blue-500);
+  background: white;
+}
+
+.admin-login-card .admin-login-error {
+  background: #fdecea;
+  border: 1px solid #f5c6c1;
+  color: var(--red-600);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.admin-login-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--navy-900);
+  color: #fff;
+}
+
+.admin-login-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-login-back {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--grey-600);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* ============================================================
