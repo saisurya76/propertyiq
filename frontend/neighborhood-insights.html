@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- A genuinely separate, static HTML file — not just the same
+    index.html with a client-side title change — is the real reason
+    this page's SEO/social-share metadata actually works. A React SPA
+    that only sets document.title via JS looks fine to Google (which
+    executes JS before indexing) but shows nothing useful to WhatsApp,
+    Facebook, or Twitter/X link-preview crawlers, none of which run
+    JavaScript. AccidentIQ's own sibling Travel Safety page uses this
+    same real, separate-file approach, confirmed directly from its
+    actual source rather than assumed. -->
+    <title>Neighborhood Insights — Know Your Neighborhood Before You Buy | PropertyIQ</title>
+    <meta name="description" content="Free tool: see real hospitals, schools, markets, banks, and public transport near any property, plus a buyer's due-diligence checklist and resale demand signal — before you decide. No signup needed." />
+    <link rel="canonical" href="https://app.propertyiqweb.com/neighborhood-insights" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Know your neighborhood, before you buy." />
+    <meta property="og:description" content="Free tool: see real hospitals, schools, markets, banks, and public transport near any property, plus a buyer's due-diligence checklist and resale demand signal — before you decide." />
+    <meta property="og:image" content="https://app.propertyiqweb.com/neighborhood-insights-og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://app.propertyiqweb.com/neighborhood-insights" />
+    <meta property="og:site_name" content="PropertyIQ" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Know your neighborhood, before you buy." />
+    <meta name="twitter:description" content="Free tool: see real hospitals, schools, markets, banks, and public transport near any property, plus a buyer's due-diligence checklist and resale demand signal." />
+    <meta name="twitter:image" content="https://app.propertyiqweb.com/neighborhood-insights-og.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

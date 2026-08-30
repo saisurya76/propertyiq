@@ -104,16 +104,24 @@ def _set_cached(city_slug: str, result: dict[str, Any]) -> None:
     set_app_setting(_cache_key(city_slug), json.dumps({"result": result, "fetched_at": datetime.now(timezone.utc).isoformat()}))
 
 
-def get_infrastructure_summary(city: str) -> dict[str, Any]:
+def get_infrastructure_summary(city: str, country: str = "India") -> dict[str, Any]:
     """Returns {has_data, summary, sources, disclaimer, reason,
     error_detail}. `sources` is a list of {title, uri} pulled from
     Tavily's own real search results — never fabricated — so
     genuinely empty if the search turned up nothing (in which case
-    has_data is also False)."""
+    has_data is also False).
+
+    `country` is the real, full country name (e.g. "Thailand"),
+    defaulting to "India" so every existing caller keeps working
+    unchanged. Included in the cache key alongside the city, not just
+    appended to the query string — the same city name could
+    theoretically exist in more than one supported country, and a
+    cache collision there would show one country's infrastructure news
+    under another's."""
     if not city or not city.strip():
         return _no_data("no_city")
 
-    city_slug = city.strip().lower().replace(" ", "_")
+    city_slug = f"{country.strip().lower().replace(' ', '_')}_{city.strip().lower().replace(' ', '_')}"
     cached = _get_cached(city_slug)
     if cached is not None:
         return cached
@@ -122,7 +130,7 @@ def get_infrastructure_summary(city: str) -> dict[str, Any]:
         logger.warning("neighborhood_infrastructure: TAVILY_API_KEY is not configured.")
         return _no_data("no_api_key")
 
-    query = f"upcoming infrastructure projects metro highway development {city.strip()} India 2026"
+    query = f"upcoming infrastructure projects metro highway development {city.strip()} {country.strip()} 2026"
 
     try:
         client = TavilyClient(api_key=TAVILY_API_KEY)
@@ -132,7 +140,7 @@ def get_infrastructure_summary(city: str) -> dict[str, Any]:
             topic="news",
             max_results=5,
             include_answer=True,
-            country="india",
+            country=country.strip().lower(),
         )
     except Exception as exc:
         exc_text = str(exc)

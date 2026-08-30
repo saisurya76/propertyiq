@@ -62,6 +62,42 @@ def test_sends_a_real_india_scoped_query_with_expected_tavily_parameters():
     assert call_kwargs["include_answer"] is True
 
 
+def test_a_non_india_country_is_genuinely_used_in_the_query_not_hardcoded():
+    """The real fix for multi-country support: this previously
+    hardcoded "India" into both the search query and Tavily's own
+    country-boost parameter regardless of what was actually asked for.
+    Confirms a different country genuinely reaches the real API call."""
+    fake_response = _mock_tavily_response("Some answer", [("Source", "https://example.com")])
+    with patch("backend.neighborhood_infrastructure.get_app_setting", return_value=None), \
+         patch("backend.neighborhood_infrastructure.set_app_setting"), \
+         patch("backend.neighborhood_infrastructure.TAVILY_API_KEY", "fake_key"), \
+         patch("backend.neighborhood_infrastructure.TavilyClient") as mock_client_cls:
+        mock_client_cls.return_value.search.return_value = fake_response
+        get_infrastructure_summary("Bangkok", country="Thailand")
+
+    call_kwargs = mock_client_cls.return_value.search.call_args.kwargs
+    assert "Bangkok" in call_kwargs["query"]
+    assert "Thailand" in call_kwargs["query"]
+    assert "India" not in call_kwargs["query"]
+    assert call_kwargs["country"] == "thailand"
+
+
+def test_different_countries_with_the_same_city_name_do_not_share_a_cache_entry():
+    """A real, deliberate cache-key fix: without country in the key, a
+    city name that happens to exist in two supported countries could
+    show one country's infrastructure news under the other's."""
+    with patch("backend.neighborhood_infrastructure.get_app_setting", return_value=None) as mock_get, \
+         patch("backend.neighborhood_infrastructure.set_app_setting"), \
+         patch("backend.neighborhood_infrastructure.TAVILY_API_KEY", "fake_key"), \
+         patch("backend.neighborhood_infrastructure.TavilyClient") as mock_client_cls:
+        mock_client_cls.return_value.search.return_value = _mock_tavily_response("Answer", [("Source", "https://example.com")])
+        get_infrastructure_summary("Springfield", country="India")
+        get_infrastructure_summary("Springfield", country="Thailand")
+
+    cache_keys_checked = [call.args[0] for call in mock_get.call_args_list]
+    assert cache_keys_checked[0] != cache_keys_checked[1]
+
+
 def test_honestly_reports_no_data_when_search_returns_no_sources():
     """The real, important honesty guarantee: an answer with zero real
     source URLs means the search didn't actually ground anything --

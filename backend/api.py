@@ -1527,10 +1527,18 @@ def _set_cached_json(cache_key: str, result: Any) -> None:
 
 
 @app.get("/api/neighborhood-insights/autocomplete")
-def neighborhood_autocomplete(q: str):
+def neighborhood_autocomplete(q: str, country: str = "in"):
     """Proxies LocationIQ's /autocomplete endpoint for the Neighborhood
     Insights address field. Public (no auth) — same reasoning as the
-    resale-signal endpoint just below: a free, no-signup entry point."""
+    resale-signal endpoint just below: a free, no-signup entry point.
+
+    `country` is a lowercase ISO 3166-1 alpha-2 code (LocationIQ's own
+    countrycodes parameter format), defaulting to "in" so every
+    existing call site (which never passed this) keeps working
+    unchanged. Reuses the exact same country-code convention already
+    established in the main app's own COUNTRY_CODE_MAP (frontend
+    App.jsx) for Thailand/Philippines/Vietnam/Indonesia, rather than
+    inventing a separate one for this page."""
     if not LOCATIONIQ_API_KEY:
         raise HTTPException(status_code=503, detail="Address lookup isn't configured yet — LOCATIONIQ_API_KEY is not set.")
     if not q or len(q.strip()) < 3:
@@ -1538,7 +1546,7 @@ def neighborhood_autocomplete(q: str):
     try:
         resp = requests.get(
             f"{LOCATIONIQ_BASE}/autocomplete",
-            params={"key": LOCATIONIQ_API_KEY, "q": q, "limit": 6, "countrycodes": "in", "format": "json"},
+            params={"key": LOCATIONIQ_API_KEY, "q": q, "limit": 6, "countrycodes": country.lower(), "format": "json"},
             timeout=6,
         )
         if resp.status_code != 200:
@@ -1602,7 +1610,7 @@ def neighborhood_nearby(lat: float, lon: float, tag: str, radius: int = 2000):
 
 
 @app.get("/api/neighborhood-insights/infrastructure")
-def neighborhood_infrastructure(city: str):
+def neighborhood_infrastructure(city: str, country: str = "India"):
     """Search-grounded (real web search, not a plain guess) summary of
     upcoming infrastructure for the Neighborhood Insights page. Public
     (no auth), same reasoning as the other neighborhood-insights
@@ -1610,8 +1618,12 @@ def neighborhood_infrastructure(city: str):
     neighborhood_infrastructure.py's own module docstring for the
     critical honesty boundary: city-level general news, not verified
     proximity to a specific address, always shown with real sources
-    and an explicit disclaimer."""
-    return get_infrastructure_summary(city)
+    and an explicit disclaimer.
+
+    `country` is the real, full country name (e.g. "Thailand"), used
+    directly in the search query — defaults to "India" so every
+    existing call site keeps working unchanged."""
+    return get_infrastructure_summary(city, country)
 
 
 NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "checklist", "authority_contacts", "cross_sell", "share"]

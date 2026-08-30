@@ -331,3 +331,39 @@ def test_toggling_one_section_does_not_reset_a_previously_hidden_one():
         r = client.post("/api/admin/settings", json={"password": "test", "ni_section_visibility": {"share": False}})
         assert r.json()["ni_section_visibility"]["infrastructure"] is False
         assert r.json()["ni_section_visibility"]["share"] is False
+
+
+def test_autocomplete_uses_a_non_india_country_code_when_provided(monkeypatch):
+    """The real fix for multi-country support: this previously
+    hardcoded countrycodes=in regardless of what was asked for."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "LOCATIONIQ_API_KEY", "pk.test_key_123")
+
+    captured = {}
+
+    def fake_get(url, params=None, timeout=None):
+        captured["params"] = params
+        return _FakeResponse(200, [])
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+
+    client.get("/api/neighborhood-insights/autocomplete?q=Bangkok+Sukhumvit&country=th")
+    assert captured["params"]["countrycodes"] == "th"
+
+
+def test_autocomplete_still_defaults_to_india_when_country_not_specified(monkeypatch):
+    """Backward compatibility: every existing call site never passed a
+    country, and must keep working exactly as before."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "LOCATIONIQ_API_KEY", "pk.test_key_123")
+
+    captured = {}
+
+    def fake_get(url, params=None, timeout=None):
+        captured["params"] = params
+        return _FakeResponse(200, [])
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+
+    client.get("/api/neighborhood-insights/autocomplete?q=Banjara+Hills")
+    assert captured["params"]["countrycodes"] == "in"

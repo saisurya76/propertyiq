@@ -36,48 +36,122 @@ const POI_CATEGORIES = [
   { key: "park", label: "Parks", tag: "leisure:park", color: "#059669", icon: "🌳" },
 ];
 
-const CHECKLIST_ITEMS = [
-  "Verify the title deed and confirm a clear, marketable title with no encumbrances",
-  "Check RERA registration for the project (for under-construction or recently completed properties)",
-  "Confirm the occupancy certificate (OC) and completion certificate (CC) have been issued",
-  "Get an encumbrance certificate covering at least the last 13-30 years",
-  "Review property tax receipts to confirm they're current and in the seller's name",
-  "Check for any pending litigation or disputes tied to the property or land",
-  "Confirm the approved building plan matches the actual construction",
-  "Verify khata/mutation records reflect the current owner correctly",
-];
+// Real, researched per-country config -- reuses the same lowercase
+// 2-letter codes as App.jsx's own COUNTRY_CODE_MAP (th/ph/vn/id),
+// defaulting to India ("" / no prefix) for every existing bookmark,
+// share, or link to this page. Each country's checklist and contacts
+// are genuinely different content, not a template swap of the Indian
+// list -- researched per-country (property title/ownership systems,
+// the real regulator, and the real foreign-ownership constraint that
+// actually applies there), not assumed from the Indian version.
+const COUNTRY_CONFIG = {
+  "": {
+    name: "India", isoCode: "in", currency: "INR", currencySymbol: "₹",
+    localityExample: "Kompally, or the nearest main road", cityExample: "Hyderabad", homePath: "/",
+    checklist: [
+      "Verify the title deed and confirm a clear, marketable title with no encumbrances",
+      "Check RERA registration for the project (for under-construction or recently completed properties)",
+      "Confirm the occupancy certificate (OC) and completion certificate (CC) have been issued",
+      "Get an encumbrance certificate covering at least the last 13-30 years",
+      "Review property tax receipts to confirm they're current and in the seller's name",
+      "Check for any pending litigation or disputes tied to the property or land",
+      "Confirm the approved building plan matches the actual construction",
+      "Verify khata/mutation records reflect the current owner correctly",
+    ],
+    authorityContacts: (state) => [
+      { label: "RERA helpline", detail: state ? `For ${state}: search "${state} RERA helpline" for the current number` : "Search online for your state's RERA helpline" },
+      { label: "Sub-Registrar's Office", detail: "Handles registration and encumbrance certificates" },
+      { label: "Municipal Corporation / Panchayat", detail: "Property tax records, building plan approvals" },
+      { label: "State Consumer Helpline", detail: "1915" },
+    ],
+  },
+  th: {
+    name: "Thailand", isoCode: "th", currency: "THB", currencySymbol: "฿",
+    localityExample: "Sukhumvit, or the nearest main road", cityExample: "Bangkok", homePath: "/th",
+    checklist: [
+      "Verify the title is a Chanote (Nor Sor 4 Jor) — the only Thai title conferring full, GPS-surveyed ownership; lower-grade titles (Nor Sor 3, Nor Sor 3 Gor, Sor Kor 1) do not",
+      "For a condo, confirm the building's 49% foreign-ownership quota has not been reached (request written confirmation from the juristic person manager)",
+      "If buying freehold as a foreigner, ensure funds are remitted from abroad through a Thai bank and a Foreign Exchange Transaction Form (FETF) is issued — required for the Land Department to register the transfer",
+      "Check the title for encumbrances, mortgages, outstanding common-area fees, and any litigation at the Land Office",
+      "If the plot is landlocked, verify a registered right-of-way easement exists — a Chanote does not itself guarantee road access",
+      "Foreigners cannot own land directly — confirm whether the deal structure is freehold condo, registered lease, or another lawful route before paying a deposit",
+    ],
+    authorityContacts: () => [
+      { label: "Department of Lands (Land Department)", detail: "National title registry and transfer authority — verify Chanote status here" },
+      { label: "Local Land Office", detail: "Handles title checks and registration for the property's specific district" },
+    ],
+  },
+  ph: {
+    name: "Philippines", isoCode: "ph", currency: "PHP", currencySymbol: "₱",
+    localityExample: "Bonifacio Global City, or the nearest main road", cityExample: "Manila", homePath: "/ph",
+    checklist: [
+      "Get a Certified True Copy of the title from the Registry of Deeds — Transfer Certificate of Title (TCT) for land, Condominium Certificate of Title (CCT) for condo units",
+      "Confirm the title has no liens, encumbrances, adverse claims, or lis pendens annotations",
+      "Cross-check the tax declaration at the local Assessor's Office against the title for matching dimensions and ownership",
+      "Confirm the developer holds a valid License to Sell from DHSUD (Department of Human Settlements and Urban Development, formerly HLURB)",
+      "Foreigners cannot own land — if buying a condo, verify in writing that the building's 40% foreign-ownership cap has not been reached",
+      "Check the developer's track record with DHSUD for delivery delays or pending complaints",
+    ],
+    authorityContacts: () => [
+      { label: "Registry of Deeds", detail: "Under the Land Registration Authority — title verification and registration" },
+      { label: "DHSUD", detail: "Department of Human Settlements and Urban Development — developer/project licensing" },
+      { label: "Bureau of Internal Revenue (BIR)", detail: "Transfer taxes and the Certificate Authorizing Registration (CAR)" },
+    ],
+  },
+  vn: {
+    name: "Vietnam", isoCode: "vn", currency: "VND", currencySymbol: "₫",
+    localityExample: "District 1, or the nearest main road", cityExample: "Ho Chi Minh City", homePath: "/vn",
+    checklist: [
+      "Verify the seller's Pink Book (Sổ Hồng — Certificate of Land Use Rights and Ownership of Assets) is genuine and the named owner matches the seller",
+      "Confirm no mortgage, dispute, or restriction annotations on the certificate",
+      "If buying as a foreigner, verify the building's foreign-ownership quota (30% of units per building) has not been reached",
+      "Understand foreign ownership is a 50-year term from Pink Book issuance (one renewal possible, not guaranteed) — not freehold land ownership, since all land in Vietnam is state/collectively owned",
+      "For off-plan purchases, confirm the project has official approval for foreign sales before paying any deposit",
+      "Confirm funds are transferred through a licensed Vietnamese bank, with all payment receipts kept for the eventual Pink Book application",
+    ],
+    authorityContacts: () => [
+      { label: "Provincial land registration office", detail: "Under the Ministry of Agriculture and Environment — Pink Book issuance and verification" },
+      { label: "Commune-level People's Committee", detail: "Since July 2025, first-time certificates are issued here, not at district level" },
+    ],
+  },
+  id: {
+    name: "Indonesia", isoCode: "id", currency: "IDR", currencySymbol: "Rp",
+    localityExample: "Kuta, or the nearest main road", cityExample: "Jakarta", homePath: "/id",
+    checklist: [
+      "Confirm the certificate type — Hak Milik (freehold) is reserved for Indonesian citizens only; foreigners can hold Hak Pakai (right to use) or access Hak Guna Bangunan (right to build) via a PT PMA company",
+      "Verify the land certificate directly at the local BPN (Badan Pertanahan Nasional) office — registered owner, boundaries, and expiry date for HGB/Hak Pakai titles",
+      "Reject any legacy or unregistered certificate such as Girik — these became invalid for transfer under Government Regulation 18/2021 as of February 2026",
+      "Check the property's zoning designation against the local spatial plan (RTRW)",
+      "Confirm building approval (PBG, formerly IMB) and a fitness-for-use certificate (SLF) for completed structures",
+      "Avoid nominee arrangements (an Indonesian citizen holding Hak Milik \"on your behalf\") — these are illegal and unenforceable for a foreign buyer",
+    ],
+    authorityContacts: () => [
+      { label: "BPN / ATR", detail: "Badan Pertanahan Nasional / Agency for Agrarian Affairs and Spatial Planning — land certificate verification and registration" },
+      { label: "Local PPAT", detail: "Land deed notary — required to execute and register any property transfer" },
+    ],
+  },
+};
 
-// Best-effort extraction of the state from LocationIQ's own
+// Best-effort extraction of the state/province from LocationIQ's own
 // display_name string (e.g. "Kompally, Hyderabad, Telangana, India" ->
 // "Telangana") -- a real fix for a real bug: this previously showed
 // the literal, unfilled text "[your state]" verbatim instead of ever
 // substituting anything, since no state was ever actually collected
-// or derived from anywhere. LocationIQ's address components aren't
-// always in a perfectly consistent position, so this stays a
-// best-effort guess (second-to-last comma-separated segment before
-// "India") with an honest, non-templated fallback rather than a
+// or derived from anywhere. Only meaningful for India's own
+// authorityContacts (state-level RERA) -- other countries' contact
+// lists are national, not state-scoped, so they ignore this value.
+// LocationIQ's address components aren't always in a perfectly
+// consistent position, so this stays a best-effort guess
+// (second-to-last comma-separated segment before the country name)
+// with an honest, non-templated fallback rather than a
 // guaranteed-correct lookup.
-function extractStateFromLabel(label) {
+function extractStateFromLabel(label, countryName) {
   if (!label) return null;
   const parts = label.split(",").map((p) => p.trim()).filter(Boolean);
   if (parts.length < 2) return null;
   const last = parts[parts.length - 1].toLowerCase();
-  if (last !== "india") return null;
+  if (last !== countryName.toLowerCase()) return null;
   return parts[parts.length - 2] || null;
-}
-
-function getAuthorityContacts(state) {
-  return [
-    {
-      label: "RERA helpline",
-      detail: state
-        ? `For ${state}: search "${state} RERA helpline" for the current number`
-        : "Search online for your state's RERA helpline",
-    },
-    { label: "Sub-Registrar's Office", detail: "Handles registration and encumbrance certificates" },
-    { label: "Municipal Corporation / Panchayat", detail: "Property tax records, building plan approvals" },
-    { label: "State Consumer Helpline", detail: "1915" },
-  ];
 }
 
 function timeoutFetch(url, ms = 6000) {
@@ -117,14 +191,18 @@ function gmapsPlaceLink(name, lat, lon) {
 }
 
 // Standalone page, not part of the main app's navigation, reached at
-// /neighborhood-insights. Mirrors the structure of the sibling AccidentIQ
-// product's own Travel Safety page (same section order, same standalone-
-// tool-that-cross-sells-the-main-product pattern), with PropertyIQ's own
-// navy/emerald theme. The map/nearby-places feature below reuses
-// AccidentIQ's own real LocationIQ-based approach (confirmed from its
-// actual source, not guessed) rather than the Google Places API
+// /neighborhood-insights (India, the default) or /<code>/neighborhood-insights
+// for one of the app's already-supported countries (th/ph/vn/id, matching
+// App.jsx's own COUNTRY_CODE_MAP). Mirrors the structure of the sibling
+// AccidentIQ product's own Travel Safety page (same section order, same
+// standalone-tool-that-cross-sells-the-main-product pattern), with
+// PropertyIQ's own navy/emerald theme. The map/nearby-places feature below
+// reuses AccidentIQ's own real LocationIQ-based approach (confirmed from
+// its actual source, not guessed) rather than the Google Places API
 // originally (and wrongly) assumed before that source was shared.
-function NeighborhoodInsights() {
+function NeighborhoodInsights({ countryCode }) {
+  const country = COUNTRY_CONFIG[countryCode || ""] || COUNTRY_CONFIG[""];
+
   // Deliberately separate from the geocoded search below: a property's
   // own name/label is never required to exist in any map database (a
   // brand-new, not-yet-built project genuinely won't), so it's plain
@@ -156,6 +234,28 @@ function NeighborhoodInsights() {
       .catch(() => {}); // keep the safe, all-visible default on any failure
   }, []);
 
+  // Updates the real <title> and meta description client-side for the
+  // country-specific variants of this page (/th/neighborhood-insights
+  // etc). The static neighborhood-insights.html file's own tags are
+  // deliberately country-neutral (they can't dynamically change without
+  // JS, so they're written to read correctly for any country) — this
+  // effect helps Google specifically, since it executes JS before
+  // indexing and will see the more specific, country-named title/
+  // description on the actual rendered page. It does NOT help social
+  // media link-preview crawlers (WhatsApp/Facebook/Twitter), which
+  // never execute JS at all — those always see the static file's own,
+  // neutral tags regardless of which country's URL was shared.
+  useEffect(() => {
+    document.title = `Neighborhood Insights — Know Your Neighborhood Before You Buy in ${country.name} | PropertyIQ`;
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "description");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", `Free tool: see real hospitals, schools, markets, banks, and public transport near any property in ${country.name}, plus a buyer's due-diligence checklist and resale demand signal — before you decide.`);
+  }, [country.name]);
+
   const [poiState, setPoiState] = useState("idle"); // "idle" | "loading" | "done"
   const [poiDataByCat, setPoiDataByCat] = useState({});
   const [failedCategories, setFailedCategories] = useState([]);
@@ -184,7 +284,7 @@ function NeighborhoodInsights() {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const url = `${API_BASE}/api/neighborhood-insights/autocomplete?q=${encodeURIComponent(value)}`;
+        const url = `${API_BASE}/api/neighborhood-insights/autocomplete?q=${encodeURIComponent(value)}&country=${country.isoCode}`;
         const res = await fetch(url);
         const data = await res.json();
         setAddressSuggestions(Array.isArray(data) ? data : []);
@@ -245,7 +345,7 @@ function NeighborhoodInsights() {
     // count as "has data" at all.
     setInfraState("loading");
     try {
-      const res = await fetch(`${API_BASE}/api/neighborhood-insights/infrastructure?city=${encodeURIComponent(city)}`);
+      const res = await fetch(`${API_BASE}/api/neighborhood-insights/infrastructure?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country.name)}`);
       const data = await res.json();
       setInfraData(data);
       setInfraState("done");
@@ -440,30 +540,31 @@ function NeighborhoodInsights() {
   const googleMapsUrl = selectedPlace
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedPlace.label)}`
     : "#";
+  const pageUrl = `https://app.propertyiqweb.com${countryCode ? `/${countryCode}` : ""}/neighborhood-insights`;
   const shareText = propertyName.trim()
-    ? `Check out the neighborhood insights for ${propertyName.trim()} before buying: https://app.propertyiqweb.com/neighborhood-insights`
-    : `Check out this neighborhood insights tool before buying a property: https://app.propertyiqweb.com/neighborhood-insights`;
+    ? `Check out the neighborhood insights for ${propertyName.trim()} before buying: ${pageUrl}`
+    : `Check out this neighborhood insights tool before buying a property: ${pageUrl}`;
   const activeCat = POI_CATEGORIES.find((c) => c.key === activeCategory);
   const activePlaces = activeCategory ? poiDataByCat[activeCategory] || [] : [];
 
   return (
     <div className="ni-page">
       <div className="ni-top-banner">
-        🏠 Ready to buy? <a href="/" target="_blank" rel="noopener noreferrer">Get your free Instant Property Score with PropertyIQ →</a>
+        🏠 Ready to buy? <a href={country.homePath} target="_blank" rel="noopener noreferrer">Get your free Instant Property Score with PropertyIQ →</a>
       </div>
 
       <div className="ni-nav">
         <span className="ni-nav-brand">LivingIQ · Neighborhood Insights</span>
         <div className="ni-nav-links">
           <a href="https://livingiqweb.com" target="_blank" rel="noopener noreferrer">← Back to LivingIQ</a>
-          <a href="/" target="_blank" rel="noopener noreferrer">PropertyIQ →</a>
+          <a href={country.homePath} target="_blank" rel="noopener noreferrer">PropertyIQ →</a>
         </div>
       </div>
 
       <div className="ni-hero">
         <h1>Know your neighborhood, before you buy</h1>
         <p>
-          See hospitals, schools, markets, banks, and public transport near a property, plus a
+          See hospitals, schools, markets, banks, and public transport near a property in {country.name}, plus a
           buyer's due-diligence checklist and resale demand signal — all in one place, before you decide.
         </p>
       </div>
@@ -478,7 +579,7 @@ function NeighborhoodInsights() {
         <div className="ni-form-row">
           <div className="ni-form-field ni-autocomplete-field">
             <label>Nearest known address, road, or locality</label>
-            <input value={addressQuery} onChange={(e) => handleAddressInput(e.target.value)} placeholder="e.g. Kompally, or the nearest main road" autoComplete="off" />
+            <input value={addressQuery} onChange={(e) => handleAddressInput(e.target.value)} placeholder={`e.g. ${country.localityExample}`} autoComplete="off" />
             <p className="ni-field-hint">For a brand-new project not yet on the map, search the closest known area or road instead — insights are about the surrounding neighborhood either way.</p>
             {addressSuggestions.length > 0 && (
               <div className="ni-autocomplete-list">
@@ -492,7 +593,7 @@ function NeighborhoodInsights() {
           </div>
           <div className="ni-form-field">
             <label>City</label>
-            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Hyderabad" />
+            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={`e.g. ${country.cityExample}`} />
           </div>
         </div>
         <div className="ni-form-row">
@@ -644,7 +745,7 @@ function NeighborhoodInsights() {
                   <span className="ni-resale-label">comparable {propertyType.toLowerCase()} listing{resaleSignal.comparable_count === 1 ? "" : "s"} tracked in {city}</span>
                 </div>
                 <div className="ni-resale-stat">
-                  <span className="ni-resale-number">₹{resaleSignal.average_price_per_sqft.toLocaleString("en-IN")}</span>
+                  <span className="ni-resale-number">{country.currencySymbol}{resaleSignal.average_price_per_sqft.toLocaleString("en-IN")}</span>
                   <span className="ni-resale-label">average price/sq ft ({resaleSignal.data_source === "live" ? "live market data" : "recent snapshot"})</span>
                 </div>
               </div>
@@ -659,7 +760,7 @@ function NeighborhoodInsights() {
           <div className="ni-card">
             <h3>✅ Buyer's due-diligence checklist</h3>
             <ul className="ni-checklist">
-              {CHECKLIST_ITEMS.map((item) => <li key={item}>{item}</li>)}
+              {country.checklist.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </div>
           )}
@@ -668,7 +769,7 @@ function NeighborhoodInsights() {
           <div className="ni-card">
             <h3>📞 Local authority contacts</h3>
             <ul className="ni-contact-list">
-              {getAuthorityContacts(extractStateFromLabel(selectedPlace?.label)).map((c) => (
+              {country.authorityContacts(extractStateFromLabel(selectedPlace?.label, country.name)).map((c) => (
                 <li key={c.label}><strong>{c.label}:</strong> {c.detail}</li>
               ))}
             </ul>
@@ -684,7 +785,7 @@ function NeighborhoodInsights() {
               <li>🚩 Red flags checked against real comparable listings</li>
               <li>📊 Backed by the same data shown in this report</li>
             </ul>
-            <a href="/" target="_blank" rel="noopener noreferrer" className="ni-primary-btn ni-cta-btn">Try PropertyIQ →</a>
+            <a href={country.homePath} target="_blank" rel="noopener noreferrer" className="ni-primary-btn ni-cta-btn">Try PropertyIQ →</a>
           </div>
           )}
 

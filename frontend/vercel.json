@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/neighborhood-insights", "destination": "/neighborhood-insights.html" },
+    { "source": "/:code([a-z]{2})/neighborhood-insights", "destination": "/neighborhood-insights.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
