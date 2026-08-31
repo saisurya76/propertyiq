@@ -133,7 +133,7 @@ def test_overlay_dodo_prices_marks_fallback_when_no_product_id_is_configured_at_
 
 def test_tiers_endpoint_returns_dodo_overlaid_prices():
     with patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_pro": "prod_pro_123", "studio_starter": "", "studio_unlimited": "", "insight_addon": ""}), \
-         patch("backend.api.get_dodo_product_price", side_effect=lambda pid: {"price_usd": 35.0, "currency": "usd", "is_recurring": True} if pid == "prod_pro_123" else None):
+         patch("backend.api.get_dodo_product_price", side_effect=lambda pid, force_refresh=False: {"price_usd": 35.0, "currency": "usd", "is_recurring": True} if pid == "prod_pro_123" else None):
         r = client.get("/api/tiers")
     assert r.status_code == 200
     data = r.json()
@@ -165,3 +165,79 @@ def test_overlay_dodo_prices_accepts_usd_case_insensitively():
 
     assert result["studio_pro"]["price_usd"] == 35.0
     assert result["studio_pro"]["price_source"] == "dodo"
+
+
+def test_get_dodo_product_price_logs_the_real_error_on_failure():
+    """The exact real gap this fixes: a previous version used a bare
+    `except Exception: return None` with zero logging, making a
+    genuine Dodo API failure completely indistinguishable from "nothing
+    is wrong, there's just no product configured" -- undiagnosable in
+    production. Confirms the real exception is now actually logged."""
+    with patch("backend.api.get_app_setting", return_value=None), \
+         patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.logger") as mock_logger:
+        mock_client_cls.return_value.products.retrieve.side_effect = Exception("simulated real Dodo error: invalid product_id")
+        result = get_dodo_product_price("prod_test_123")
+
+    assert result is None
+    mock_logger.error.assert_called_once()
+    logged_message = mock_logger.error.call_args[0][0]
+    assert "prod_test_123" in logged_message
+    assert "simulated real Dodo error" in logged_message
+
+
+def test_force_refresh_bypasses_the_cache_entirely():
+    """The real, practical fix for "changed the price in Dodo and it's
+    still showing the old one": force_refresh=True must skip the
+    cached value and hit the real Dodo API again, not just shorten the
+    wait."""
+    cached_stale_value = {"price_usd": 29.0, "currency": "usd", "is_recurring": True}
+    import json as json_module
+    from datetime import datetime, timezone
+    cached_json = json_module.dumps({"result": cached_stale_value, "fetched_at": datetime.now(timezone.utc).isoformat()})
+
+    with patch("backend.api.get_app_setting", return_value=cached_json), \
+         patch("backend.api.set_app_setting"), \
+         patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls:
+        mock_client_cls.return_value.products.retrieve.return_value = _fake_product(3500)
+        result = get_dodo_product_price("prod_test_123", force_refresh=True)
+
+    # Confirms the real API was actually called, not the stale cache returned
+    mock_client_cls.return_value.products.retrieve.assert_called_once()
+    assert result["price_usd"] == 35.0
+
+
+def test_without_force_refresh_the_cache_is_still_used_normally():
+    """Confirms force_refresh is opt-in -- normal calls must still
+    benefit from caching, not hit Dodo on every single request."""
+    with patch("backend.api.get_app_setting", return_value=None), \
+         patch("backend.api.set_app_setting"), \
+         patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls:
+        mock_client_cls.return_value.products.retrieve.return_value = _fake_product(2900)
+        get_dodo_product_price("prod_test_456")
+        assert mock_client_cls.return_value.products.retrieve.call_count == 1
+
+    import json as json_module
+    from datetime import datetime, timezone
+    cached_json = json_module.dumps({"result": {"price_usd": 29.0, "currency": "usd", "is_recurring": True}, "fetched_at": datetime.now(timezone.utc).isoformat()})
+    with patch("backend.api.get_app_setting", return_value=cached_json), \
+         patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls2:
+        get_dodo_product_price("prod_test_456")
+        mock_client_cls2.assert_not_called()
+
+
+def test_admin_overview_passes_through_force_refresh_prices(monkeypatch):
+    """Confirms the admin panel's own refresh action genuinely reaches
+    all the way through to bypassing the Dodo cache, not just resetting
+    UI state."""
+    import os
+    monkeypatch.setattr("backend.api.PROPERTYIQ_ADMIN_PASSWORD", "test-admin-pw")
+    with patch("backend.api.overlay_dodo_prices") as mock_overlay:
+        mock_overlay.return_value = {}
+        client.post("/api/admin/overview", json={"password": "test-admin-pw", "force_refresh_prices": True})
+
+    assert mock_overlay.call_args.kwargs.get("force_refresh") is True

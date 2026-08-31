@@ -157,7 +157,12 @@ function AdminPanel({ onBack }) {
 
   const refresh = async () => {
     try {
-      const data = await studioApi.adminOverview(password);
+      // true: the admin's own "Refresh" button is exactly the moment a
+      // real, live Dodo price is most wanted — right after checking or
+      // changing something in Dodo's own dashboard — so this bypasses
+      // the 15-minute price cache rather than potentially showing
+      // whatever was cached from just before that change.
+      const data = await studioApi.adminOverview(password, true);
       setTierConfig(data.tier_config);
       setSubscriptions(data.subscriptions);
       setGrants(data.insight_grants);

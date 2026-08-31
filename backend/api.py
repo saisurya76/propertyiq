@@ -239,13 +239,16 @@ TIER_DODO_PRODUCT_IDS = {
 }
 
 
-def get_dodo_product_price(product_id: str) -> Optional[dict[str, Any]]:
+def get_dodo_product_price(product_id: str, force_refresh: bool = False) -> Optional[dict[str, Any]]:
     """Fetches a product's real, current price directly from Dodo's own
     API — the actual source of truth for what a customer is charged.
-    Cached 1 hour (via the same _get_cached_json/_set_cached_json
+    Cached 15 minutes (via the same _get_cached_json/_set_cached_json
     helpers the neighborhood-insights endpoints use) since prices don't
     change minute-to-minute and this would otherwise be called on every
-    single pricing-page load.
+    single pricing-page load. `force_refresh=True` bypasses the cache
+    entirely — used by the admin panel's refresh action, since an admin
+    actively testing a price change in Dodo's own dashboard needs to
+    see it reflected immediately, not wait out the cache window.
 
     This exists because of a real, confirmed gap: PropertyIQ's own
     stored `price_usd` per tier was never actually sent to Dodo at
@@ -261,14 +264,21 @@ def get_dodo_product_price(product_id: str) -> Optional[dict[str, Any]]:
     or None if the product isn't configured, Dodo is unreachable, or
     the key isn't set — callers should fall back to the locally-stored
     price in that case rather than breaking the whole pricing page over
-    a transient Dodo outage."""
+    a transient Dodo outage. Every failure is logged with the real
+    exception — a previous version of this function used a bare
+    `except Exception: return None` with no logging at all, which made
+    "the overlay silently never activates" completely undiagnosable in
+    production; this exact gap is what made a real, reported bug
+    (admin/pricing pages both stuck on old values after a real Dodo
+    price change) take extra effort to root-cause after the fact."""
     if not product_id or not DODO_API_KEY:
         return None
 
     cache_key = f"dodo_product_price_{product_id}"
-    cached = _get_cached_json(cache_key, ttl_hours=1)
-    if cached is not None:
-        return cached
+    if not force_refresh:
+        cached = _get_cached_json(cache_key, ttl_hours=0.25)
+        if cached is not None:
+            return cached
 
     try:
         client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
@@ -282,14 +292,15 @@ def get_dodo_product_price(product_id: str) -> Optional[dict[str, Any]]:
             "currency": price.currency,
             "is_recurring": price.type == "recurring_price",
         }
-    except Exception:
+    except Exception as exc:
+        logger.error(f"get_dodo_product_price: Dodo API call failed for product_id={product_id!r}: {exc}")
         return None
 
     _set_cached_json(cache_key, result)
     return result
 
 
-def overlay_dodo_prices(tiers: dict[str, Any]) -> dict[str, Any]:
+def overlay_dodo_prices(tiers: dict[str, Any], force_refresh: bool = False) -> dict[str, Any]:
     """Returns a copy of `tiers` with price_usd/currency replaced by the
     real, current Dodo price wherever a product is configured and
     reachable — the locally-stored value is kept as an honest fallback
@@ -301,20 +312,25 @@ def overlay_dodo_prices(tiers: dict[str, Any]) -> dict[str, Any]:
     identically as if they were equally trustworthy.
 
     Only trusts a Dodo price when its own currency is genuinely USD —
-    a real, necessary check this didn't originally have: every other
-    part of the app's pricing (get_fx_rates's own "USD-based FX table")
-    assumes price_usd really is USD. A Dodo product misconfigured in a
-    different currency would otherwise get silently treated as a raw
-    USD figure and then converted AGAIN by the frontend's own local-
-    currency display logic, double-converting the price incorrectly.
-    Falls back to the local value and logs a warning in that case,
-    since it would mean a real Dodo dashboard misconfiguration worth
-    fixing, not a transient issue to silently paper over."""
+    a real, necessary check: every other part of the app's pricing
+    (get_fx_rates's own "USD-based FX table") assumes price_usd really
+    is USD. A Dodo product misconfigured in a different currency would
+    otherwise get silently treated as a raw USD figure and then
+    converted AGAIN by the frontend's own local-currency display logic,
+    double-converting the price incorrectly. Falls back to the local
+    value and logs a warning in that case, since it would mean a real
+    Dodo dashboard misconfiguration worth fixing, not a transient issue
+    to silently paper over.
+
+    `force_refresh=True` bypasses the price cache for every tier —
+    passed through from the admin panel's refresh action so a price
+    just changed in Dodo's own dashboard shows up immediately rather
+    than waiting out the cache window."""
     result = {}
     for tier_id, tier in tiers.items():
         tier_copy = dict(tier)
         product_id = TIER_DODO_PRODUCT_IDS.get(tier_id)
-        dodo_price = get_dodo_product_price(product_id) if product_id else None
+        dodo_price = get_dodo_product_price(product_id, force_refresh=force_refresh) if product_id else None
         if dodo_price and dodo_price.get("currency", "").lower() == "usd":
             tier_copy["price_usd"] = dodo_price["price_usd"]
             tier_copy["price_source"] = "dodo"
@@ -1055,6 +1071,11 @@ class AdminTierConfigRequest(BaseModel):
 
 class AdminAuthRequest(BaseModel):
     password: str
+    # Bypasses the 15-minute Dodo price cache when set — the admin
+    # panel's own refresh button sends this so a price just changed in
+    # Dodo's dashboard is confirmed live immediately, not stuck showing
+    # whatever was cached from before the change.
+    force_refresh_prices: bool = False
 
 
 def _require_admin_password(password: str) -> None:
@@ -1093,14 +1114,18 @@ def verify_otp_endpoint(request: VerifyOtpRequest):
 
 
 @app.get("/api/tiers")
-def list_tiers():
+def list_tiers(force_refresh: bool = False):
     """Public tier/pricing config for the pricing page. Base prices are USD;
     convert client-side for display using the same fx table Construction
     Studio uses. Prices are overlaid with the real, current value from
     Dodo's own API wherever a product is configured and reachable — see
     overlay_dodo_prices's own docstring for why the locally-stored
-    price_usd alone was never actually reliable."""
-    return overlay_dodo_prices(get_all_tiers_merged())
+    price_usd alone was never actually reliable.
+
+    force_refresh bypasses the 15-minute price cache — mainly useful
+    right after changing a price in Dodo's own dashboard and wanting to
+    confirm it's live without waiting out the cache window."""
+    return overlay_dodo_prices(get_all_tiers_merged(), force_refresh=force_refresh)
 
 
 @app.get("/api/fx-rates")
@@ -1135,7 +1160,7 @@ def admin_overview(request: AdminAuthRequest):
     _require_admin_password(request.password)
 
     return {
-        "tier_config": overlay_dodo_prices(get_all_tiers_merged()),
+        "tier_config": overlay_dodo_prices(get_all_tiers_merged(), force_refresh=request.force_refresh_prices),
         "subscriptions": list_all_subscriptions(),
         "insight_grants": list_all_grants(),
         "all_features": ALL_FEATURES,
@@ -1602,7 +1627,7 @@ LOCATIONIQ_API_KEY = os.environ.get("LOCATIONIQ_API_KEY", "")
 LOCATIONIQ_BASE = "https://us1.locationiq.com/v1"
 
 
-def _get_cached_json(cache_key: str, ttl_hours: int) -> Optional[Any]:
+def _get_cached_json(cache_key: str, ttl_hours: float) -> Optional[Any]:
     """Generic JSON cache read against the same get_app_setting/
     set_app_setting key-value store neighborhood_infrastructure.py and
     live_comparables.py already use for their own caching — a real,

@@ -96,8 +96,8 @@ export const studioApi = {
   getBillOfQuantities: (payload) =>
     apiFetch("/api/construction-studio/bill-of-quantities", { method: "POST", body: JSON.stringify(payload) }),
 
-  adminOverview: (password) =>
-    apiFetch("/api/admin/overview", { method: "POST", body: JSON.stringify({ password }) }),
+  adminOverview: (password, forceRefreshPrices = false) =>
+    apiFetch("/api/admin/overview", { method: "POST", body: JSON.stringify({ password, force_refresh_prices: forceRefreshPrices }) }),
 
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
