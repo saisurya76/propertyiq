@@ -364,3 +364,140 @@ def test_standardwebhooks_dependency_is_actually_installed():
         assert "install" not in str(exc).lower() and "webhooks]" not in str(exc), (
             f"standardwebhooks dependency appears to be missing again: {type(exc).__name__}: {exc}"
         )
+
+
+def test_admin_can_already_cap_the_unlimited_tier_with_a_real_finite_quota():
+    """Directly answers a real question: does setting a specific number
+    for Studio Unlimited's design_quota_per_month (instead of leaving it
+    None/blank) actually get enforced, the same as it would for any
+    other tier? Confirms this is already fully supported mechanically —
+    nothing in the backend hardcodes "unlimited tier always has no
+    limit" — the enforcement check only ever looks at whatever value is
+    actually stored, for every tier including this one."""
+    from backend.config_store import get_all_tiers_merged, set_tier_config
+
+    original = get_all_tiers_merged()
+    capped_config = {**original, "studio_unlimited": {**original["studio_unlimited"], "design_quota_per_month": 2}}
+    set_tier_config(capped_config)
+
+    try:
+        email = "capped_unlimited@example.com"
+        headers = _authed_headers(email)
+        upsert_subscription(email=email, tier_id="studio_unlimited", status="active", dodo_subscription_id="sub_capped")
+
+        payload = {
+            "plot_size_sqft": 1000, "plot_length_ft": 40, "plot_width_ft": 25,
+            "selections": {}, "entrance_direction": "north", "road_facing_side": "north",
+        }
+
+        r1 = client.post("/api/construction-studio/design", headers=headers, json=payload)
+        assert r1.status_code == 200
+        r2 = client.post("/api/construction-studio/design", headers=headers, json=payload)
+        assert r2.status_code == 200
+        # The 3rd generate this month must now be blocked, exactly like
+        # it would be for Starter/Pro hitting their own real quota.
+        r3 = client.post("/api/construction-studio/design", headers=headers, json=payload)
+        assert r3.status_code == 403
+        assert "2/2" in r3.json()["detail"]
+    finally:
+        set_tier_config(original)
+
+
+def test_deleting_a_saved_property_does_not_free_up_the_generate_quota():
+    """Directly answers a real, important question: does deleting a
+    design free up the monthly GENERATE quota (design_quota_per_month)?
+    No -- confirmed here directly. design_quota_per_month counts rows
+    in construction_designs (an append-only generate-history log with
+    no delete path at all, based on created_at within the current
+    calendar month) -- a completely separate table/concept from the
+    properties table saved_designs_limit counts, and a completely
+    separate ACTION from saving/deleting a property at all: only
+    /api/construction-studio/design (the cost-estimate generation step)
+    consumes this quota; /api/properties (saving a multi-floor property
+    directly) does not touch it at all, confirmed directly rather than
+    assumed."""
+    from backend.config_store import get_all_tiers_merged, set_tier_config
+
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "design_quota_per_month": 1}}
+    set_tier_config(tight_config)
+
+    try:
+        email = "quota_after_delete@example.com"
+        headers = _authed_headers(email)
+        upsert_subscription(email=email, tier_id="studio_starter", status="active", dodo_subscription_id="sub_qd")
+
+        plot_spec = {
+            "plot_size_sqft": 1000, "plot_length_ft": 40, "plot_width_ft": 25,
+            "entrance_direction": "north", "road_facing_side": "north",
+        }
+
+        # Uses up the entire monthly generate quota (1).
+        r_generate = client.post(
+            "/api/construction-studio/design", headers=headers,
+            json={**plot_spec, "selections": {}},
+        )
+        assert r_generate.status_code == 200
+
+        # Separately, save a property (a different action, unrelated to
+        # the generate quota) and then delete it.
+        floors = [{"floor_number": 1, "floor_label": "Ground Floor", "rooms": []}]
+        r_create = client.post("/api/properties", headers=headers, json={"name": "Test House", "plot_spec": plot_spec, "floors": floors})
+        assert r_create.status_code == 200
+        property_id = r_create.json()["property_id"]
+        r_delete = client.delete(f"/api/properties/{property_id}", headers=headers)
+        assert r_delete.status_code == 200
+
+        # The generate quota must still be exhausted -- deleting the
+        # saved property (an entirely separate action/table) did NOT
+        # free it up.
+        r_generate_again = client.post(
+            "/api/construction-studio/design", headers=headers,
+            json={**plot_spec, "selections": {}},
+        )
+        assert r_generate_again.status_code == 403
+        assert "Monthly design quota reached" in r_generate_again.json()["detail"]
+    finally:
+        set_tier_config(original)
+
+
+def test_deleting_a_saved_property_does_free_up_the_save_limit():
+    """The other half of the same question, for the OTHER limit type:
+    saved_designs_limit counts live rows in `properties` directly, so
+    deleting one genuinely does free up a slot -- confirmed here
+    directly, not assumed from reading the code."""
+    from backend.config_store import get_all_tiers_merged, set_tier_config
+
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "saved_designs_limit": 1, "design_quota_per_month": None}}
+    set_tier_config(tight_config)
+
+    try:
+        email = "savelimit_after_delete@example.com"
+        headers = _authed_headers(email)
+        upsert_subscription(email=email, tier_id="studio_starter", status="active", dodo_subscription_id="sub_sl")
+
+        plot_spec = {
+            "plot_size_sqft": 1000, "plot_length_ft": 40, "plot_width_ft": 25,
+            "entrance_direction": "north", "road_facing_side": "north",
+        }
+
+        floors = [{"floor_number": 1, "floor_label": "Ground Floor", "rooms": []}]
+        r_create1 = client.post("/api/properties", headers=headers, json={"name": "House 1", "plot_spec": plot_spec, "floors": floors})
+        assert r_create1.status_code == 200
+        property_id = r_create1.json()["property_id"]
+
+        # A 2nd save must be blocked -- the save limit (1) is now full.
+        r_create2_blocked = client.post("/api/properties", headers=headers, json={"name": "House 2", "plot_spec": plot_spec, "floors": floors})
+        assert r_create2_blocked.status_code == 403
+        assert "Saved design limit reached" in r_create2_blocked.json()["detail"]
+
+        # Delete the first one.
+        r_delete = client.delete(f"/api/properties/{property_id}", headers=headers)
+        assert r_delete.status_code == 200
+
+        # Now a new save must genuinely succeed -- the slot was freed.
+        r_create2_now_ok = client.post("/api/properties", headers=headers, json={"name": "House 2", "plot_spec": plot_spec, "floors": floors})
+        assert r_create2_now_ok.status_code == 200
+    finally:
+        set_tier_config(original)
