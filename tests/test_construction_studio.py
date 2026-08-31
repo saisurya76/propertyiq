@@ -622,13 +622,48 @@ def test_vnd_idr_php_fx_rates_are_not_missing():
     estimates (an entire house's cement+steel+bricks totaling under $1
     equivalent). Caught by actually running a real estimate and noticing
     the output was nonsensical, not by assuming the materials data alone
-    was sufficient."""
+    was sufficient.
+    """
     from backend.construction_studio import get_fx_rates
 
     rates = get_fx_rates()
     for currency in ("VND", "IDR", "PHP"):
         assert currency in rates
         assert rates[currency] > 10  # all three are genuinely high-denomination currencies vs USD
+
+
+def test_fx_rates_for_supported_countries_are_within_a_sane_current_range():
+    """A real, separate staleness bug caught 2026-08-31: all 4 of the
+    app's other-language-supported countries' FX rates (plus INR, the
+    app's own primary/default currency) were drifted 5-14% from real,
+    current rates verified directly against multiple live sources on
+    the day this was checked -- INR specifically was the worst,
+    stored at 83.5 against a real ~95.3, meaning every Indian user (the
+    app's largest market) was seeing prices roughly 14% lower than a
+    truly current conversion would show. Deliberately wide bounds here
+    (rates do genuinely fluctuate) -- this exists to catch a grossly
+    wrong or accidentally-transposed value (e.g. THB at 3.48 instead of
+    ~33), not to pin an exact rate that would need updating on every
+    real-world market move."""
+    from backend.construction_studio import get_fx_rates
+
+    rates = get_fx_rates()
+    # (currency, minimum sane rate, maximum sane rate) -- generous bands
+    # around the real, verified rates as of 2026-08-31, wide enough to
+    # absorb real market movement without needing constant updates.
+    sane_ranges = {
+        "INR": (75, 115),
+        "THB": (25, 42),
+        "VND": (18000, 29000),
+        "IDR": (13000, 21000),
+        "PHP": (42, 65),
+    }
+    for currency, (low, high) in sane_ranges.items():
+        assert currency in rates, f"{currency} is missing from fx_rates_usd_base entirely"
+        assert low <= rates[currency] <= high, (
+            f"{currency} rate {rates[currency]} is outside the sane {low}-{high} range -- "
+            f"likely stale or a data-entry error, not real market movement"
+        )
 
 
 def test_new_country_cost_estimates_are_realistic():

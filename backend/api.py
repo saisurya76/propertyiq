@@ -8,9 +8,12 @@ import os
 import json
 import uuid
 import asyncio
+import logging
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import requests
+
+logger = logging.getLogger(__name__)
 
 from dodopayments import DodoPayments
 
@@ -295,16 +298,33 @@ def overlay_dodo_prices(tiers: dict[str, Any]) -> dict[str, Any]:
     breaking the pricing page entirely over a transient outage.
     price_source lets the admin panel distinguish a real, live Dodo
     price from a stale local fallback, rather than showing both
-    identically as if they were equally trustworthy."""
+    identically as if they were equally trustworthy.
+
+    Only trusts a Dodo price when its own currency is genuinely USD —
+    a real, necessary check this didn't originally have: every other
+    part of the app's pricing (get_fx_rates's own "USD-based FX table")
+    assumes price_usd really is USD. A Dodo product misconfigured in a
+    different currency would otherwise get silently treated as a raw
+    USD figure and then converted AGAIN by the frontend's own local-
+    currency display logic, double-converting the price incorrectly.
+    Falls back to the local value and logs a warning in that case,
+    since it would mean a real Dodo dashboard misconfiguration worth
+    fixing, not a transient issue to silently paper over."""
     result = {}
     for tier_id, tier in tiers.items():
         tier_copy = dict(tier)
         product_id = TIER_DODO_PRODUCT_IDS.get(tier_id)
         dodo_price = get_dodo_product_price(product_id) if product_id else None
-        if dodo_price:
+        if dodo_price and dodo_price.get("currency", "").lower() == "usd":
             tier_copy["price_usd"] = dodo_price["price_usd"]
             tier_copy["price_source"] = "dodo"
         else:
+            if dodo_price:
+                logger.warning(
+                    f"overlay_dodo_prices: Dodo product for tier={tier_id!r} is configured in "
+                    f"currency={dodo_price.get('currency')!r}, not USD — falling back to the local "
+                    f"price rather than treating a non-USD figure as USD. Check the Dodo dashboard."
+                )
             tier_copy["price_source"] = "local_fallback"
         result[tier_id] = tier_copy
     return result

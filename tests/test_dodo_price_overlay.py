@@ -139,3 +139,29 @@ def test_tiers_endpoint_returns_dodo_overlaid_prices():
     data = r.json()
     assert data["studio_pro"]["price_usd"] == 35.0
     assert data["studio_pro"]["price_source"] == "dodo"
+
+
+def test_overlay_dodo_prices_rejects_a_non_usd_dodo_product():
+    """A real, necessary safety check: every other part of the app's
+    pricing (get_fx_rates's own USD-based FX table) assumes price_usd
+    genuinely is USD. A Dodo product misconfigured in a different
+    currency must not get silently treated as a raw USD figure -- that
+    would double-convert incorrectly once the frontend's own local-
+    currency display logic multiplies it by the FX rate again."""
+    tiers = {"studio_pro": {"label": "Studio Pro", "price_usd": 29, "billing": "subscription", "features": []}}
+    with patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_pro": "prod_pro_123"}), \
+         patch("backend.api.get_dodo_product_price", return_value={"price_usd": 2500.0, "currency": "inr", "is_recurring": True}):
+        result = overlay_dodo_prices(tiers)
+
+    assert result["studio_pro"]["price_usd"] == 29  # untouched local value, NOT the raw INR figure
+    assert result["studio_pro"]["price_source"] == "local_fallback"
+
+
+def test_overlay_dodo_prices_accepts_usd_case_insensitively():
+    tiers = {"studio_pro": {"label": "Studio Pro", "price_usd": 29, "billing": "subscription", "features": []}}
+    with patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_pro": "prod_pro_123"}), \
+         patch("backend.api.get_dodo_product_price", return_value={"price_usd": 35.0, "currency": "USD", "is_recurring": True}):
+        result = overlay_dodo_prices(tiers)
+
+    assert result["studio_pro"]["price_usd"] == 35.0
+    assert result["studio_pro"]["price_source"] == "dodo"

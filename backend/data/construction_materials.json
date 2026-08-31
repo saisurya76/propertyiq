@@ -1784,14 +1784,14 @@
   },
   "fx_rates_usd_base": {
     "USD": 1.0,
-    "INR": 83.5,
-    "THB": 34.8,
+    "INR": 95.3,
+    "THB": 33.05,
     "AED": 3.67,
     "GBP": 0.79,
     "EUR": 0.92,
-    "VND": 25000.0,
-    "IDR": 15800.0,
-    "PHP": 56.0
+    "VND": 23400.0,
+    "IDR": 17700.0,
+    "PHP": 50.8
   },
   "labor_categories": {
     "rcc_work": {
