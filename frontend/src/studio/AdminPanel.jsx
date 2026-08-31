@@ -333,20 +333,27 @@ function AdminPanel({ onBack }) {
           <div className="admin-section admin-section-purple">
             <h3>Tier Configuration</h3>
             <div className="admin-tier-row admin-tier-row-header">
-              <span>Tier</span><span>Price (USD)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Max price watches (blank = unlimited)</span><span>Label</span>
+              <span>Tier</span><span>Price (from Dodo)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Max price watches (blank = unlimited)</span><span>Label</span>
             </div>
+            <p className="admin-section-note" style={{ marginTop: -8 }}>
+              Price is read directly from Dodo Payments — the real, actual amount a customer is
+              charged — and can't be edited here. Change it in the Dodo dashboard instead; editing a
+              locally-stored number here could never actually change what anyone pays, since checkout
+              only ever sends Dodo a product ID, not a price.
+            </p>
             {TIER_ORDER.filter((id) => tierConfig?.[id]).map((tierId) => {
               const tier = tierConfig[tierId];
               return (
                 <Fragment key={tierId}>
                   <div className="admin-tier-row">
                     <span className="admin-tier-row-name">{tierId}</span>
-                    <input
-                      type="number"
-                      placeholder="Price (USD)"
-                      value={tier.price_usd}
-                      onChange={(e) => updateTierField(tierId, "price_usd", Number(e.target.value))}
-                    />
+                    <span title={tier.price_source === "dodo" ? "Live value from Dodo Payments" : "Dodo price unavailable right now — showing the last known/local fallback value"}>
+                      <input
+                        type="text"
+                        disabled
+                        value={`$${tier.price_usd}${tier.price_source === "dodo" ? "" : " (fallback)"}`}
+                      />
+                    </span>
                     <input
                       type="number"
                       value={tier.design_quota_per_month ?? ""}

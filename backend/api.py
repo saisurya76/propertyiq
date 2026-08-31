@@ -224,12 +224,90 @@ PROPERTYIQ_ADMIN_PASSWORD = os.getenv("ADMIN_DASHBOARD_PASSWORD", "") or os.gete
 PROPERTYIQ_BETA_BYPASS_PAYMENTS = os.getenv("PROPERTYIQ_BETA_BYPASS_PAYMENTS", "false").lower() == "true"
 
 # Per-tier Dodo product IDs — each must be created as a recurring/subscription
-# product in the Dodo dashboard first.
+# product in the Dodo dashboard first. insight_addon is included here too
+# (even though it's one-time, not subscription) since both this mapping and
+# the price-overlay logic below need a single, complete lookup covering
+# every tier, not just the 3 subscription ones.
 TIER_DODO_PRODUCT_IDS = {
+    "insight_addon": os.getenv("DODO_PRODUCT_ID_INSIGHT_ADDON", ""),
     "studio_starter": os.getenv("DODO_PRODUCT_ID_STUDIO_STARTER", ""),
     "studio_pro": os.getenv("DODO_PRODUCT_ID_STUDIO_PRO", ""),
     "studio_unlimited": os.getenv("DODO_PRODUCT_ID_STUDIO_UNLIMITED", ""),
 }
+
+
+def get_dodo_product_price(product_id: str) -> Optional[dict[str, Any]]:
+    """Fetches a product's real, current price directly from Dodo's own
+    API — the actual source of truth for what a customer is charged.
+    Cached 1 hour (via the same _get_cached_json/_set_cached_json
+    helpers the neighborhood-insights endpoints use) since prices don't
+    change minute-to-minute and this would otherwise be called on every
+    single pricing-page load.
+
+    This exists because of a real, confirmed gap: PropertyIQ's own
+    stored `price_usd` per tier was never actually sent to Dodo at
+    checkout at all — checkout only ever passes a product_id, and Dodo
+    itself determines the real charge from that product's own
+    configured price. `price_usd` was purely a locally-editable display
+    value with no connection to what a customer is actually charged,
+    meaning an admin editing it in the dashboard could easily, silently
+    create a mismatch between the displayed and the real price. Reading
+    the real price directly from Dodo closes that gap.
+
+    Returns {"price_usd": float, "currency": str, "is_recurring": bool}
+    or None if the product isn't configured, Dodo is unreachable, or
+    the key isn't set — callers should fall back to the locally-stored
+    price in that case rather than breaking the whole pricing page over
+    a transient Dodo outage."""
+    if not product_id or not DODO_API_KEY:
+        return None
+
+    cache_key = f"dodo_product_price_{product_id}"
+    cached = _get_cached_json(cache_key, ttl_hours=1)
+    if cached is not None:
+        return cached
+
+    try:
+        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        product = client.products.retrieve(product_id)
+        price = product.price
+        # price.price is in the smallest currency denomination (cents
+        # for USD) per Dodo's own real API shape — confirmed directly
+        # against the installed SDK's actual Price type, not assumed.
+        result = {
+            "price_usd": round(price.price / 100, 2),
+            "currency": price.currency,
+            "is_recurring": price.type == "recurring_price",
+        }
+    except Exception:
+        return None
+
+    _set_cached_json(cache_key, result)
+    return result
+
+
+def overlay_dodo_prices(tiers: dict[str, Any]) -> dict[str, Any]:
+    """Returns a copy of `tiers` with price_usd/currency replaced by the
+    real, current Dodo price wherever a product is configured and
+    reachable — the locally-stored value is kept as an honest fallback
+    (with price_source explicitly marked) for a tier whose product_id
+    isn't set yet or when Dodo is temporarily unreachable, rather than
+    breaking the pricing page entirely over a transient outage.
+    price_source lets the admin panel distinguish a real, live Dodo
+    price from a stale local fallback, rather than showing both
+    identically as if they were equally trustworthy."""
+    result = {}
+    for tier_id, tier in tiers.items():
+        tier_copy = dict(tier)
+        product_id = TIER_DODO_PRODUCT_IDS.get(tier_id)
+        dodo_price = get_dodo_product_price(product_id) if product_id else None
+        if dodo_price:
+            tier_copy["price_usd"] = dodo_price["price_usd"]
+            tier_copy["price_source"] = "dodo"
+        else:
+            tier_copy["price_source"] = "local_fallback"
+        result[tier_id] = tier_copy
+    return result
 
 
 def get_dodo_webhook_client():
@@ -998,8 +1076,11 @@ def verify_otp_endpoint(request: VerifyOtpRequest):
 def list_tiers():
     """Public tier/pricing config for the pricing page. Base prices are USD;
     convert client-side for display using the same fx table Construction
-    Studio uses."""
-    return get_all_tiers_merged()
+    Studio uses. Prices are overlaid with the real, current value from
+    Dodo's own API wherever a product is configured and reachable — see
+    overlay_dodo_prices's own docstring for why the locally-stored
+    price_usd alone was never actually reliable."""
+    return overlay_dodo_prices(get_all_tiers_merged())
 
 
 @app.get("/api/fx-rates")
@@ -1034,7 +1115,7 @@ def admin_overview(request: AdminAuthRequest):
     _require_admin_password(request.password)
 
     return {
-        "tier_config": get_all_tiers_merged(),
+        "tier_config": overlay_dodo_prices(get_all_tiers_merged()),
         "subscriptions": list_all_subscriptions(),
         "insight_grants": list_all_grants(),
         "all_features": ALL_FEATURES,

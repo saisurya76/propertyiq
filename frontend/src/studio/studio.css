@@ -1576,6 +1576,13 @@
   box-shadow: 0 0 0 3px rgba(46, 134, 193, 0.15);
 }
 
+.admin-tier-row input:disabled {
+  background: var(--grey-100, #ebf5fb);
+  color: var(--grey-600, #5b6f7c);
+  cursor: not-allowed;
+  border-color: var(--grey-200, #d6e4ec);
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
