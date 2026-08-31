@@ -30,7 +30,6 @@ DEFAULT_TIER_CONFIG = {
         "price_usd": 9,
         "features": [
             "similar_property_suggestions",
-            "construction_studio_lite",
             "vastu_compliance",
             "standard_suppliers",
             "property_url_import",
@@ -46,7 +45,6 @@ DEFAULT_TIER_CONFIG = {
         "price_usd": 29,
         "features": [
             "similar_property_suggestions",
-            "construction_studio_lite",
             "vastu_compliance",
             "premium_global_suppliers",
             "property_url_import",
@@ -62,7 +60,6 @@ DEFAULT_TIER_CONFIG = {
         "price_usd": 79,
         "features": [
             "similar_property_suggestions",
-            "construction_studio_lite",
             "vastu_compliance",
             "premium_global_suppliers",
             "priority_cad_formats",
@@ -96,6 +93,27 @@ def initialize_config_store() -> None:
     existing = get_tier_config()
     if existing is None:
         set_tier_config(DEFAULT_TIER_CONFIG)
+        return
+
+    # A real, one-time cleanup for every deployment already past first
+    # run, not just fresh ones: "construction_studio_lite" was listed on
+    # every Studio tier's pricing-page bullet list and admin toggle for
+    # a real stretch of time, but nothing anywhere ever actually checked
+    # it via has_feature() — an already-live database's stored config
+    # still has this dead entry baked in, and DEFAULT_TIER_CONFIG above
+    # only applies to a database that's never been seeded at all. Runs
+    # on every startup, but is a genuine no-op once cleaned (removing an
+    # already-absent string from a list changes nothing), so it's safe
+    # to leave here permanently rather than needing its own one-off
+    # migration script.
+    changed = False
+    for tier in existing.values():
+        features = tier.get("features")
+        if isinstance(features, list) and "construction_studio_lite" in features:
+            tier["features"] = [f for f in features if f != "construction_studio_lite"]
+            changed = True
+    if changed:
+        set_tier_config(existing)
 
 
 def get_tier_config() -> dict[str, Any] | None:
@@ -198,7 +216,6 @@ def get_all_tiers_merged() -> dict[str, Any]:
 # panel would do nothing.
 ALL_FEATURES = [
     "similar_property_suggestions",
-    "construction_studio_lite",
     "vastu_compliance",
     "standard_suppliers",
     "premium_global_suppliers",
