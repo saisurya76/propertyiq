@@ -105,6 +105,18 @@ export const studioApi = {
   adminUpdateSettings: (password, geminiApiKey, niSectionVisibility) =>
     apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility }) }),
 
+  adminLookupPayments: (password, email) =>
+    apiFetch("/api/admin/payments", { method: "POST", body: JSON.stringify({ password, email }) }),
+
+  adminIssueRefund: (password, paymentId, userEmail, reason) =>
+    apiFetch("/api/admin/refunds", { method: "POST", body: JSON.stringify({ password, payment_id: paymentId, user_email: userEmail, reason }) }),
+
+  adminRecordManualRefund: (password, userEmail, amountUsd, currency, reason, adminNote) =>
+    apiFetch("/api/admin/refunds/manual", { method: "POST", body: JSON.stringify({ password, user_email: userEmail, amount_usd: amountUsd, currency, reason, admin_note: adminNote }) }),
+
+  adminListRefunds: (password) =>
+    apiFetch("/api/admin/refunds/list", { method: "POST", body: JSON.stringify({ password }) }),
+
   listProperties: () => apiFetch("/api/properties"),
 
   getProperty: (propertyId) => apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`),

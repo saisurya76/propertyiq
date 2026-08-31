@@ -117,6 +117,14 @@ from backend.subscription_store import (
     list_all_subscriptions,
 )
 
+from backend.refund_store import (
+    initialize_refund_store,
+    record_dodo_refund,
+    record_manual_refund,
+    upsert_refund_status_by_dodo_id,
+    list_all_refunds,
+)
+
 from backend.property_url_extract import extract_property_data, get_gemini_api_key
 
 from backend.insight_store import (
@@ -204,6 +212,7 @@ initialize_property_store()
 initialize_auth_store()
 initialize_config_store()
 initialize_subscription_store()
+initialize_refund_store()
 initialize_insight_store()
 initialize_challenge_store()
 initialize_price_watch_store()
@@ -1177,6 +1186,137 @@ def admin_overview(request: AdminAuthRequest):
     }
 
 
+class AdminPaymentsLookupRequest(BaseModel):
+    password: str
+    email: str
+
+
+@app.post("/api/admin/payments")
+def admin_lookup_payments(request: AdminPaymentsLookupRequest):
+    """Admin-only: looks up a user's real payments directly from Dodo's
+    own API, keyed off whatever dodo_subscription_id PropertyIQ already
+    has on file for their email — so an admin can find the right
+    payment_id to refund without needing to separately dig through
+    Dodo's own dashboard first. Only covers subscription payments this
+    way; a one-time purchase (Insight Add-on, a Standard Report) has no
+    subscription_id at all, so those still need the payment_id pasted
+    in manually from Dodo's dashboard (see the admin panel's own refund
+    form) — a real, honest limitation of this lookup, not a bug."""
+    _require_admin_password(request.password)
+
+    subscription = get_subscription(request.email)
+    if not subscription or not subscription.get("dodo_subscription_id"):
+        return {"payments": [], "note": "No subscription on file for this email — for a one-time purchase (Insight Add-on, Standard Report), paste the payment_id directly from Dodo's dashboard instead."}
+
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+
+    try:
+        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        page = client.payments.list(subscription_id=subscription["dodo_subscription_id"])
+        payments = [
+            {
+                "payment_id": p.payment_id,
+                "amount_usd": round(p.total_amount / 100, 2),
+                "currency": p.currency,
+                "status": p.status,
+                "refund_status": p.refund_status,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in page.items
+        ]
+    except Exception as exc:
+        logger.error(f"admin_lookup_payments: Dodo API call failed for email={request.email!r}: {exc}")
+        raise HTTPException(status_code=502, detail="Couldn't reach Dodo to look up payments — check Render logs for the real error.")
+
+    return {"payments": payments, "note": ""}
+
+
+class AdminIssueRefundRequest(BaseModel):
+    password: str
+    payment_id: str
+    user_email: str
+    reason: Optional[str] = None
+
+
+@app.post("/api/admin/refunds")
+def admin_issue_refund(request: AdminIssueRefundRequest):
+    """Admin-only: issues a REAL refund through Dodo's own API for a
+    given payment_id — this actually moves money back to the customer,
+    it's not just a local record. Full refund only (Dodo's own `items`
+    parameter would allow a partial refund; not exposed here since the
+    admin panel doesn't yet have a way to specify which line item/
+    amount, so this always refunds the payment in full). Records the
+    result in PropertyIQ's own refund store immediately with whatever
+    status Dodo returns right away; the real, final status (a refund
+    can be "pending" before settling) arrives later via the
+    refund.succeeded/refund.failed webhook and updates this same
+    record via upsert_refund_status_by_dodo_id."""
+    _require_admin_password(request.password)
+
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+
+    try:
+        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        refund = client.refunds.create(payment_id=request.payment_id, reason=request.reason)
+    except Exception as exc:
+        logger.error(f"admin_issue_refund: Dodo API call failed for payment_id={request.payment_id!r}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Dodo rejected the refund request: {exc}")
+
+    record = record_dodo_refund(
+        dodo_refund_id=refund.refund_id,
+        dodo_payment_id=request.payment_id,
+        user_email=request.user_email,
+        amount_usd=round(refund.amount / 100, 2) if refund.amount is not None else None,
+        currency=refund.currency,
+        reason=request.reason,
+        status=refund.status,
+    )
+    return {"refund": record}
+
+
+class AdminManualRefundRequest(BaseModel):
+    password: str
+    user_email: str
+    amount_usd: float
+    currency: str = "USD"
+    reason: str
+    admin_note: str
+
+
+@app.post("/api/admin/refunds/manual")
+def admin_record_manual_refund(request: AdminManualRefundRequest):
+    """Admin-only: records a refund PropertyIQ handled OUTSIDE Dodo
+    entirely — the exact, explicit case this whole feature was
+    requested for: something Dodo didn't process (an expired card with
+    no way to re-charge for a correction, a refund issued another way
+    by mistake never going through Dodo, a goodwill gesture done by
+    direct transfer). This makes no real API call and moves no actual
+    money — it's a record-keeping action only, so the admin panel's own
+    refund history stays complete even for cases Dodo never saw."""
+    _require_admin_password(request.password)
+
+    record = record_manual_refund(
+        user_email=request.user_email,
+        amount_usd=request.amount_usd,
+        currency=request.currency,
+        reason=request.reason,
+        admin_note=request.admin_note,
+    )
+    return {"refund": record}
+
+
+@app.post("/api/admin/refunds/list")
+def admin_list_refunds(request: AdminAuthRequest):
+    """Admin-only: every refund record PropertyIQ has — both ones
+    issued through Dodo (whether via this app's own admin panel or
+    directly in Dodo's own dashboard, reflected here via webhook) and
+    manual entries for cases Dodo never handled at all."""
+    _require_admin_password(request.password)
+    return {"refunds": list_all_refunds()}
+
+
 class AdminSettingsRequest(BaseModel):
     password: str
     gemini_api_key: Optional[str] = None
@@ -1548,6 +1688,35 @@ async def dodo_webhook(request: Request):
         mark_order_paid(metadata["order_id"], dodo_payment_id=dodo_payment_id)
     elif event_type == "payment.failed" and metadata.get("product") == "propertyiq_report" and metadata.get("order_id"):
         mark_order_failed(metadata["order_id"])
+    elif event_type in ("refund.succeeded", "refund.failed"):
+        # Keeps PropertyIQ's own refund records current even for a
+        # refund issued directly from Dodo's own dashboard, never
+        # through PropertyIQ's admin panel at all — Dodo's webhook
+        # fires either way, and upsert_refund_status_by_dodo_id's own
+        # docstring explains why this needs to both update an existing
+        # record AND be able to create a new one from scratch.
+        dodo_refund_id = getattr(data, "refund_id", None) or (data.get("refund_id") if isinstance(data, dict) else None)
+        refund_customer = getattr(data, "customer", None) or (data.get("customer") if isinstance(data, dict) else None)
+        refund_email = (
+            getattr(refund_customer, "email", None)
+            or (refund_customer.get("email") if isinstance(refund_customer, dict) else None)
+        )
+        refund_amount = getattr(data, "amount", None) or (data.get("amount") if isinstance(data, dict) else None)
+        refund_currency = getattr(data, "currency", None) or (data.get("currency") if isinstance(data, dict) else None)
+        refund_reason = getattr(data, "reason", None) or (data.get("reason") if isinstance(data, dict) else None)
+        if dodo_refund_id:
+            upsert_refund_status_by_dodo_id(
+                dodo_refund_id=dodo_refund_id,
+                status="succeeded" if event_type == "refund.succeeded" else "failed",
+                dodo_payment_id=dodo_payment_id,
+                user_email=refund_email,
+                # amount is in the smallest currency denomination (cents
+                # for USD) per Dodo's own real API shape, same as
+                # elsewhere in this file — /100 to store real dollars.
+                amount_usd=round(refund_amount / 100, 2) if refund_amount is not None else None,
+                currency=refund_currency,
+                reason=refund_reason,
+            )
 
     return {"received": True}
 

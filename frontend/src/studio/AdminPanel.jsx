@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { studioApi } from "./studioApi";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
@@ -16,6 +16,7 @@ const MENU_ITEMS = [
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
   { screen: "grants", label: "Insight Add-on Grants", desc: "Every Insight Add-on purchase and who it was granted to." },
+  { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
 ];
 
 function AdminPanel({ onBack }) {
@@ -35,6 +36,14 @@ function AdminPanel({ onBack }) {
   const [geminiSaveMessage, setGeminiSaveMessage] = useState("");
   const [niSectionVisibility, setNiSectionVisibility] = useState(null);
   const [niVisibilitySaveMessage, setNiVisibilitySaveMessage] = useState("");
+
+  // Refunds screen state
+  const [refundLookupEmail, setRefundLookupEmail] = useState("");
+  const [refundPayments, setRefundPayments] = useState(null);
+  const [refundLookupNote, setRefundLookupNote] = useState("");
+  const [refundHistory, setRefundHistory] = useState([]);
+  const [refundMessage, setRefundMessage] = useState("");
+  const [manualRefundForm, setManualRefundForm] = useState({ email: "", amount: "", currency: "USD", reason: "", note: "" });
 
   const login = async (e) => {
     e.preventDefault();
@@ -150,6 +159,80 @@ function AdminPanel({ onBack }) {
       setNiVisibilitySaveMessage("Section visibility saved.");
     } catch (err) {
       setError(err.message || "Couldn't save section visibility.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRefundHistory = async () => {
+    try {
+      const res = await studioApi.adminListRefunds(password);
+      setRefundHistory(res.refunds || []);
+    } catch (err) {
+      setError(err.message || "Couldn't load refund history.");
+    }
+  };
+
+  useEffect(() => {
+    if (screen === "refunds" && authed) {
+      Promise.resolve().then(loadRefundHistory);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately only re-runs on screen change, not on every password/authed re-render — loadRefundHistory itself is stable enough here and re-fetching on unrelated state changes isn't needed
+  }, [screen]);
+
+  const lookupPayments = async () => {
+    setRefundMessage("");
+    setError("");
+    setRefundPayments(null);
+    if (!refundLookupEmail.trim()) return;
+    setLoading(true);
+    try {
+      const res = await studioApi.adminLookupPayments(password, refundLookupEmail.trim());
+      setRefundPayments(res.payments || []);
+      setRefundLookupNote(res.note || "");
+    } catch (err) {
+      setError(err.message || "Couldn't look up payments.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const issueRefund = async (paymentId) => {
+    setRefundMessage("");
+    setError("");
+    // A real, irreversible action — this actually moves money back to
+    // the customer via Dodo, so confirming here matters more than for
+    // most other admin actions on this page.
+    if (!window.confirm(`Issue a full refund for payment ${paymentId}? This actually refunds the customer through Dodo — it can't be undone from here.`)) return;
+    setLoading(true);
+    try {
+      await studioApi.adminIssueRefund(password, paymentId, refundLookupEmail.trim(), "Refunded via admin panel");
+      setRefundMessage(`Refund issued for ${paymentId}.`);
+      await loadRefundHistory();
+      await lookupPayments();
+    } catch (err) {
+      setError(err.message || "Couldn't issue refund.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitManualRefund = async () => {
+    setRefundMessage("");
+    setError("");
+    const { email, amount, currency, reason, note } = manualRefundForm;
+    if (!email.trim() || !amount || !reason.trim() || !note.trim()) {
+      setError("Email, amount, reason, and a note are all required for a manual refund record.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await studioApi.adminRecordManualRefund(password, email.trim(), Number(amount), currency, reason.trim(), note.trim());
+      setRefundMessage("Manual refund recorded.");
+      setManualRefundForm({ email: "", amount: "", currency: "USD", reason: "", note: "" });
+      await loadRefundHistory();
+    } catch (err) {
+      setError(err.message || "Couldn't record manual refund.");
     } finally {
       setLoading(false);
     }
@@ -582,6 +665,120 @@ function AdminPanel({ onBack }) {
                         <td>{g.report_id}</td>
                         <td>{g.user_email}</td>
                         <td>{new Date(g.granted_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "refunds" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          {refundMessage && <div className="studio-status-banner">{refundMessage}</div>}
+
+          <div className="admin-section admin-section-blue">
+            <h3>Look up payments &amp; issue a refund</h3>
+            <p className="admin-section-note">
+              Works for subscription payments (Starter/Pro/Unlimited) by email — looked up directly from Dodo.
+              For a one-time purchase (Insight Add-on, Standard Report), there's no subscription to look up by;
+              paste the payment_id from Dodo's own dashboard into the manual section below instead.
+            </p>
+            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto" }}>
+              <input
+                type="email"
+                placeholder="customer@example.com"
+                value={refundLookupEmail}
+                onChange={(e) => setRefundLookupEmail(e.target.value)}
+              />
+              <button className="cs-nav-btn cs-nav-primary" onClick={lookupPayments} disabled={loading || !refundLookupEmail.trim()}>
+                {loading ? "Looking up..." : "Look up payments"}
+              </button>
+            </div>
+
+            {refundPayments !== null && (
+              refundPayments.length === 0 ? (
+                <p className="admin-empty-note">{refundLookupNote || "No payments found for this email."}</p>
+              ) : (
+                <div className="admin-table-scroll" style={{ marginTop: 16 }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr><th>Payment ID</th><th>Amount</th><th>Status</th><th>Refund status</th><th>Date</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {refundPayments.map((p) => (
+                        <tr key={p.payment_id}>
+                          <td>{p.payment_id}</td>
+                          <td>${p.amount_usd} {p.currency?.toUpperCase()}</td>
+                          <td>{p.status}</td>
+                          <td>{p.refund_status || "—"}</td>
+                          <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
+                          <td>
+                            {p.refund_status === "full" ? (
+                              <span className="admin-empty-note">Already fully refunded</span>
+                            ) : (
+                              <button type="button" className="admin-feature-hide-btn" style={{ background: "#fdecea", borderColor: "#f5c6c1", color: "var(--red-600, #c0392b)" }} onClick={() => issueRefund(p.payment_id)} disabled={loading}>
+                                Refund via Dodo
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+          </div>
+
+          <div className="admin-section admin-section-amber">
+            <h3>Record a manual refund</h3>
+            <p className="admin-section-note">
+              For a refund handled OUTSIDE Dodo entirely — something Dodo missed, an expired card refunded by
+              direct transfer, a goodwill refund done another way. This does not call Dodo or move any money —
+              it's a record-keeping entry only, so refund history here stays complete.
+            </p>
+            <div className="admin-tier-row" style={{ gridTemplateColumns: "1.4fr 1fr 1fr" }}>
+              <input type="email" placeholder="Customer email" value={manualRefundForm.email} onChange={(e) => setManualRefundForm({ ...manualRefundForm, email: e.target.value })} />
+              <input type="number" placeholder="Amount" value={manualRefundForm.amount} onChange={(e) => setManualRefundForm({ ...manualRefundForm, amount: e.target.value })} />
+              <input type="text" placeholder="Currency (e.g. USD)" value={manualRefundForm.currency} onChange={(e) => setManualRefundForm({ ...manualRefundForm, currency: e.target.value })} />
+            </div>
+            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr 1fr auto", marginTop: 8 }}>
+              <input type="text" placeholder="Reason (e.g. duplicate charge)" value={manualRefundForm.reason} onChange={(e) => setManualRefundForm({ ...manualRefundForm, reason: e.target.value })} />
+              <input type="text" placeholder="Admin note (how it was actually refunded)" value={manualRefundForm.note} onChange={(e) => setManualRefundForm({ ...manualRefundForm, note: e.target.value })} />
+              <button className="cs-nav-btn cs-nav-primary" onClick={submitManualRefund} disabled={loading}>
+                {loading ? "Recording..." : "Record"}
+              </button>
+            </div>
+          </div>
+
+          <div className="admin-section">
+            <h3>Refund history ({refundHistory.length})</h3>
+            {refundHistory.length === 0 ? (
+              <p className="admin-empty-note">No refunds recorded yet.</p>
+            ) : (
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr><th>Email</th><th>Amount</th><th>Reason</th><th>Status</th><th>Source</th><th>Date</th></tr>
+                  </thead>
+                  <tbody>
+                    {refundHistory.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.user_email}</td>
+                        <td>{r.amount_usd != null ? `$${r.amount_usd} ${(r.currency || "").toUpperCase()}` : "—"}</td>
+                        <td>{r.reason || r.admin_note || "—"}</td>
+                        <td>
+                          <span className={`admin-status-badge ${r.status === "succeeded" ? "admin-status-active" : "admin-status-other"}`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td>{r.is_manual ? "Manual" : "Dodo"}</td>
+                        <td>{new Date(r.created_at).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
