@@ -19,6 +19,8 @@ import ScrollToTopBottom from "./components/ScrollToTopBottom";
 import AdminPanel from "./studio/AdminPanel";
 import SessionBar from "./studio/SessionBar";
 import StudioTopBar from "./studio/StudioTopBar";
+import LegalFooter from "./components/LegalFooter";
+import useTermsGate from "./hooks/useTermsGate";
 import { getSession, clearSession, studioApi } from "./studio/studioApi";
 
 
@@ -151,6 +153,8 @@ function triggerGoogleTranslation(languageCode) {
 }
 
 function App() {
+  const { requireTerms, TermsGateModal } = useTermsGate();
+
   // Memoized (not just a plain const) since it's referenced inside a
   // useEffect dependency array below — without memoizing, a fresh object
   // literal on every render would make that effect re-fire every render
@@ -726,6 +730,7 @@ function App() {
     return (
       <div className="app">
         <StudioAuth onAuthenticated={handleStudioAuthenticated} onBack={backToReport} />
+        <LegalFooter />
         <ScrollToTopBottom />
       </div>
     );
@@ -744,6 +749,7 @@ function App() {
           </div>
         )}
         <StudioPricing reportId={reportId} currency={currency} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} />
+        <LegalFooter />
         <ScrollToTopBottom />
       </div>
     );
@@ -764,6 +770,7 @@ function App() {
             setStudioView("construction");
           }}
         />
+        <LegalFooter />
         <ScrollToTopBottom />
       </div>
     );
@@ -784,6 +791,7 @@ function App() {
             setStudioResetNonce((n) => n + 1);
           }}
         />
+        <LegalFooter />
         <ScrollToTopBottom />
       </div>
     );
@@ -794,6 +802,7 @@ function App() {
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <AdminPanel onBack={backToReport} />
+        <LegalFooter />
         <ScrollToTopBottom />
       </div>
     );
@@ -1082,7 +1091,7 @@ function App() {
           <PropertyForm
             formData={formData}
             handleChange={handleChange}
-            generateAssessment={generateAssessment}
+            generateAssessment={() => requireTerms(generateAssessment)}
             loading={loading}
             onBulkFillFromExtraction={handleBulkFillFromExtraction}
             onLaunchStudio={launchStudio}
@@ -1099,15 +1108,8 @@ function App() {
 
       <Disclaimer />
 
-      <footer className="footer">
-
-      <p>PropertyIQ v1.0.0 Beta</p>
-
-      <p>Independent Property Intelligence</p>
-
-      <p>© 2026 PropertyIQ</p>
-
-    </footer>
+      <LegalFooter />
+      <TermsGateModal />
 
     <ScrollToTopBottom />
 

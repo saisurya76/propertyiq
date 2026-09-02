@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { studioApi } from "./studio/studioApi";
+import LegalFooter from "./components/LegalFooter";
 import "./App.css";
 
 // Same real geolocation-based language map App.jsx's own detect()
@@ -259,6 +260,7 @@ function ChallengeView({ challengeId }) {
           <a href="/" className="challenge-view-home-link">Try PropertyIQ</a>
         </div>
       )}
+      <LegalFooter />
     </div>
   );
 }

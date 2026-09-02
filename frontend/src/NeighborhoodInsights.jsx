@@ -842,6 +842,13 @@ function NeighborhoodInsights({ countryCode }) {
 
       <div className="ni-footer">
         A free tool by PropertyIQ — Know Before You Buy.
+        <div className="legal-footer-links">
+          <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          {" · "}
+          <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          {" · "}
+          <a href="/refund-policy.html" target="_blank" rel="noopener noreferrer">Refund Policy</a>
+        </div>
       </div>
     </div>
   );

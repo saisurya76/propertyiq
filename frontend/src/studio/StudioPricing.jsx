@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { studioApi, getSession } from "./studioApi";
+import useTermsGate from "../hooks/useTermsGate";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
 
@@ -30,6 +31,7 @@ function formatPrice(usdAmount, currency, fxRates) {
 }
 
 function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructionStudio, onSignOut }) {
+  const { requireTerms, TermsGateModal } = useTermsGate();
   const [tiers, setTiers] = useState(null);
   const [fxRates, setFxRates] = useState(null);
   const [status, setStatus] = useState(null);
@@ -98,7 +100,10 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
     try {
       const result = await studioApi.insightCheckout(reportId);
       if (result.checkout_url) {
-        // Full-page redirect to Dodo's external hosted checkout.
+        // Full-page redirect to Dodo's external hosted checkout — not a
+        // React-tracked mutation, so the compiler-oriented immutability
+        // check doesn't apply here.
+        // eslint-disable-next-line react-hooks/immutability
         window.location.href = result.checkout_url;
         return;
       }
@@ -195,7 +200,7 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
                 <button
                   className="studio-tier-btn"
                   disabled={!reportId || loadingTierId === tierId || insightUnlocked}
-                  onClick={handleInsightBuy}
+                  onClick={() => requireTerms(handleInsightBuy)}
                   title={!reportId ? "View a report first to unlock this for that report" : undefined}
                 >
                   {insightUnlocked
@@ -210,7 +215,7 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
                 <button
                   className="studio-tier-btn"
                   disabled={isCurrent || loadingTierId === tierId}
-                  onClick={() => handleSubscribe(tierId)}
+                  onClick={() => requireTerms(() => handleSubscribe(tierId))}
                 >
                   {isCurrent ? "Current plan" : loadingTierId === tierId ? "Processing..." : "Subscribe"}
                 </button>
@@ -223,6 +228,7 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
       <div style={{ textAlign: "center", marginTop: 24 }}>
         <span className="studio-back-link" onClick={onBack}>← Back to report</span>
       </div>
+      <TermsGateModal />
     </div>
   );
 }

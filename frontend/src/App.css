@@ -2555,3 +2555,127 @@ body {
     font-size: 24px;
   }
 }
+
+.footer {
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  padding: 28px 16px 40px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 32px;
+}
+
+.footer p {
+  margin: 4px 0;
+}
+
+.legal-footer-links {
+  margin-top: 10px !important;
+  font-size: 13px;
+}
+
+.legal-footer-links a {
+  color: #4b5563;
+  text-decoration: underline;
+}
+
+.legal-footer-links a:hover {
+  color: #111827;
+}
+
+.terms-gate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.terms-gate-card {
+  background: white;
+  border-radius: 14px;
+  padding: 28px 30px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.terms-gate-card h3 {
+  margin: 0 0 10px;
+  font-size: 19px;
+  color: #14283d;
+}
+
+.terms-gate-body {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.terms-gate-links {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.terms-gate-links a {
+  color: #2e86c1;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.terms-gate-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: #14283d;
+  cursor: pointer;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.terms-gate-checkbox input {
+  margin-top: 3px;
+  width: auto;
+  cursor: pointer;
+}
+
+.terms-gate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.terms-gate-decline {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid #d6e4ec;
+  background: white;
+  color: #5b6f7c;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.terms-gate-accept {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #14283d;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.terms-gate-accept:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
