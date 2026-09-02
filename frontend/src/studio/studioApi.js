@@ -117,6 +117,24 @@ export const studioApi = {
   adminListRefunds: (password) =>
     apiFetch("/api/admin/refunds/list", { method: "POST", body: JSON.stringify({ password }) }),
 
+  submitRefundRequest: (userEmail, reasonCode, details, purchaseReference) =>
+    apiFetch("/api/refund-requests", { method: "POST", body: JSON.stringify({ user_email: userEmail, reason_code: reasonCode, details, purchase_reference: purchaseReference }) }),
+
+  checkRefundRequestStatus: (requestId, userEmail) =>
+    apiFetch("/api/refund-requests/status", { method: "POST", body: JSON.stringify({ request_id: requestId, user_email: userEmail }) }),
+
+  adminListRefundRequests: (password, status) =>
+    apiFetch("/api/admin/refund-requests/list", { method: "POST", body: JSON.stringify({ password, status }) }),
+
+  adminApproveRefundRequestViaDodo: (password, requestId, paymentId, adminResponse) =>
+    apiFetch("/api/admin/refund-requests/approve-dodo", { method: "POST", body: JSON.stringify({ password, request_id: requestId, payment_id: paymentId, admin_response: adminResponse }) }),
+
+  adminApproveRefundRequestManually: (password, requestId, amountUsd, currency, adminNote, adminResponse) =>
+    apiFetch("/api/admin/refund-requests/approve-manual", { method: "POST", body: JSON.stringify({ password, request_id: requestId, amount_usd: amountUsd, currency, admin_note: adminNote, admin_response: adminResponse }) }),
+
+  adminDenyRefundRequest: (password, requestId, adminResponse) =>
+    apiFetch("/api/admin/refund-requests/deny", { method: "POST", body: JSON.stringify({ password, request_id: requestId, admin_response: adminResponse }) }),
+
   listProperties: () => apiFetch("/api/properties"),
 
   getProperty: (propertyId) => apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`),

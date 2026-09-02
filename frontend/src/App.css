@@ -2679,3 +2679,88 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.refund-request-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.refund-request-card {
+  background: white;
+  border-radius: 14px;
+  padding: 28px 30px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.refund-request-card h3 {
+  margin: 0 0 10px;
+  font-size: 19px;
+  color: #14283d;
+}
+
+.refund-request-intro {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.refund-request-error {
+  background: #fdecea;
+  border: 1px solid #f5c6c1;
+  color: #c0392b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.refund-request-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #14283d;
+  margin: 14px 0 6px;
+}
+
+.refund-request-card input,
+.refund-request-card select,
+.refund-request-card textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d6e4ec;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.refund-request-card textarea {
+  resize: vertical;
+}
+
+.refund-request-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.refund-request-reference {
+  font-size: 13px;
+  color: #5b6f7c;
+  background: #f7f9fb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 14px 0 20px;
+}

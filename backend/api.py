@@ -94,6 +94,7 @@ from backend.auth_store import (
 from backend.auth import (
     send_otp_email,
     get_current_user_email,
+    send_email,
 )
 
 from backend.config_store import (
@@ -123,6 +124,12 @@ from backend.refund_store import (
     record_manual_refund,
     upsert_refund_status_by_dodo_id,
     list_all_refunds,
+    VALID_REASON_CODES,
+    create_refund_request,
+    get_refund_request_for_user,
+    list_refund_requests,
+    approve_refund_request,
+    deny_refund_request,
 )
 
 from backend.property_url_extract import extract_property_data, get_gemini_api_key
@@ -1239,6 +1246,33 @@ class AdminIssueRefundRequest(BaseModel):
     reason: Optional[str] = None
 
 
+def _issue_dodo_refund(payment_id: str, user_email: str, reason: Optional[str]) -> dict[str, Any]:
+    """The real, shared Dodo-refund-issuing logic — extracted so both
+    the standalone admin_issue_refund endpoint and the refund-request
+    approval flow below call the exact same real path, rather than two
+    slightly different copies of "call Dodo, then record the result"
+    drifting apart over time."""
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+
+    try:
+        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        refund = client.refunds.create(payment_id=payment_id, reason=reason)
+    except Exception as exc:
+        logger.error(f"_issue_dodo_refund: Dodo API call failed for payment_id={payment_id!r}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Dodo rejected the refund request: {exc}")
+
+    return record_dodo_refund(
+        dodo_refund_id=refund.refund_id,
+        dodo_payment_id=payment_id,
+        user_email=user_email,
+        amount_usd=round(refund.amount / 100, 2) if refund.amount is not None else None,
+        currency=refund.currency,
+        reason=reason,
+        status=refund.status,
+    )
+
+
 @app.post("/api/admin/refunds")
 def admin_issue_refund(request: AdminIssueRefundRequest):
     """Admin-only: issues a REAL refund through Dodo's own API for a
@@ -1253,26 +1287,7 @@ def admin_issue_refund(request: AdminIssueRefundRequest):
     refund.succeeded/refund.failed webhook and updates this same
     record via upsert_refund_status_by_dodo_id."""
     _require_admin_password(request.password)
-
-    if not DODO_API_KEY:
-        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
-
-    try:
-        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
-        refund = client.refunds.create(payment_id=request.payment_id, reason=request.reason)
-    except Exception as exc:
-        logger.error(f"admin_issue_refund: Dodo API call failed for payment_id={request.payment_id!r}: {exc}")
-        raise HTTPException(status_code=502, detail=f"Dodo rejected the refund request: {exc}")
-
-    record = record_dodo_refund(
-        dodo_refund_id=refund.refund_id,
-        dodo_payment_id=request.payment_id,
-        user_email=request.user_email,
-        amount_usd=round(refund.amount / 100, 2) if refund.amount is not None else None,
-        currency=refund.currency,
-        reason=request.reason,
-        status=refund.status,
-    )
+    record = _issue_dodo_refund(request.payment_id, request.user_email, request.reason)
     return {"refund": record}
 
 
@@ -1315,6 +1330,204 @@ def admin_list_refunds(request: AdminAuthRequest):
     manual entries for cases Dodo never handled at all."""
     _require_admin_password(request.password)
     return {"refunds": list_all_refunds()}
+
+
+# ---------------------------------------------------------------------
+# Refund requests — the user-facing intake queue. See
+# refund_request_module_spec.md for the full design.
+# ---------------------------------------------------------------------
+
+class RefundRequestCreate(BaseModel):
+    user_email: str
+    reason_code: str
+    details: Optional[str] = None
+    purchase_reference: Optional[str] = None
+
+
+@app.post("/api/refund-requests")
+def submit_refund_request(request: RefundRequestCreate):
+    """Public: a customer submits a refund request against one of the
+    real, fixed scenarios the refund policy actually defines — not a
+    free-text-only box admin has to interpret from scratch every time.
+    `details` is required when reason_code is "other" since that's the
+    one case with no predefined clause to fall back on."""
+    if request.reason_code not in VALID_REASON_CODES:
+        raise HTTPException(status_code=400, detail=f"reason_code must be one of: {', '.join(sorted(VALID_REASON_CODES))}")
+    if request.reason_code == "other" and not (request.details or "").strip():
+        raise HTTPException(status_code=400, detail="Please describe the issue — 'other' has no predefined reason to fall back on.")
+
+    record = create_refund_request(
+        user_email=request.user_email,
+        reason_code=request.reason_code,
+        details=request.details,
+        purchase_reference=request.purchase_reference,
+    )
+
+    # Best-effort confirmation email — matches the refund policy's own
+    # stated "we aim to respond within 3 business days" commitment.
+    # Never blocks or fails the request itself if email sending has a
+    # problem; the request is already safely recorded above regardless.
+    try:
+        send_email(
+            to_email=request.user_email,
+            subject="We've received your refund request",
+            html=(
+                f"We've received your refund request (reference {record['id']}).<br><br>"
+                "We aim to respond within 3 business days, per our refund policy: "
+                '<a href="https://app.propertyiqweb.com/refund-policy.html">refund policy</a>'
+            ),
+        )
+    except Exception as exc:
+        logger.error(f"submit_refund_request: confirmation email failed for {request.user_email!r}: {exc}")
+
+    return {"request": record}
+
+
+class RefundRequestStatusQuery(BaseModel):
+    request_id: str
+    user_email: str
+
+
+@app.post("/api/refund-requests/status")
+def check_refund_request_status(request: RefundRequestStatusQuery):
+    """Public status check — no login required, since a Standard Report
+    purchase doesn't require an account at all. Requires both the
+    request id AND the matching email (see get_refund_request_for_user's
+    own docstring) so a guessed/leaked id alone can't expose someone
+    else's request."""
+    record = get_refund_request_for_user(request.request_id, request.user_email)
+    if not record:
+        raise HTTPException(status_code=404, detail="No matching refund request found for that email and reference.")
+    return {"request": record}
+
+
+class AdminRefundRequestsListRequest(BaseModel):
+    password: str
+    status: Optional[str] = None
+
+
+@app.post("/api/admin/refund-requests/list")
+def admin_list_refund_requests(request: AdminRefundRequestsListRequest):
+    """Admin-only: the refund request queue, optionally filtered to one
+    status (pending/approved/denied)."""
+    _require_admin_password(request.password)
+    return {"requests": list_refund_requests(status=request.status)}
+
+
+class AdminApproveRefundRequestDodoRequest(BaseModel):
+    password: str
+    request_id: str
+    payment_id: str
+    admin_response: Optional[str] = None
+
+
+@app.post("/api/admin/refund-requests/approve-dodo")
+def admin_approve_refund_request_via_dodo(request: AdminApproveRefundRequestDodoRequest):
+    """Admin-only: approves a pending request by actually issuing a
+    real refund through Dodo (reusing the exact same _issue_dodo_refund
+    path the standalone admin_issue_refund endpoint uses — not a
+    separate copy of that logic), then links the request to the
+    resulting refund record."""
+    _require_admin_password(request.password)
+
+    matched = next((r for r in list_refund_requests() if r["id"] == request.request_id), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail="No refund request found with that id.")
+    if matched["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"This request is already {matched['status']}, not pending.")
+
+    refund_record = _issue_dodo_refund(request.payment_id, matched["user_email"], matched["reason_code"])
+    updated = approve_refund_request(request.request_id, refund_record["id"], request.admin_response)
+
+    try:
+        send_email(
+            to_email=matched["user_email"],
+            subject="Your PropertyIQ refund has been issued",
+            html=request.admin_response or "Your refund request has been approved and issued.",
+        )
+    except Exception as exc:
+        logger.error(f"admin_approve_refund_request_via_dodo: notification email failed: {exc}")
+
+    return {"request": updated, "refund": refund_record}
+
+
+class AdminApproveRefundRequestManualRequest(BaseModel):
+    password: str
+    request_id: str
+    amount_usd: float
+    currency: str = "USD"
+    admin_note: str
+    admin_response: Optional[str] = None
+
+
+@app.post("/api/admin/refund-requests/approve-manual")
+def admin_approve_refund_request_manually(request: AdminApproveRefundRequestManualRequest):
+    """Admin-only: approves a pending request for a case Dodo can't
+    process — the exact "not handled by Dodo" scenario this whole
+    module exists for — recording a manual refund entry and linking
+    the request to it, same as the Dodo path above."""
+    _require_admin_password(request.password)
+
+    matched = next((r for r in list_refund_requests() if r["id"] == request.request_id), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail="No refund request found with that id.")
+    if matched["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"This request is already {matched['status']}, not pending.")
+
+    refund_record = record_manual_refund(
+        user_email=matched["user_email"],
+        amount_usd=request.amount_usd,
+        currency=request.currency,
+        reason=matched["reason_code"],
+        admin_note=request.admin_note,
+    )
+    updated = approve_refund_request(request.request_id, refund_record["id"], request.admin_response)
+
+    try:
+        send_email(
+            to_email=matched["user_email"],
+            subject="Your PropertyIQ refund has been processed",
+            html=request.admin_response or "Your refund request has been approved and processed.",
+        )
+    except Exception as exc:
+        logger.error(f"admin_approve_refund_request_manually: notification email failed: {exc}")
+
+    return {"request": updated, "refund": refund_record}
+
+
+class AdminDenyRefundRequestRequest(BaseModel):
+    password: str
+    request_id: str
+    admin_response: str
+
+
+@app.post("/api/admin/refund-requests/deny")
+def admin_deny_refund_request(request: AdminDenyRefundRequestRequest):
+    """Admin-only: denies a pending request with a required reason,
+    shown back to the user — a denial with no explanation isn't useful
+    to them."""
+    _require_admin_password(request.password)
+
+    matched = next((r for r in list_refund_requests() if r["id"] == request.request_id), None)
+    if not matched:
+        raise HTTPException(status_code=404, detail="No refund request found with that id.")
+    if matched["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"This request is already {matched['status']}, not pending.")
+    if not request.admin_response.strip():
+        raise HTTPException(status_code=400, detail="A reason is required when denying a request.")
+
+    updated = deny_refund_request(request.request_id, request.admin_response)
+
+    try:
+        send_email(
+            to_email=matched["user_email"],
+            subject="Update on your PropertyIQ refund request",
+            html=f"Your refund request could not be approved: {request.admin_response}",
+        )
+    except Exception as exc:
+        logger.error(f"admin_deny_refund_request: notification email failed: {exc}")
+
+    return {"request": updated}
 
 
 class AdminSettingsRequest(BaseModel):

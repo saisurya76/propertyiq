@@ -37,6 +37,30 @@ def initialize_refund_store() -> None:
                 )
                 """
             )
+            # A request queue sitting upstream of the `refunds` table
+            # above -- a customer's claim, reviewed by an admin, which
+            # (once approved) becomes a real row in `refunds` via the
+            # existing issue-via-Dodo or record-manual flows. Kept
+            # deliberately separate rather than merged into `refunds`
+            # itself: a request that gets denied, or one still awaiting
+            # review, was never a real refund and shouldn't live in the
+            # same table as ones that genuinely happened.
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS refund_requests (
+                    id TEXT PRIMARY KEY,
+                    user_email TEXT NOT NULL,
+                    reason_code TEXT NOT NULL,
+                    details TEXT,
+                    purchase_reference TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    linked_refund_id TEXT,
+                    admin_response TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
         connection.commit()
 
 
@@ -162,3 +186,112 @@ def list_all_refunds() -> list[dict[str, Any]]:
         with connection.cursor() as cursor:
             cursor.execute("SELECT * FROM refunds ORDER BY created_at DESC")
             return cursor.fetchall()
+
+
+# ---------------------------------------------------------------------
+# Refund requests — the user-facing intake queue sitting upstream of
+# the refund-fulfillment functions above. See refund_request_module_spec.md
+# for the full design; this is the "simple way" version of it.
+# ---------------------------------------------------------------------
+
+VALID_REASON_CODES = {
+    "report_never_generated",
+    "duplicate_charge",
+    "report_incorrect",
+    "insight_addon_technical_failure",
+    "first_month_guarantee",
+    "charged_after_cancellation",
+    "wrong_plan_charged",
+    "other",
+}
+
+
+def create_refund_request(
+    *,
+    user_email: str,
+    reason_code: str,
+    details: Optional[str],
+    purchase_reference: Optional[str],
+) -> dict[str, Any]:
+    now = datetime.now(timezone.utc).isoformat()
+    record_id = str(uuid.uuid4())
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO refund_requests (id, user_email, reason_code, details, purchase_reference, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
+                """,
+                (record_id, user_email.strip().lower(), reason_code, details, purchase_reference, now, now),
+            )
+        connection.commit()
+    return get_refund_request(record_id)
+
+
+def get_refund_request(record_id: str) -> Optional[dict[str, Any]]:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM refund_requests WHERE id = %s", (record_id,))
+            return cursor.fetchone()
+
+
+def get_refund_request_for_user(record_id: str, user_email: str) -> Optional[dict[str, Any]]:
+    """The public status-check lookup — deliberately requires BOTH the
+    request id and the matching email, not just the id alone, so a
+    guessed/leaked request id can't be used to read someone else's
+    refund request details (which purchase, what reason, any admin
+    response)."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM refund_requests WHERE id = %s AND user_email = %s",
+                (record_id, user_email.strip().lower()),
+            )
+            return cursor.fetchone()
+
+
+def list_refund_requests(status: Optional[str] = None) -> list[dict[str, Any]]:
+    """The admin queue view, most recent first, optionally filtered to
+    one status (pending/approved/denied)."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            if status:
+                cursor.execute(
+                    "SELECT * FROM refund_requests WHERE status = %s ORDER BY created_at DESC",
+                    (status,),
+                )
+            else:
+                cursor.execute("SELECT * FROM refund_requests ORDER BY created_at DESC")
+            return cursor.fetchall()
+
+
+def approve_refund_request(record_id: str, linked_refund_id: str, admin_response: Optional[str] = None) -> Optional[dict[str, Any]]:
+    """Marks a request approved once it's actually been fulfilled — via
+    either the real Dodo refund flow or a manual entry — linking back
+    to the resulting row in the `refunds` table so the two stay
+    traceable to each other."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE refund_requests SET status = 'approved', linked_refund_id = %s, admin_response = %s, updated_at = %s WHERE id = %s",
+                (linked_refund_id, admin_response, now, record_id),
+            )
+        connection.commit()
+    return get_refund_request(record_id)
+
+
+def deny_refund_request(record_id: str, admin_response: str) -> Optional[dict[str, Any]]:
+    """admin_response is required here (unlike approval's optional
+    note) since it's the reason shown back to the user for why their
+    request was denied -- a denial with no explanation isn't useful to
+    them."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE refund_requests SET status = 'denied', admin_response = %s, updated_at = %s WHERE id = %s",
+                (admin_response, now, record_id),
+            )
+        connection.commit()
+    return get_refund_request(record_id)

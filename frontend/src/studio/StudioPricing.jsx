@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { studioApi, getSession } from "./studioApi";
 import useTermsGate from "../hooks/useTermsGate";
+import RefundRequestForm from "./RefundRequestForm";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
 
@@ -32,6 +33,7 @@ function formatPrice(usdAmount, currency, fxRates) {
 
 function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructionStudio, onSignOut }) {
   const { requireTerms, TermsGateModal } = useTermsGate();
+  const [showRefundRequest, setShowRefundRequest] = useState(false);
   const [tiers, setTiers] = useState(null);
   const [fxRates, setFxRates] = useState(null);
   const [status, setStatus] = useState(null);
@@ -227,8 +229,13 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
 
       <div style={{ textAlign: "center", marginTop: 24 }}>
         <span className="studio-back-link" onClick={onBack}>← Back to report</span>
+        {" · "}
+        <span className="studio-back-link" onClick={() => setShowRefundRequest(true)}>Request a refund</span>
       </div>
       <TermsGateModal />
+      {showRefundRequest && (
+        <RefundRequestForm defaultEmail={getSession()?.email || ""} onClose={() => setShowRefundRequest(false)} />
+      )}
     </div>
   );
 }

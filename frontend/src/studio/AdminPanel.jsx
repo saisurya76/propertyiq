@@ -9,6 +9,21 @@ const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unl
 // to on click — clean segregation into sections, each reached by
 // clicking its own tile, rather than one long page with everything
 // visible at once.
+// Human-readable labels for the fixed reason codes refund_store.py's
+// VALID_REASON_CODES defines — matches the real refund policy clauses
+// exactly (see refund_request_module_spec.md section 3), not invented
+// separately from what the backend actually validates against.
+const REFUND_REASON_LABELS = {
+  report_never_generated: "Report never generated",
+  duplicate_charge: "Duplicate charge",
+  report_incorrect: "Report materially incorrect",
+  insight_addon_technical_failure: "Insight Add-on didn't unlock",
+  first_month_guarantee: "First-month guarantee",
+  charged_after_cancellation: "Charged after cancellation",
+  wrong_plan_charged: "Charged for the wrong plan",
+  other: "Other",
+};
+
 const MENU_ITEMS = [
   { screen: "overview", label: "Overview & Analytics", desc: "Subscription counts, insight purchases, and estimated revenue." },
   { screen: "tiers", label: "Tier Configuration", desc: "Prices, quotas, and which features each tier includes." },
@@ -17,6 +32,7 @@ const MENU_ITEMS = [
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
   { screen: "grants", label: "Insight Add-on Grants", desc: "Every Insight Add-on purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
+  { screen: "refund-requests", label: "Refund Requests", desc: "Review and act on refund requests customers have actually submitted." },
 ];
 
 function AdminPanel({ onBack }) {
@@ -44,6 +60,13 @@ function AdminPanel({ onBack }) {
   const [refundHistory, setRefundHistory] = useState([]);
   const [refundMessage, setRefundMessage] = useState("");
   const [manualRefundForm, setManualRefundForm] = useState({ email: "", amount: "", currency: "USD", reason: "", note: "" });
+
+  // Refund Requests screen state
+  const [refundRequests, setRefundRequests] = useState([]);
+  const [refundRequestsFilter, setRefundRequestsFilter] = useState("pending");
+  const [refundRequestsMessage, setRefundRequestsMessage] = useState("");
+  const [expandedRequestId, setExpandedRequestId] = useState(null);
+  const [decisionForms, setDecisionForms] = useState({});
 
   const login = async (e) => {
     e.preventDefault();
@@ -179,6 +202,87 @@ function AdminPanel({ onBack }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately only re-runs on screen change, not on every password/authed re-render — loadRefundHistory itself is stable enough here and re-fetching on unrelated state changes isn't needed
   }, [screen]);
+
+  const loadRefundRequests = async (statusFilter) => {
+    try {
+      const res = await studioApi.adminListRefundRequests(password, statusFilter || undefined);
+      setRefundRequests(res.requests || []);
+    } catch (err) {
+      setError(err.message || "Couldn't load refund requests.");
+    }
+  };
+
+  useEffect(() => {
+    if (screen === "refund-requests" && authed) {
+      Promise.resolve().then(() => loadRefundRequests(refundRequestsFilter));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-runs on screen entry and on filter change; loadRefundRequests itself is stable here
+  }, [screen, refundRequestsFilter]);
+
+  const updateDecisionForm = (requestId, patch) => {
+    setDecisionForms((prev) => ({ ...prev, [requestId]: { ...(prev[requestId] || {}), ...patch } }));
+  };
+
+  const approveViaDodo = async (requestId) => {
+    const form = decisionForms[requestId] || {};
+    if (!form.paymentId?.trim()) {
+      setError("Enter the Dodo payment_id to refund.");
+      return;
+    }
+    if (!window.confirm("Issue a real refund through Dodo for this request? This actually moves money and can't be undone from here.")) return;
+    setRefundRequestsMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      await studioApi.adminApproveRefundRequestViaDodo(password, requestId, form.paymentId.trim(), form.response?.trim() || undefined);
+      setRefundRequestsMessage("Refund issued and request approved.");
+      await loadRefundRequests(refundRequestsFilter);
+    } catch (err) {
+      setError(err.message || "Couldn't approve via Dodo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const approveManually = async (requestId) => {
+    const form = decisionForms[requestId] || {};
+    if (!form.amount || !form.note?.trim()) {
+      setError("Amount and a note on how it was actually refunded are both required for a manual approval.");
+      return;
+    }
+    setRefundRequestsMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      await studioApi.adminApproveRefundRequestManually(password, requestId, Number(form.amount), form.currency || "USD", form.note.trim(), form.response?.trim() || undefined);
+      setRefundRequestsMessage("Manual refund recorded and request approved.");
+      await loadRefundRequests(refundRequestsFilter);
+    } catch (err) {
+      setError(err.message || "Couldn't record the manual approval.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const denyRequest = async (requestId) => {
+    const form = decisionForms[requestId] || {};
+    if (!form.response?.trim()) {
+      setError("A reason is required when denying a request — it's shown back to the customer.");
+      return;
+    }
+    setRefundRequestsMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      await studioApi.adminDenyRefundRequest(password, requestId, form.response.trim());
+      setRefundRequestsMessage("Request denied.");
+      await loadRefundRequests(refundRequestsFilter);
+    } catch (err) {
+      setError(err.message || "Couldn't deny the request.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const lookupPayments = async () => {
     setRefundMessage("");
@@ -784,6 +888,129 @@ function AdminPanel({ onBack }) {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "refund-requests" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          {refundRequestsMessage && <div className="studio-status-banner">{refundRequestsMessage}</div>}
+
+          <div className="admin-section admin-section-amber">
+            <h3>Refund Requests ({refundRequests.length})</h3>
+            <p className="admin-section-note">
+              Requests customers have actually submitted, each tied to a real policy scenario. Approving
+              one either issues a real refund via Dodo or records a manual entry — the same fulfillment
+              this screen's sibling "Refunds" tile already uses, just started from a real request instead
+              of an ad-hoc lookup.
+            </p>
+            <div className="admin-tier-features-row" style={{ marginBottom: 16 }}>
+              <span className="admin-tier-features-label">Filter:</span>
+              {["pending", "approved", "denied"].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="admin-feature-hide-btn"
+                  style={
+                    refundRequestsFilter === s
+                      ? { background: "#14283d", borderColor: "#14283d", color: "white" }
+                      : { background: "white", borderColor: "var(--grey-200, #d6e4ec)", color: "var(--grey-600, #5b6f7c)" }
+                  }
+                  onClick={() => setRefundRequestsFilter(s)}
+                >
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {refundRequests.length === 0 ? (
+              <p className="admin-empty-note">No {refundRequestsFilter} requests.</p>
+            ) : (
+              refundRequests.map((req) => {
+                const isOpen = expandedRequestId === req.id;
+                const form = decisionForms[req.id] || {};
+                return (
+                  <div key={req.id} className="admin-section" style={{ marginBottom: 12, padding: 16 }}>
+                    <div
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                      onClick={() => setExpandedRequestId(isOpen ? null : req.id)}
+                    >
+                      <div>
+                        <strong>{req.user_email}</strong>
+                        {" — "}
+                        {REFUND_REASON_LABELS[req.reason_code] || req.reason_code}
+                        <span
+                          className={`admin-status-badge ${req.status === "approved" ? "admin-status-active" : "admin-status-other"}`}
+                          style={{ marginLeft: 10 }}
+                        >
+                          {req.status}
+                        </span>
+                      </div>
+                      <span className="admin-empty-note">{new Date(req.created_at).toLocaleString()}</span>
+                    </div>
+
+                    {isOpen && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--grey-100, #ebf5fb)" }}>
+                        {req.purchase_reference && <p><strong>Purchase reference:</strong> {req.purchase_reference}</p>}
+                        {req.details && <p><strong>Customer's notes:</strong> {req.details}</p>}
+                        {req.admin_response && <p><strong>Admin response:</strong> {req.admin_response}</p>}
+
+                        {req.status === "pending" && (
+                          <>
+                            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 10 }}>
+                              <input
+                                type="text"
+                                placeholder="Dodo payment_id (to refund via Dodo)"
+                                value={form.paymentId || ""}
+                                onChange={(e) => updateDecisionForm(req.id, { paymentId: e.target.value })}
+                              />
+                              <button className="cs-nav-btn cs-nav-primary" onClick={() => approveViaDodo(req.id)} disabled={loading}>
+                                Approve &amp; Refund via Dodo
+                              </button>
+                            </div>
+                            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr 1fr 1fr", marginTop: 8 }}>
+                              <input
+                                type="number"
+                                placeholder="Amount"
+                                value={form.amount || ""}
+                                onChange={(e) => updateDecisionForm(req.id, { amount: e.target.value })}
+                              />
+                              <input
+                                type="text"
+                                placeholder="How it was actually refunded"
+                                value={form.note || ""}
+                                onChange={(e) => updateDecisionForm(req.id, { note: e.target.value })}
+                              />
+                              <button className="cs-nav-btn cs-nav-primary" onClick={() => approveManually(req.id)} disabled={loading}>
+                                Approve &amp; Record Manual
+                              </button>
+                            </div>
+                            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto", marginTop: 8 }}>
+                              <input
+                                type="text"
+                                placeholder="Response shown to the customer (required to deny; optional note on approval)"
+                                value={form.response || ""}
+                                onChange={(e) => updateDecisionForm(req.id, { response: e.target.value })}
+                              />
+                              <button
+                                type="button"
+                                className="admin-feature-hide-btn"
+                                onClick={() => denyRequest(req.id)}
+                                disabled={loading}
+                              >
+                                Deny
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </>
