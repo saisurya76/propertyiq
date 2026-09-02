@@ -3,6 +3,7 @@ import { studioApi } from "./studioApi";
 import PlotPreview from "./PlotPreview";
 import { evaluateAdjacency, ARCHITECTURAL_STYLE_LABELS } from "./adjacencyEngine";
 import ComplianceInfoIcon from "./ComplianceInfoIcon";
+import useTermsGate from "../hooks/useTermsGate";
 import DisciplineOverlayView from "./DisciplineOverlayView";
 
 const RoomCanvas = lazy(() => import("./RoomCanvas"));
@@ -210,6 +211,7 @@ function formatLinePrice(usdPerUnit, plotSizeSqft, currency, fxRates, openingAre
 }
 
 function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStartNew, urlCountryContext }) {
+  const { requireTerms, TermsGateModal } = useTermsGate();
   const [step, setStep] = useState(0);
 
   // A URL country context (visiting /th) only seeds a BRAND NEW design's
@@ -2085,7 +2087,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
                 {Object.keys(selections).length} material{Object.keys(selections).length === 1 ? "" : "s"} selected ·{" "}
                 {rooms.filter((r) => r.name.trim()).length} room(s)
               </p>
-              <button className="cs-nav-btn cs-nav-primary" onClick={generateDesign} disabled={loading || overflowWarnings.length > 0}>
+              <button className="cs-nav-btn cs-nav-primary" onClick={() => requireTerms(generateDesign)} disabled={loading || overflowWarnings.length > 0}>
                 {loading ? "Generating..." : overflowWarnings.length > 0 ? "Fix layout errors above first" : "Generate Design"}
               </button>
             </>
@@ -2236,6 +2238,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
           </span>
         </div>
       )}
+      <TermsGateModal />
     </div>
   );
 }
