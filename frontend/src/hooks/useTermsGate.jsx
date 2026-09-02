@@ -70,7 +70,7 @@ function useTermsGate() {
           <h3>Before you continue</h3>
           <p className="terms-gate-body">
             Please review and accept our policies to continue. Reports and cost estimates are informational,
-            not professional advice — see our Terms for what that means and our full refund terms.
+            not professional advice — see our Terms for what that means.
           </p>
           <ul className="terms-gate-links">
             <li><a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer">Terms of Service</a></li>
