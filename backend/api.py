@@ -118,6 +118,8 @@ from backend.subscription_store import (
     list_all_subscriptions,
 )
 
+from backend.payment_email import build_payment_confirmation_html
+
 from backend.refund_store import (
     initialize_refund_store,
     record_dodo_refund,
@@ -1779,6 +1781,30 @@ def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: st
     return {"extracted": extracted}
 
 
+def _send_payment_confirmation_email(user_email: Optional[str], product_name: str, amount_usd: Optional[float], currency: Optional[str], payment_id: Optional[str]) -> None:
+    """Best-effort: sends PropertyIQ's own branded payment confirmation
+    (see payment_email.py's own module docstring for how this relates
+    to Dodo's own separate, automatic receipt email). Never raises —
+    a failure here must not break webhook processing, which has
+    already recorded the real, important state change (tier activated,
+    access granted, order marked paid) by the time this runs."""
+    if not user_email:
+        return
+    try:
+        send_email(
+            to_email=user_email,
+            subject=f"Payment confirmed — {product_name}",
+            html=build_payment_confirmation_html(
+                product_name=product_name,
+                amount_usd=amount_usd,
+                currency=currency or "USD",
+                payment_id=payment_id,
+            ),
+        )
+    except Exception as exc:
+        logger.error(f"_send_payment_confirmation_email: failed for {user_email!r}, product={product_name!r}: {exc}")
+
+
 @app.post("/api/webhooks/dodo")
 async def dodo_webhook(request: Request):
     """Handles subscription lifecycle + one-time Insight add-on payments.
@@ -1838,6 +1864,25 @@ async def dodo_webhook(request: Request):
     dodo_payment_id = getattr(data, "payment_id", None) or (
         data.get("payment_id") if isinstance(data, dict) else None
     )
+    # Generic amount/currency extraction for the payment-confirmation
+    # email below — present on payment.succeeded events (same shape
+    # already relied on for refunds elsewhere in this file); absent on
+    # subscription.active/renewed itself, which describes the plan, not
+    # a specific charge — that branch looks up the real Dodo price
+    # separately instead of relying on this.
+    dodo_amount = getattr(data, "amount", None) or (data.get("amount") if isinstance(data, dict) else None)
+    dodo_currency = getattr(data, "currency", None) or (data.get("currency") if isinstance(data, dict) else None)
+    # report_orders (the Standard Report one-time purchase) never
+    # captures a customer email of its own in its own table at all —
+    # confirmed directly from its real schema — so for that specific
+    # product, the email has to come from Dodo's own payment object
+    # instead of the metadata.get("user_email") path the other two
+    # product types use.
+    dodo_customer = getattr(data, "customer", None) or (data.get("customer") if isinstance(data, dict) else None)
+    dodo_customer_email = (
+        getattr(dodo_customer, "email", None)
+        or (dodo_customer.get("email") if isinstance(dodo_customer, dict) else None)
+    )
 
     if event_type in ("subscription.active", "subscription.renewed", "subscription.updated") and dodo_subscription_id and not (tier_id and user_email):
         try:
@@ -1875,6 +1920,23 @@ async def dodo_webhook(request: Request):
             status="active",
             dodo_subscription_id=dodo_subscription_id,
         )
+        tier_info = get_tier(tier_id)
+        # subscription.active/renewed describes the plan, not a specific
+        # charge -- no amount on this event itself (unlike the
+        # payment.succeeded branches below), so the real, current Dodo
+        # price is looked up directly, with the locally-stored price as
+        # an honest fallback if Dodo is briefly unreachable.
+        tier_product_id = TIER_DODO_PRODUCT_IDS.get(tier_id)
+        dodo_price = get_dodo_product_price(tier_product_id) if tier_product_id else None
+        confirmation_amount = dodo_price["price_usd"] if dodo_price else (tier_info.get("price_usd") if tier_info else None)
+        confirmation_currency = dodo_price["currency"] if dodo_price else "USD"
+        _send_payment_confirmation_email(
+            user_email,
+            tier_info.get("label", tier_id) if tier_info else tier_id,
+            confirmation_amount,
+            confirmation_currency,
+            dodo_payment_id,
+        )
     elif event_type == "subscription.updated" and tier_id and user_email and sub_status == "active":
         upsert_subscription(
             email=user_email,
@@ -1892,6 +1954,13 @@ async def dodo_webhook(request: Request):
         set_status_by_dodo_id(dodo_subscription_id, "payment_failed")
     elif event_type == "payment.succeeded" and tier_id == "insight_addon" and metadata.get("report_id") and user_email:
         grant_insight_access(metadata["report_id"], user_email)
+        _send_payment_confirmation_email(
+            user_email,
+            "Insight Add-on",
+            round(dodo_amount / 100, 2) if dodo_amount is not None else None,
+            dodo_currency,
+            dodo_payment_id,
+        )
     elif event_type == "payment.succeeded" and metadata.get("product") == "propertyiq_report" and metadata.get("order_id"):
         # The one-time report-unlock payment — a real, confirmed gap this
         # closes: this branch never existed at all before, so a
@@ -1899,6 +1968,13 @@ async def dodo_webhook(request: Request):
         # backend action (the order stayed "pending_payment" forever,
         # and nothing ever told the user their payment went through).
         mark_order_paid(metadata["order_id"], dodo_payment_id=dodo_payment_id)
+        _send_payment_confirmation_email(
+            dodo_customer_email,
+            "PropertyIQ Standard Report",
+            round(dodo_amount / 100, 2) if dodo_amount is not None else None,
+            dodo_currency,
+            dodo_payment_id,
+        )
     elif event_type == "payment.failed" and metadata.get("product") == "propertyiq_report" and metadata.get("order_id"):
         mark_order_failed(metadata["order_id"])
     elif event_type in ("refund.succeeded", "refund.failed"):
