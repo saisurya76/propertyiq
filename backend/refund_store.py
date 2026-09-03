@@ -188,6 +188,28 @@ def list_all_refunds() -> list[dict[str, Any]]:
             return cursor.fetchall()
 
 
+def has_already_used_first_month_guarantee(user_email: str) -> bool:
+    """A real, previously-missing technical check for the refund
+    policy's own stated "this applies once per customer" rule for the
+    first-month subscription guarantee — before this existed, that
+    line was policy text only, with no actual system enforcement
+    behind it; whether it was honored at all depended entirely on an
+    admin remembering to check a customer's full refund history by
+    hand before approving each request. Checks both refund-store
+    reasons the same guarantee refund could have been recorded under:
+    the fixed reason_code used by the refund-request flow, and the
+    equivalent free-text reason an admin might have typed when issuing
+    one directly without going through a request at all."""
+    email = user_email.strip().lower()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM refunds WHERE user_email = %s AND reason ILIKE %s LIMIT 1",
+                (email, "%first_month_guarantee%"),
+            )
+            return cursor.fetchone() is not None
+
+
 # ---------------------------------------------------------------------
 # Refund requests — the user-facing intake queue sitting upstream of
 # the refund-fulfillment functions above. See refund_request_module_spec.md

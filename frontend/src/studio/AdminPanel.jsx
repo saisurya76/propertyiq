@@ -1004,6 +1004,17 @@ function AdminPanel({ onBack }) {
                       <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--grey-100, #ebf5fb)" }}>
                         {req.purchase_reference && <p><strong>Purchase reference:</strong> {req.purchase_reference}</p>}
                         {req.details && <p><strong>Customer's notes:</strong> {req.details}</p>}
+                        {req.reason_code === "first_month_guarantee" && (
+                          <div className="terms-gate-body" style={{
+                            background: req.already_used_guarantee_before ? "#fdecea" : "#f7f9fb",
+                            padding: 10, borderRadius: 8, marginBottom: 10,
+                          }}>
+                            <strong>Usage this month:</strong> {req.designs_generated_this_month} design{req.designs_generated_this_month === 1 ? "" : "s"} generated.
+                            {req.already_used_guarantee_before && (
+                              <> <strong style={{ color: "#c0392b" }}>This customer has already used the first-month guarantee before — approving here will be blocked.</strong></>
+                            )}
+                          </div>
+                        )}
                         {req.admin_response && <p><strong>Admin response:</strong> {req.admin_response}</p>}
 
                         {req.status === "pending" && (

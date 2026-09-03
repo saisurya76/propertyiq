@@ -142,6 +142,7 @@ from backend.refund_store import (
     list_refund_requests,
     approve_refund_request,
     deny_refund_request,
+    has_already_used_first_month_guarantee,
 )
 
 from backend.property_url_extract import extract_property_data, get_gemini_api_key
@@ -1477,9 +1478,24 @@ class AdminRefundRequestsListRequest(BaseModel):
 @app.post("/api/admin/refund-requests/list")
 def admin_list_refund_requests(request: AdminRefundRequestsListRequest):
     """Admin-only: the refund request queue, optionally filtered to one
-    status (pending/approved/denied)."""
+    status (pending/approved/denied).
+
+    For a first_month_guarantee request specifically, also attaches the
+    customer's real usage this month (designs generated) and whether
+    they've already used the guarantee before — a real, previously-
+    missing safeguard: reviewing "I'm unhappy with my first month"
+    against a bare claim, with no visibility into whether the customer
+    had already generated dozens of designs first, gave admin nothing
+    to actually judge the request against. Matches standard refund-
+    review practice: verify usage data supports the claim before
+    approving, rather than approving on the reason label alone."""
     _require_admin_password(request.password)
-    return {"requests": list_refund_requests(status=request.status)}
+    requests = list_refund_requests(status=request.status)
+    for req in requests:
+        if req["reason_code"] == "first_month_guarantee":
+            req["designs_generated_this_month"] = count_designs_this_month(req["user_email"])
+            req["already_used_guarantee_before"] = has_already_used_first_month_guarantee(req["user_email"])
+    return {"requests": requests}
 
 
 class AdminApproveRefundRequestDodoRequest(BaseModel):
@@ -1514,6 +1530,20 @@ def admin_approve_refund_request_via_dodo(request: AdminApproveRefundRequestDodo
         raise HTTPException(status_code=404, detail="No refund request found with that id.")
     if matched["status"] != "pending":
         raise HTTPException(status_code=409, detail=f"This request is already {matched['status']}, not pending.")
+
+    # Real, previously-missing enforcement of the refund policy's own
+    # stated "this applies once per customer" rule for the first-month
+    # guarantee -- was policy text only before, with no actual system
+    # check behind it. A genuinely exceptional second case still has a
+    # path: deny this one, then use the manual-refund flow, which
+    # doesn't run through this specific guard.
+    if matched["reason_code"] == "first_month_guarantee" and has_already_used_first_month_guarantee(matched["user_email"]):
+        raise HTTPException(
+            status_code=409,
+            detail="This customer has already received a first-month-guarantee refund before — the policy "
+                   "limits this to once per customer. Deny this request, or use the manual refund flow if a "
+                   "genuine exception is warranted.",
+        )
 
     dodo_subscription_id = None
     if matched["reason_code"] in SUBSCRIPTION_REFUND_REASON_CODES:

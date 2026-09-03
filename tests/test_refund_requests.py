@@ -240,3 +240,155 @@ def test_approve_dodo_does_not_cancel_subscription_for_one_time_purchase_reasons
     assert r.status_code == 200
     mock_client_cls.return_value.subscriptions.update.assert_not_called()
     assert get_subscription(email)["status"] == "active"
+
+
+def test_first_month_guarantee_cannot_be_approved_twice_for_the_same_customer():
+    """The real, previously-missing technical enforcement of the
+    policy's own stated "once per customer" rule -- before this, it
+    was policy text only, with no actual system check behind it."""
+    from backend.subscription_store import upsert_subscription
+
+    email = "repeatguarantee@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_repeat_1")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_repeat_1"
+    fake_refund.amount = 2900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    first_request = create_refund_request(user_email=email, reason_code="first_month_guarantee", details=None, purchase_reference="pay_repeat_1")
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email"):
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r1 = client.post("/api/admin/refund-requests/approve-dodo", json={
+            "password": "test-admin-pw", "request_id": first_request["id"], "payment_id": "pay_repeat_1",
+        })
+    assert r1.status_code == 200
+
+    # A second subscription, second request, same customer email --
+    # must be blocked even though it's a genuinely different subscription/payment.
+    upsert_subscription(email=email, tier_id="studio_unlimited", status="active", dodo_subscription_id="sub_repeat_2")
+    second_request = create_refund_request(user_email=email, reason_code="first_month_guarantee", details=None, purchase_reference="pay_repeat_2")
+    r2 = client.post("/api/admin/refund-requests/approve-dodo", json={
+        "password": "test-admin-pw", "request_id": second_request["id"], "payment_id": "pay_repeat_2",
+    })
+    assert r2.status_code == 409
+    assert "once per customer" in r2.json()["detail"]
+
+
+def test_first_month_guarantee_is_fine_for_a_genuinely_new_customer():
+    """Confirms the check is scoped correctly -- a customer who has
+    never used the guarantee before must not be blocked by someone
+    else's prior refund."""
+    from backend.subscription_store import upsert_subscription
+
+    email = "freshguarantee@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_fresh_1")
+    created = create_refund_request(user_email=email, reason_code="first_month_guarantee", details=None, purchase_reference="pay_fresh_1")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_fresh_1"
+    fake_refund.amount = 2900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email"):
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r = client.post("/api/admin/refund-requests/approve-dodo", json={
+            "password": "test-admin-pw", "request_id": created["id"], "payment_id": "pay_fresh_1",
+        })
+    assert r.status_code == 200
+
+
+def test_other_reason_codes_are_not_subject_to_the_once_per_customer_limit():
+    """The once-per-customer rule is specific to the first-month
+    guarantee -- a customer with a prior duplicate-charge refund must
+    still be able to get a genuinely separate billing-error refund."""
+    from backend.subscription_store import upsert_subscription
+
+    email = "multiplebillingerrors@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_multi_1")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_multi_1"
+    fake_refund.amount = 2900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    first_request = create_refund_request(user_email=email, reason_code="duplicate_charge", details=None, purchase_reference="pay_multi_1")
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email"):
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r1 = client.post("/api/admin/refund-requests/approve-dodo", json={
+            "password": "test-admin-pw", "request_id": first_request["id"], "payment_id": "pay_multi_1",
+        })
+    assert r1.status_code == 200
+
+    second_request = create_refund_request(user_email=email, reason_code="charged_after_cancellation", details=None, purchase_reference="pay_multi_2")
+    fake_refund2 = MagicMock()
+    fake_refund2.refund_id = "refund_multi_2"
+    fake_refund2.amount = 2900
+    fake_refund2.currency = "usd"
+    fake_refund2.status = "succeeded"
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls2, \
+         patch("backend.api.send_email"):
+        mock_client_cls2.return_value.refunds.create.return_value = fake_refund2
+        r2 = client.post("/api/admin/refund-requests/approve-dodo", json={
+            "password": "test-admin-pw", "request_id": second_request["id"], "payment_id": "pay_multi_2",
+        })
+    assert r2.status_code == 200
+
+
+def test_admin_list_shows_real_usage_for_first_month_guarantee_requests():
+    """The real, previously-missing safeguard: admin reviewing a
+    first-month-guarantee request can now see actual usage data
+    (designs generated this month) rather than approving on the
+    reason label alone -- matches standard refund-review practice of
+    verifying usage data supports the claim."""
+    from backend.subscription_store import upsert_subscription
+    from backend.auth_store import create_otp
+    from backend.config_store import get_all_tiers_merged, set_tier_config
+
+    email = "usagecheck@example.com"
+    upsert_subscription(email=email, tier_id="studio_starter", status="active", dodo_subscription_id="sub_usage_check")
+
+    code = create_otp(email)
+    verify_r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {verify_r.json()['session_token']}"}
+
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "design_quota_per_month": 5}}
+    set_tier_config(tight_config)
+    try:
+        client.post("/api/construction-studio/design", headers=headers, json={
+            "plot_size_sqft": 1000, "plot_length_ft": 40, "plot_width_ft": 25,
+            "entrance_direction": "north", "road_facing_side": "north", "selections": {},
+        })
+    finally:
+        set_tier_config(original)
+
+    create_refund_request(user_email=email, reason_code="first_month_guarantee", details=None, purchase_reference="pay_usage_check")
+
+    r = client.post("/api/admin/refund-requests/list", json={"password": "test-admin-pw", "status": "pending"})
+    assert r.status_code == 200
+    matched = next(req for req in r.json()["requests"] if req["user_email"] == email)
+    assert matched["designs_generated_this_month"] == 1
+    assert matched["already_used_guarantee_before"] is False
+
+
+def test_admin_list_does_not_attach_usage_data_for_other_reason_codes():
+    """A real, deliberate scope check -- usage data is only relevant
+    (and only computed) for first_month_guarantee requests, not every
+    request in the queue."""
+    created = create_refund_request(user_email="nonusagecheck@example.com", reason_code="duplicate_charge", details=None, purchase_reference="pay_nonusage")
+
+    r = client.post("/api/admin/refund-requests/list", json={"password": "test-admin-pw", "status": "pending"})
+    assert r.status_code == 200
+    matched = next(req for req in r.json()["requests"] if req["id"] == created["id"])
+    assert "designs_generated_this_month" not in matched
