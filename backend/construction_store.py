@@ -100,6 +100,104 @@ def save_design(
         connection.commit()
 
 
+def save_design_if_under_quota(
+    *,
+    quota: Optional[int],
+    design_id: str,
+    user_email: str,
+    region: str,
+    currency: str,
+    plot_spec: dict[str, Any],
+    selections: dict[str, str],
+    cost_estimate: dict[str, Any],
+    vastu_result: Optional[dict[str, Any]] = None,
+    risks: Optional[list[str]] = None,
+    dxf_path: Optional[str] = None,
+) -> bool:
+    """The real, race-safe version of the quota-then-save sequence the
+    generate-design endpoint needs. A real, previously-unfixed gap:
+    the endpoint's own quota check (count_designs_this_month) and the
+    actual save happened as two entirely separate, unsynchronized
+    operations, with real work in between (Vastu compliance checking,
+    risk identification, DXF file generation) — a genuine window where
+    two concurrent requests from the same user could each pass the
+    quota check before either one's save landed, letting them generate
+    more designs in a month than their tier actually allows.
+
+    Fixed with a real Postgres advisory transaction lock
+    (pg_advisory_xact_lock), keyed by a hash of the user's own email
+    (not a single global lock, which would serialize every user's
+    saves against each other) — held for the lifetime of this one
+    transaction, automatically released on commit or rollback. Re-
+    counts this month's real designs INSIDE that lock, immediately
+    before the insert, so two concurrent calls for the same user are
+    forced to run this check-then-insert sequence one at a time rather
+    than interleaving. Returns False (and saves nothing) if the quota
+    would be exceeded — the caller is responsible for turning that
+    into the actual 403 response, since only it knows the tier's
+    label/limit for a clear error message.
+
+    Deliberately a new function rather than changing save_design
+    itself: this locked, quota-aware path is specific to the one real
+    caller that needs race-safety (the generate-design endpoint);
+    other callers of the plain save_design (if any exist or are added
+    later) aren't quota-gated at all and shouldn't pay for a lock they
+    don't need."""
+    user_email = user_email.strip().lower()
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            # hashtext() is Postgres's own stable string hash — using it
+            # (rather than Python's hash(), which isn't stable across
+            # process restarts by design) means the same email always
+            # maps to the same lock key, which is what actually makes
+            # this serialize correctly across separate requests/workers.
+            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (user_email,))
+
+            if quota is not None:
+                month_prefix = now[:7]
+                reset = get_quota_reset(user_email)
+                if reset and reset["reset_at"].startswith(month_prefix):
+                    cursor.execute(
+                        "SELECT COUNT(*) as cnt FROM construction_designs WHERE user_email = %s AND created_at > %s",
+                        (user_email, reset["reset_at"]),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT COUNT(*) as cnt FROM construction_designs WHERE user_email = %s AND created_at LIKE %s",
+                        (user_email, f"{month_prefix}%"),
+                    )
+                used = cursor.fetchone()["cnt"]
+                if used >= quota:
+                    connection.rollback()
+                    return False
+
+            cursor.execute(
+                """
+                INSERT INTO construction_designs (
+                    design_id, user_email, region, currency, plot_spec, selections,
+                    cost_estimate, vastu_result, risks, dxf_path, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    design_id,
+                    user_email,
+                    region,
+                    currency,
+                    json.dumps(plot_spec, separators=(",", ":")),
+                    json.dumps(selections, separators=(",", ":")),
+                    json.dumps(cost_estimate, separators=(",", ":")),
+                    json.dumps(vastu_result, separators=(",", ":")) if vastu_result else None,
+                    json.dumps(risks, separators=(",", ":")) if risks else None,
+                    dxf_path,
+                    now,
+                    now,
+                ),
+            )
+        connection.commit()
+    return True
+
+
 def get_design(design_id: str) -> Optional[dict[str, Any]]:
     with get_connection() as connection:
         with connection.cursor() as cursor:

@@ -29,6 +29,7 @@ from backend.payment_store import (
 from backend.construction_store import (
     initialize_construction_store,
     save_design,
+    save_design_if_under_quota,
     get_design,
     count_designs_this_month,
     reset_quota_for_user,
@@ -3420,7 +3421,8 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         "unit_system": request.unit_system,
     }
 
-    save_design(
+    saved = save_design_if_under_quota(
+        quota=quota,
         design_id=design_id,
         user_email=user_email,
         region=request.region,
@@ -3432,6 +3434,18 @@ def construction_design(request: ConstructionDesignRequest, user_email: str = De
         risks=risks,
         dxf_path=dxf_path,
     )
+    if not saved:
+        # The real, race-safe re-check inside save_design_if_under_quota
+        # caught what the earlier check above this function couldn't:
+        # a concurrent request for this same user landed first and used
+        # up the last slot in the window between that first check and
+        # this save. Same error shape as the original check, just
+        # re-read here since `used` above is now stale.
+        raise HTTPException(
+            status_code=403,
+            detail=f"Monthly design quota reached for the {tier['label']} tier. "
+                   f"Upgrade your plan or wait until next month.",
+        )
 
     return {
         "design_id": design_id,

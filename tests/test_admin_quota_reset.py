@@ -239,3 +239,54 @@ def test_reset_works_even_for_a_user_with_no_subscription():
     r = client.post("/api/admin/reset-quota", json={"password": "test-admin-pw", "user_email": email})
     assert r.status_code == 200
     assert r.json()["designs_used_this_month"] == 0
+
+
+def test_save_design_if_under_quota_genuinely_blocks_at_the_real_limit():
+    """Direct test of the new race-safe function itself: the second
+    call for a user already at quota must be rejected and must not
+    have saved anything."""
+    from backend.construction_store import save_design_if_under_quota, count_designs_this_month
+    import uuid as uuid_module
+
+    email = "atomicquota@example.com"
+    common_kwargs = dict(
+        user_email=email, region="global", currency="USD",
+        plot_spec={}, selections={}, cost_estimate={"grand_total_usd": 1000},
+    )
+
+    r1 = save_design_if_under_quota(quota=1, design_id=str(uuid_module.uuid4()), **common_kwargs)
+    assert r1 is True
+    assert count_designs_this_month(email) == 1
+
+    r2 = save_design_if_under_quota(quota=1, design_id=str(uuid_module.uuid4()), **common_kwargs)
+    assert r2 is False
+    assert count_designs_this_month(email) == 1  # still 1 -- the rejected call saved nothing
+
+
+def test_save_design_if_under_quota_prevents_the_real_race_condition():
+    """The actual, direct proof this was built for: fire many
+    genuinely concurrent calls at a tight quota and confirm the
+    advisory lock serializes them correctly -- the real count in the
+    database must never exceed the real quota, regardless of how many
+    requests raced to get there at once."""
+    from backend.construction_store import save_design_if_under_quota, count_designs_this_month
+    import uuid as uuid_module
+    from concurrent.futures import ThreadPoolExecutor
+
+    email = "raceconditiontest@example.com"
+    quota = 3
+    attempts = 10
+
+    def attempt(_):
+        return save_design_if_under_quota(
+            quota=quota, design_id=str(uuid_module.uuid4()),
+            user_email=email, region="global", currency="USD",
+            plot_spec={}, selections={}, cost_estimate={"grand_total_usd": 1000},
+        )
+
+    with ThreadPoolExecutor(max_workers=attempts) as executor:
+        results = list(executor.map(attempt, range(attempts)))
+
+    successes = sum(1 for r in results if r is True)
+    assert successes == quota
+    assert count_designs_this_month(email) == quota
