@@ -65,6 +65,13 @@ def save_design(
     risks: Optional[list[str]] = None,
     dxf_path: Optional[str] = None,
 ) -> None:
+    # Normalized here for the same reason count_designs_this_month now
+    # normalizes its own parameter: every real caller today already
+    # passes an already-lowercased email (the session layer normalizes
+    # at login), but storing it un-normalized would make this table
+    # silently inconsistent with quota_resets/count_designs_this_month
+    # the moment any future caller passed a differently-cased one.
+    user_email = user_email.strip().lower()
     now = datetime.now(timezone.utc).isoformat()
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -119,7 +126,19 @@ def count_designs_this_month(user_email: str) -> int:
     used for tier-quota enforcement. If an admin has reset this user's
     quota this month (see reset_quota_for_user), only counts designs
     created AFTER that reset — not from the start of the month — so a
-    reset genuinely gives a fresh count rather than a no-op."""
+    reset genuinely gives a fresh count rather than a no-op.
+
+    Normalizes user_email once, here, rather than trusting every
+    caller to have already done so — a real, previously-latent
+    inconsistency: get_quota_reset always normalized internally before
+    its own lookup, but the construction_designs query in this same
+    function used the raw, un-normalized parameter directly. Every
+    existing caller already happened to pass an already-lowercased
+    email (from the session layer, which normalizes at login), so this
+    never actually misfired in production — but it was one careless
+    future caller away from silently returning 0 for a real user with
+    a differently-cased email."""
+    user_email = user_email.strip().lower()
     now = datetime.now(timezone.utc)
     month_prefix = now.strftime("%Y-%m")
 

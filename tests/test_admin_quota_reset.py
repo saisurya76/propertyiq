@@ -155,3 +155,87 @@ def test_reset_only_applies_within_the_same_calendar_month():
     # This month's real count must still reflect actual current-month
     # designs, unaffected by that stale, out-of-month reset.
     assert count_designs_this_month(email) == 0
+
+
+def test_count_designs_this_month_is_case_insensitive_on_email():
+    """A real, genuine bug found and fixed during a data-integrity
+    review: count_designs_this_month's own construction_designs query
+    used the raw, un-normalized email parameter, while its internal
+    get_quota_reset lookup always normalized. Every real caller today
+    already happens to pass an already-lowercased email (the session
+    layer normalizes at login), so this never actually misfired in
+    production -- but confirms directly that a differently-cased email
+    now still correctly finds the same user's real designs."""
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "design_quota_per_month": 5}}
+    set_tier_config(tight_config)
+
+    try:
+        email_lower = "casetest@example.com"
+        headers = _authed_headers(email_lower)
+        upsert_subscription(email=email_lower, tier_id="studio_starter", status="active", dodo_subscription_id="sub_case_test")
+
+        r = client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+        assert r.status_code == 200
+
+        # Querying with a differently-cased / whitespace-padded version
+        # of the same email must still find the real, same design.
+        assert count_designs_this_month("  CaseTest@Example.COM  ") == 1
+        assert count_designs_this_month(email_lower) == 1
+    finally:
+        set_tier_config(original)
+
+
+def test_reset_and_lookup_are_consistent_regardless_of_email_case():
+    """The same case-consistency guarantee, specifically for the admin
+    reset/lookup endpoints, end to end."""
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "design_quota_per_month": 1}}
+    set_tier_config(tight_config)
+
+    try:
+        email_lower = "mixedcase@example.com"
+        headers = _authed_headers(email_lower)
+        upsert_subscription(email=email_lower, tier_id="studio_starter", status="active", dodo_subscription_id="sub_mixed_case")
+
+        client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+
+        # Admin looks the user up using a differently-cased email.
+        r_lookup = client.post("/api/admin/quota-lookup", json={"password": "test-admin-pw", "user_email": "  MixedCase@Example.COM  "})
+        assert r_lookup.status_code == 200
+        assert r_lookup.json()["designs_used_this_month"] == 1
+
+        # Reset using yet another casing.
+        r_reset = client.post("/api/admin/reset-quota", json={"password": "test-admin-pw", "user_email": "MIXEDCASE@EXAMPLE.COM"})
+        assert r_reset.status_code == 200
+        assert r_reset.json()["designs_used_this_month"] == 0
+
+        # The real user (lowercase, as their session actually uses) must
+        # now be able to generate again.
+        r_generate = client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+        assert r_generate.status_code == 200
+    finally:
+        set_tier_config(original)
+
+
+def test_quota_lookup_handles_a_user_with_no_subscription_at_all():
+    """A real edge case: a user with historical designs but no current
+    subscription (e.g. a lapsed/cancelled plan) must not crash the
+    lookup -- tier_id and the quota limit should come back as None,
+    not raise an error."""
+    email = "nosubscription@example.com"
+    r = client.post("/api/admin/quota-lookup", json={"password": "test-admin-pw", "user_email": email})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["tier_id"] is None
+    assert data["design_quota_per_month"] is None
+
+
+def test_reset_works_even_for_a_user_with_no_subscription():
+    """Confirms reset itself doesn't require an active subscription to
+    exist -- it's purely a record against an email, independent of
+    subscription state."""
+    email = "resetnosubscription@example.com"
+    r = client.post("/api/admin/reset-quota", json={"password": "test-admin-pw", "user_email": email})
+    assert r.status_code == 200
+    assert r.json()["designs_used_this_month"] == 0
