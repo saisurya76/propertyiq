@@ -485,3 +485,22 @@ def test_rejects_empty_or_whitespace_property_type():
     for bad_type in ["", "   "]:
         with pytest.raises(ValueError, match="Property type is required"):
             create_price_watch(email="a@b.com", price=5000000, city="Hyderabad", property_type=bad_type, area_value=1200, target_price=4000000)
+
+
+def test_create_price_watch_normalizes_email_case_consistently():
+    """A real, previously-latent bug fixed as part of a broader email-
+    case-consistency audit: create_price_watch stored the raw,
+    un-normalized email, while count_active_watches_for_email's own
+    query used its own raw parameter too -- a differently-cased caller
+    (or the same caller with inconsistent casing across calls) could
+    silently undercount a user's real active watches, letting them
+    exceed their tier's real max_price_watches limit."""
+    from backend.price_watch_store import count_active_watches_for_email
+
+    create_price_watch(
+        email="  MixedCase@Example.COM  ", price=5000000, city="Hyderabad",
+        property_type="Apartment", area_value=1200, target_price=4500000,
+    )
+
+    assert count_active_watches_for_email("mixedcase@example.com") == 1
+    assert count_active_watches_for_email("  MIXEDCASE@EXAMPLE.com  ") == 1

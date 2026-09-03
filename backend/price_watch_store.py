@@ -83,6 +83,7 @@ def create_price_watch(
         raise ValueError("area_unit must be 'sqft' or 'sqm'.")
     if "@" not in email:
         raise ValueError("A valid email is required to be notified.")
+    email = email.strip().lower()
     if not city or not city.strip():
         raise ValueError("City is required.")
     if not property_type or not property_type.strip():
@@ -136,6 +137,7 @@ def count_active_watches_for_email(email: str) -> int:
     'active' watches (a 'triggered' one has already served its purpose
     and shouldn't count against the limit, letting a user watch a new
     property once an old watch fires)."""
+    email = email.strip().lower()
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
