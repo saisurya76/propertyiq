@@ -2032,6 +2032,42 @@
   .cs-step-pill {
     flex-shrink: 0;
   }
+
+  /* Admin tier config grid: several fields shared the exact same
+     placeholder text ("unlimited" appeared on two different inputs),
+     so "each input has its own placeholder" genuinely didn't hold up
+     here -- an admin had no real way to tell which stacked
+     "unlimited" value was the monthly quota vs the saved-designs
+     limit. Real, visible labels via data-label (not just placeholder
+     text, which also isn't picked up by screen readers as a proper
+     label) instead. Lives at 900px (not just phone-width 640px)
+     since the 6-column grid was ALSO squeezing "unlimited" down to a
+     visually truncated "unlimi" with no ellipsis at tablet widths —
+     not just unusable on a phone, genuinely broken on an iPad too. */
+  .admin-tier-row-header {
+    display: none;
+  }
+
+  .admin-tier-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid #f3ecff;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+
+  .admin-tier-row > span[data-label]::before,
+  .admin-tier-row > span.admin-tier-row-name[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--grey-600, #5b6f7c);
+    margin-bottom: 3px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -2039,6 +2075,21 @@
     max-width: 100%;
     margin: 16px 8px;
     padding: 22px 18px;
+  }
+
+  /* Discipline overlay toolbar: 3 discipline toggles + a flex:1 spacer
+     + 3 zoom buttons (7 items, no wrap/scroll at all) genuinely
+     overflowed a phone screen, pushing the zoom controls completely
+     off-screen and unreachable — not just visually tight, actually
+     unusable. Real fix: let it wrap to a second line, and drop the
+     spacer (a flex:1 item on a wrapped row would otherwise claim an
+     entire empty row of its own). */
+  .discipline-overlay-toggle {
+    flex-wrap: wrap;
+  }
+
+  .discipline-overlay-toolbar-spacer {
+    display: none;
   }
 
   .studio-pricing-header h2,
@@ -2172,32 +2223,10 @@
      "unlimited" value was the monthly quota vs the saved-designs
      limit. Real, visible labels via data-label (not just placeholder
      text, which also isn't picked up by screen readers as a proper
-     label) instead. */
-  .admin-tier-row-header {
-    display: none;
-  }
-
-  .admin-tier-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    padding: 14px;
-    border: 1px solid #f3ecff;
-    border-radius: 12px;
-    margin-bottom: 12px;
-  }
-
-  .admin-tier-row > span[data-label]::before,
-  .admin-tier-row > span.admin-tier-row-name[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: var(--grey-600, #5b6f7c);
-    margin-bottom: 3px;
-  }
-
+     label) instead. Lives in the 900px (not just 640px) breakpoint
+     since the 6-column grid was ALSO squeezing "unlimited" down to a
+     visually truncated "unlimi" with no ellipsis at tablet widths —
+     not just unusable on a phone, genuinely broken on an iPad too. */
   .admin-tier-row-name {
     font-size: 15px;
   }
