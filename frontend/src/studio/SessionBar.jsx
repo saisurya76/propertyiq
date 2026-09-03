@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSession, clearSession, studioApi } from "./studioApi";
+import ProfilePanel from "./ProfilePanel";
 
 // Shows the user's current subscription plan next to their email — a
 // real, previously-missing gap: there was nowhere on the app that
@@ -10,6 +11,7 @@ import { getSession, clearSession, studioApi } from "./studioApi";
 function SessionBar({ onSignOut, onManagePlan }) {
   const [session, setSession] = useState(getSession());
   const [planLabel, setPlanLabel] = useState(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -37,6 +39,15 @@ function SessionBar({ onSignOut, onManagePlan }) {
   return (
     <div className="session-bar">
       Signed in as <strong>{session.email}</strong>
+      <span
+        className="session-profile-icon"
+        onClick={() => setShowProfile(true)}
+        role="button"
+        tabIndex={0}
+        title="Your account"
+      >
+        👤
+      </span>
       {planLabel && (
         <span
           className="session-plan-badge"
@@ -49,6 +60,20 @@ function SessionBar({ onSignOut, onManagePlan }) {
         </span>
       )}
       <span className="studio-sign-out-link" onClick={handleClick}>Sign out</span>
+
+      {showProfile && (
+        <ProfilePanel
+          onClose={() => setShowProfile(false)}
+          onUpgrade={() => {
+            setShowProfile(false);
+            if (onManagePlan) onManagePlan();
+          }}
+          onSignedOut={() => {
+            setShowProfile(false);
+            handleClick();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -281,4 +281,12 @@ export const studioApi = {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   },
+
+  getProfile: () => apiFetch("/api/profile"),
+
+  cancelSubscription: (reason) =>
+    apiFetch("/api/profile/cancel-subscription", { method: "POST", body: JSON.stringify({ reason }) }),
+
+  deleteAccount: (confirmEmail, reason) =>
+    apiFetch("/api/profile/delete-account", { method: "POST", body: JSON.stringify({ confirm_email: confirmEmail, reason }) }),
 };

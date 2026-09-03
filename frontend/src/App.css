@@ -2764,3 +2764,41 @@ body {
   padding: 10px 12px;
   margin: 14px 0 20px;
 }
+
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #374151;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.session-profile-icon {
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.session-profile-icon:hover {
+  background: #e5e7eb;
+}
+
+.session-plan-badge {
+  cursor: pointer;
+  background: #ede9fe;
+  color: #6d28d9;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.session-plan-badge:hover {
+  background: #ddd6fe;
+}

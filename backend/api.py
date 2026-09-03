@@ -99,6 +99,14 @@ from backend.auth import (
     send_email,
 )
 
+from backend.profile_store import (
+    initialize_profile_store,
+    is_email_in_cooling_off,
+    delete_account,
+    get_deletion_record,
+    COOLING_OFF_DAYS,
+)
+
 from backend.config_store import (
     initialize_config_store,
     get_tier_config,
@@ -224,6 +232,7 @@ initialize_auth_store()
 initialize_config_store()
 initialize_subscription_store()
 initialize_refund_store()
+initialize_profile_store()
 initialize_insight_store()
 initialize_challenge_store()
 initialize_price_watch_store()
@@ -1116,6 +1125,12 @@ def request_otp(request: RequestOtpRequest):
     """Step 1 of email registration/login: sends a 6-digit code valid for
     10 minutes. Calling this again before the code is used invalidates the
     previous one."""
+    if is_email_in_cooling_off(request.email):
+        raise HTTPException(
+            status_code=403,
+            detail=f"This email was recently used to delete an account. For security, it can't be used to "
+                    f"create a new one for {COOLING_OFF_DAYS} days from deletion.",
+        )
     code = create_otp(request.email)
     send_otp_email(request.email, code)
     return {"status": "sent"}
@@ -1551,9 +1566,25 @@ def admin_reset_quota(request: AdminResetQuotaRequest):
     completely intact; only what counts against the CURRENT month's
     limit changes, from this moment forward."""
     _require_admin_password(request.password)
-    reset_quota_for_user(request.user_email, request.admin_note)
-    new_count = count_designs_this_month(request.user_email.strip().lower())
-    return {"user_email": request.user_email.strip().lower(), "designs_used_this_month": new_count}
+    email = request.user_email.strip().lower()
+    reset_quota_for_user(email, request.admin_note)
+    new_count = count_designs_this_month(email)
+
+    try:
+        send_email(
+            to_email=email,
+            subject="Your PropertyIQ design quota has been reset",
+            html=(
+                "Good news — your monthly design-generate quota has been reset, so you can "
+                "generate again right away without waiting for next month.<br><br>"
+                + (f"Note from our team: {request.admin_note}<br><br>" if request.admin_note else "")
+                + '<a href="https://app.propertyiqweb.com/">Open PropertyIQ</a>'
+            ),
+        )
+    except Exception as exc:
+        logger.error(f"admin_reset_quota: confirmation email failed for {email!r}: {exc}")
+
+    return {"user_email": email, "designs_used_this_month": new_count}
 
 
 class AdminQuotaLookupRequest(BaseModel):
@@ -2080,6 +2111,178 @@ def subscribe_status(user_email: str = Depends(get_current_user_email)):
         "designs_used_this_month": used,
         "designs_remaining": None if quota is None else max(0, quota - used),
     }
+
+
+@app.get("/api/profile")
+def get_profile(user_email: str = Depends(get_current_user_email)):
+    """The customer's own self-service profile: tier details, quota
+    remaining, saved-design usage, real payment history (from Dodo),
+    and a simple notification feed aggregated from the app's own real
+    events — refund request updates and quota resets — rather than a
+    separate notifications system built from scratch for this alone."""
+    sub = get_subscription(user_email)
+    tier_id = get_active_tier(user_email)
+    tier = get_tier(tier_id) if tier_id else None
+
+    quota = tier.get("design_quota_per_month") if tier else None
+    used = count_designs_this_month(user_email)
+    saved_limit = tier.get("saved_designs_limit") if tier else None
+    saved_count = count_saved_properties(user_email)
+
+    payments = []
+    payments_note = ""
+    if sub and sub.get("dodo_subscription_id") and DODO_API_KEY:
+        try:
+            client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+            page = client.payments.list(subscription_id=sub["dodo_subscription_id"])
+            payments = [
+                {
+                    "payment_id": p.payment_id,
+                    "amount_usd": round(p.total_amount / 100, 2),
+                    "currency": p.currency,
+                    "status": p.status,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                }
+                for p in page.items
+            ]
+        except Exception as exc:
+            logger.error(f"get_profile: Dodo payment history lookup failed for {user_email!r}: {exc}")
+            payments_note = "Couldn't load payment history right now — try again shortly."
+    elif not sub or not sub.get("dodo_subscription_id"):
+        payments_note = "No subscription payments on file. A Standard Report or Insight Add-on purchase won't show here."
+
+    notifications = []
+    for req in list_refund_requests():
+        if req["user_email"] == user_email and req["status"] != "pending":
+            notifications.append({
+                "type": "refund_request",
+                "message": (
+                    f"Your refund request was approved." if req["status"] == "approved"
+                    else f"Your refund request was not approved: {req.get('admin_response') or 'see policy for details'}"
+                ),
+                "at": req["updated_at"],
+            })
+    reset = get_quota_reset(user_email)
+    if reset:
+        notifications.append({
+            "type": "quota_reset",
+            "message": "Your monthly design quota was reset by our support team.",
+            "at": reset["reset_at"],
+        })
+    notifications.sort(key=lambda n: n["at"], reverse=True)
+
+    return {
+        "email": user_email,
+        "tier": {
+            "tier_id": tier_id,
+            "label": tier.get("label") if tier else None,
+            "price_usd": tier.get("price_usd") if tier else None,
+            "status": sub["status"] if sub else "none",
+        },
+        "quota": {
+            "design_quota_per_month": quota,
+            "designs_used_this_month": used,
+            "designs_remaining": None if quota is None else max(0, quota - used),
+            "saved_designs_limit": saved_limit,
+            "saved_designs_count": saved_count,
+        },
+        "payments": payments,
+        "payments_note": payments_note,
+        "notifications": notifications,
+    }
+
+
+class ProfileCancelSubscriptionRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@app.post("/api/profile/cancel-subscription")
+def cancel_subscription(request: ProfileCancelSubscriptionRequest, user_email: str = Depends(get_current_user_email)):
+    """Self-service 'disable account' — stops future billing via a real
+    Dodo API call (cancel_at_next_billing_date=True, matching the
+    refund policy's own stated behavior: "cancelling does not refund
+    the current period, but you keep access until it ends"). Does NOT
+    delete the account or any data — that's the separate, more drastic
+    delete-account action below."""
+    sub = get_subscription(user_email)
+    if not sub or not sub.get("dodo_subscription_id"):
+        raise HTTPException(status_code=400, detail="No active subscription to cancel.")
+
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+
+    try:
+        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        client.subscriptions.update(
+            sub["dodo_subscription_id"],
+            cancel_at_next_billing_date=True,
+            cancel_reason="cancelled_by_customer",
+            cancellation_comment=request.reason,
+        )
+    except Exception as exc:
+        logger.error(f"cancel_subscription: Dodo API call failed for {user_email!r}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Dodo couldn't process the cancellation: {exc}")
+
+    try:
+        send_email(
+            to_email=user_email,
+            subject="Your PropertyIQ subscription will not renew",
+            html="Your subscription is set to cancel at the end of your current billing period. You'll keep full access until then.",
+        )
+    except Exception as exc:
+        logger.error(f"cancel_subscription: confirmation email failed for {user_email!r}: {exc}")
+
+    return {"status": "cancellation_scheduled"}
+
+
+class ProfileDeleteAccountRequest(BaseModel):
+    confirm_email: str
+    reason: Optional[str] = None
+
+
+@app.post("/api/profile/delete-account")
+def delete_account_endpoint(request: ProfileDeleteAccountRequest, user_email: str = Depends(get_current_user_email)):
+    """Self-service full account deletion. Requires re-typing the exact
+    email as a genuine confirmation step, since this is irreversible —
+    a session token alone (which could be sitting in an old browser
+    tab) isn't enough friction for something this permanent. See
+    profile_store.py's own module docstring for the real reasoning
+    behind using a short cooling-off period here instead of a
+    permanent email ban."""
+    if request.confirm_email.strip().lower() != user_email.strip().lower():
+        raise HTTPException(status_code=400, detail="The email you typed doesn't match your account email.")
+
+    sub = get_subscription(user_email)
+    if sub and sub.get("dodo_subscription_id") and DODO_API_KEY:
+        try:
+            client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+            client.subscriptions.update(
+                sub["dodo_subscription_id"],
+                cancel_at_next_billing_date=True,
+                cancel_reason="cancelled_by_customer",
+                cancellation_comment="Account deleted by customer",
+            )
+        except Exception as exc:
+            # Logged, not raised -- a Dodo hiccup must not block the
+            # actual account/data deletion the user asked for; worth
+            # a manual follow-up check in Dodo's own dashboard.
+            logger.error(f"delete_account_endpoint: Dodo cancellation failed for {user_email!r}: {exc}")
+
+    delete_account(user_email, reason=request.reason)
+
+    try:
+        send_email(
+            to_email=user_email,
+            subject="Your PropertyIQ account has been deleted",
+            html=(
+                "Your account and its data have been deleted, as requested. "
+                f"For security, this email address can't be used to create a new account for {COOLING_OFF_DAYS} days."
+            ),
+        )
+    except Exception as exc:
+        logger.error(f"delete_account_endpoint: confirmation email failed for {user_email!r}: {exc}")
+
+    return {"status": "deleted"}
 
 
 def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
