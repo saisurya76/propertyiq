@@ -39,6 +39,7 @@ from backend.construction_store import (
 from backend.property_store import (
     initialize_property_store,
     create_property,
+    create_property_if_under_limit,
     list_properties_for_user,
     get_property,
     update_property,
@@ -77,6 +78,16 @@ from backend.design_disciplines import group_by_discipline
 from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
 from backend.comparables import get_comparables, average_price_per_sqft
 from backend.neighborhood_infrastructure import get_infrastructure_summary
+
+from backend.neighborhood_comparison_store import (
+    initialize_neighborhood_comparison_store,
+    create_comparison,
+    get_comparison,
+    update_comparison_results,
+    set_monitoring,
+    list_monitored_comparisons,
+    MAX_AREAS_PER_COMPARISON,
+)
 from backend.construction_report import generate_construction_report_pdf
 
 from backend.adjacency_engine import (
@@ -180,11 +191,13 @@ from backend.challenge_store import (
 from backend.price_watch_store import (
     initialize_price_watch_store,
     create_price_watch,
+    create_price_watch_if_under_limit,
     get_price_watch,
     update_watch_price,
     count_active_watches_for_email,
 )
 from backend.price_watch_scheduler import price_watch_check_loop
+from backend.neighborhood_comparison_scheduler import neighborhood_comparison_refresh_loop
 
 from backend.assessment_pipeline import (
     PropertyInput,
@@ -212,6 +225,7 @@ from backend.renderers.pdf_renderer import (
 )
 
 _price_watch_task = None
+_neighborhood_comparison_task = None
 
 
 @asynccontextmanager
@@ -221,12 +235,16 @@ async def _lifespan(app: FastAPI):
     cleanly on shutdown — see backend/price_watch_scheduler.py's own
     docstring for why this approach (rather than a separate cron
     service) is the real, working choice given Render's standard
-    web-service tier."""
-    global _price_watch_task
+    web-service tier. Same reasoning, same pattern, for the hourly
+    neighborhood-comparison refresher."""
+    global _price_watch_task, _neighborhood_comparison_task
     _price_watch_task = asyncio.create_task(price_watch_check_loop())
+    _neighborhood_comparison_task = asyncio.create_task(neighborhood_comparison_refresh_loop())
     yield
     if _price_watch_task is not None:
         _price_watch_task.cancel()
+    if _neighborhood_comparison_task is not None:
+        _neighborhood_comparison_task.cancel()
 
 
 app = FastAPI(lifespan=_lifespan)
@@ -241,6 +259,7 @@ initialize_subscription_store()
 initialize_refund_store()
 initialize_profile_store()
 initialize_webhook_store()
+initialize_neighborhood_comparison_store()
 initialize_insight_store()
 initialize_challenge_store()
 initialize_price_watch_store()
@@ -2501,7 +2520,7 @@ def _set_cached_json(cache_key: str, result: Any) -> None:
 
 
 @app.get("/api/neighborhood-insights/autocomplete")
-def neighborhood_autocomplete(q: str, country: str = "in"):
+def neighborhood_autocomplete(q: str, country: Optional[str] = "in"):
     """Proxies LocationIQ's /autocomplete endpoint for the Neighborhood
     Insights address field. Public (no auth) — same reasoning as the
     resale-signal endpoint just below: a free, no-signup entry point.
@@ -2512,15 +2531,24 @@ def neighborhood_autocomplete(q: str, country: str = "in"):
     unchanged. Reuses the exact same country-code convention already
     established in the main app's own COUNTRY_CODE_MAP (frontend
     App.jsx) for Thailand/Philippines/Vietnam/Indonesia, rather than
-    inventing a separate one for this page."""
+    inventing a separate one for this page.
+
+    Passing an empty string explicitly (country="") searches globally,
+    with no country restriction at all — the real, necessary mode for
+    the "any city, any country" comparison feature, where the area
+    being searched for isn't known in advance to belong to any of the
+    5 sites this app otherwise supports."""
     if not LOCATIONIQ_API_KEY:
         raise HTTPException(status_code=503, detail="Address lookup isn't configured yet — LOCATIONIQ_API_KEY is not set.")
     if not q or len(q.strip()) < 3:
         return []
     try:
+        params = {"key": LOCATIONIQ_API_KEY, "q": q, "limit": 6, "format": "json"}
+        if country:
+            params["countrycodes"] = country.lower()
         resp = requests.get(
             f"{LOCATIONIQ_BASE}/autocomplete",
-            params={"key": LOCATIONIQ_API_KEY, "q": q, "limit": 6, "countrycodes": country.lower(), "format": "json"},
+            params=params,
             timeout=6,
         )
         if resp.status_code != 200:
@@ -2600,7 +2628,127 @@ def neighborhood_infrastructure(city: str, country: str = "India"):
     return get_infrastructure_summary(city, country)
 
 
-NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "checklist", "authority_contacts", "cross_sell", "share"]
+class NeighborhoodComparisonArea(BaseModel):
+    city: str
+    country: str = "India"
+    locality: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    property_type: str = "Apartment"
+
+
+class NeighborhoodComparisonCreateRequest(BaseModel):
+    areas: list[NeighborhoodComparisonArea]
+
+
+def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict[str, Any]:
+    """The real per-area data pull, reusing exactly the same functions
+    (and their own caching/honesty behavior) the single-area page
+    already relies on — a comparison is genuinely the same real data,
+    just fetched for several areas and laid out side by side, not a
+    separate, parallel data pipeline that could quietly drift from
+    what the rest of the page shows."""
+    comps = get_comparables(area.city, area.property_type)
+    if comps:
+        is_live = len(comps) == 1 and comps[0].developer == "Live market data"
+        resale = {
+            "has_data": True,
+            "comparable_count": len(comps),
+            "average_price_per_sqft": average_price_per_sqft(comps),
+            "currency": "INR",
+            "data_source": "live" if is_live else "static_snapshot",
+        }
+    else:
+        resale = {"has_data": False, "comparable_count": 0, "average_price_per_sqft": 0, "currency": "INR", "data_source": "none"}
+
+    infrastructure = get_infrastructure_summary(area.city, area.country)
+
+    flood_risk = {"has_data": False, "nearby_water_count": 0}
+    if area.lat is not None and area.lon is not None:
+        try:
+            river = neighborhood_nearby(area.lat, area.lon, "waterway:river", 2000)
+            water = neighborhood_nearby(area.lat, area.lon, "natural:water", 2000)
+            flood_risk = {"has_data": True, "nearby_water_count": len(river) + len(water)}
+        except Exception as exc:
+            logger.error(f"_fetch_area_comparison_data: flood-risk lookup failed for {area.city!r}: {exc}")
+
+    return {
+        "city": area.city,
+        "country": area.country,
+        "locality": area.locality,
+        "resale_signal": resale,
+        "infrastructure": infrastructure,
+        "flood_risk": flood_risk,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.post("/api/neighborhood-insights/compare")
+def neighborhood_create_comparison(request: NeighborhoodComparisonCreateRequest):
+    """Public (no auth, same reasoning as every other neighborhood-
+    insights endpoint): creates a new side-by-side comparison of up to
+    MAX_AREAS_PER_COMPARISON areas — any city, any country, no
+    relation required between them. Fetches each area's real data
+    (resale signal, infrastructure news, flood-risk proximity) using
+    the exact same functions/caching the single-area page already
+    uses, then persists the result set so it can be reloaded instantly
+    (get_comparison below) rather than re-fetched on every visit."""
+    if len(request.areas) > MAX_AREAS_PER_COMPARISON:
+        raise HTTPException(status_code=400, detail=f"A comparison can include at most {MAX_AREAS_PER_COMPARISON} areas.")
+    if len(request.areas) < 2:
+        raise HTTPException(status_code=400, detail="A comparison needs at least 2 areas.")
+
+    results = [_fetch_area_comparison_data(area) for area in request.areas]
+    record = create_comparison([area.model_dump() for area in request.areas], results)
+    return record
+
+
+@app.get("/api/neighborhood-insights/compare/{comparison_id}")
+def neighborhood_get_comparison(comparison_id: str):
+    """Public: retrieves an existing comparison's current, cached
+    results — instant, no re-fetching — so a returning visitor (or the
+    same visitor reloading the page) sees the comparison "ready when
+    the page loads," refreshed in the background by the hourly
+    monitoring loop rather than on their own page load."""
+    record = get_comparison(comparison_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    return record
+
+
+@app.post("/api/neighborhood-insights/compare/{comparison_id}/refresh")
+def neighborhood_refresh_comparison(comparison_id: str):
+    """Manually re-fetches a comparison's data right now, independent
+    of the hourly monitoring loop — for a visitor who wants current
+    data immediately rather than waiting for the next scheduled
+    refresh."""
+    record = get_comparison(comparison_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    areas = [NeighborhoodComparisonArea(**area) for area in record["areas"]]
+    results = [_fetch_area_comparison_data(area) for area in areas]
+    update_comparison_results(comparison_id, results)
+    return get_comparison(comparison_id)
+
+
+class NeighborhoodComparisonMonitorRequest(BaseModel):
+    monitoring: bool
+
+
+@app.post("/api/neighborhood-insights/compare/{comparison_id}/monitor")
+def neighborhood_set_comparison_monitoring(comparison_id: str, request: NeighborhoodComparisonMonitorRequest):
+    """Public: toggles "keep monitoring" for a comparison — once on,
+    the hourly background loop (neighborhood_comparison_scheduler.py)
+    picks it up and refreshes its data automatically, with no visitor
+    needing to be on the page (or even have the app open) for it to
+    stay current."""
+    record = set_monitoring(comparison_id, request.monitoring)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    return record
+
+
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "comparison", "checklist", "authority_contacts", "cross_sell", "share"]
 NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
 
 
@@ -2930,7 +3078,8 @@ def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = D
         )
 
     try:
-        return create_price_watch(
+        watch = create_price_watch_if_under_limit(
+            max_watches=max_watches,
             email=user_email, price=price, city=city,
             property_type=property_type, area_value=area_value,
             target_price=request.target_price, area_unit=request.area_unit, url=request.url,
@@ -2938,6 +3087,21 @@ def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = D
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if watch is None:
+        # The real, race-safe re-check inside create_price_watch_if_
+        # under_limit caught what the earlier check above this function
+        # can't guarantee alone: a concurrent watch-create for this same
+        # user landed first and used the last slot in between —
+        # current_count read earlier is now potentially stale.
+        current_count = count_active_watches_for_email(user_email)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your plan allows watching up to {max_watches} propert{'y' if max_watches == 1 else 'ies'} "
+                   f"at a time. You're already watching {current_count} — cancel one or upgrade your plan "
+                   f"to watch more.",
+        )
+    return watch
 
 
 @app.get("/api/price-watches/{watch_id}")
@@ -3631,19 +3795,12 @@ def api_create_property(request: CreatePropertyRequest, user_email: str = Depend
 
     tier = get_tier(tier_id)
     limit = tier.get("saved_designs_limit", 0) if tier else 0
-    if limit is not None:
-        used = count_saved_properties(user_email)
-        if used >= limit:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Saved design limit reached ({used}/{limit}) for the {tier['label']} tier. "
-                       f"Delete an existing saved design or upgrade your plan."
-            )
 
     if not request.floors:
         raise HTTPException(status_code=400, detail="A property must have at least one floor")
 
-    prop = create_property(
+    prop = create_property_if_under_limit(
+        limit=limit,
         user_email=user_email,
         name=request.name,
         plot_spec=request.plot_spec.model_dump(),
@@ -3653,6 +3810,18 @@ def api_create_property(request: CreatePropertyRequest, user_email: str = Depend
         floors=[f.model_dump() for f in request.floors],
         supplier_preferences=request.supplier_preferences,
     )
+    if prop is None:
+        # The real, race-safe re-check inside create_property_if_under_limit
+        # caught what the earlier tier lookup above can't guarantee alone:
+        # a concurrent save for this same user landed first and used the
+        # last slot in between. count_saved_properties is re-read here
+        # since any value read before this point is now potentially stale.
+        used = count_saved_properties(user_email)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Saved design limit reached ({used}/{limit}) for the {tier['label']} tier. "
+                   f"Delete an existing saved design or upgrade your plan.",
+        )
     return prop
 
 

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
+import NeighborhoodComparison from "./NeighborhoodComparison";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 
@@ -838,6 +839,12 @@ function NeighborhoodInsights({ countryCode }) {
           </div>
           )}
         </>
+      )}
+
+      {sectionVisibility.comparison && (
+        <div className="ni-card">
+          <NeighborhoodComparison />
+        </div>
       )}
 
       <div className="ni-footer">

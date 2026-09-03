@@ -367,3 +367,23 @@ def test_autocomplete_still_defaults_to_india_when_country_not_specified(monkeyp
 
     client.get("/api/neighborhood-insights/autocomplete?q=Banjara+Hills")
     assert captured["params"]["countrycodes"] == "in"
+
+
+def test_autocomplete_searches_globally_when_country_is_explicitly_empty(monkeypatch):
+    """The real, necessary mode for the "any city, any country"
+    comparison feature: an explicitly empty country string must omit
+    the countrycodes restriction entirely, not silently fall back to
+    India or reject the request."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "LOCATIONIQ_API_KEY", "pk.test_key_123")
+
+    captured = {}
+
+    def fake_get(url, params=None, timeout=None):
+        captured["params"] = params
+        return _FakeResponse(200, [])
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+
+    client.get("/api/neighborhood-insights/autocomplete?q=Lisbon+Alfama&country=")
+    assert "countrycodes" not in captured["params"]
