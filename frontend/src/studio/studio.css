@@ -2001,11 +2001,24 @@
 /* ============================================================
    RESPONSIVE — mandatory across every Studio page.
    Two breakpoints: tablet/narrow desktop (900px) and phone (640px).
+
+   Grid-collapse rule: when collapsing a multi-column grid to one
+   column on mobile, always use `minmax(0, 1fr)`, never bare `1fr`.
+   A bare `1fr` track has a hidden default minimum equal to its
+   content's own natural width — if any single child in that column
+   is wide (a row of color-swatch buttons, a long label), the whole
+   "single column" silently stays exactly as wide as that child,
+   overflowing the real viewport, even though every DevTools grid
+   line and every element you inspect individually looks fine.
+   `minmax(0, 1fr)` is the only value that actually lets the track
+   shrink to the real available width. Found the hard way while
+   verifying mobile labels that were rendering correctly but sitting
+   far outside the visible viewport.
    ============================================================ */
 
 @media (max-width: 900px) {
   .studio-tier-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .cs-steps {
@@ -2066,7 +2079,7 @@
   }
 
   .cs-field-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .cs-material-category-header {
@@ -2115,24 +2128,16 @@
     font-size: 20px;
   }
 
-  /* Room layout grid: the fixed 6-column grid genuinely cannot fit on a
-     phone screen, so it collapses to one input per line. The header
-     labels row is hidden here (it doesn't map to a stacked layout) —
-     each input has its own placeholder instead, so fields stay
-     self-explanatory without it. */
-  .cs-room-row-header {
-    display: none;
-  }
-
-  .cs-room-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 14px;
-    border: 1px solid #f3ecff;
-    border-radius: 12px;
-    margin-bottom: 12px;
-  }
-
+  /* Room layout grid: this table intentionally does NOT collapse to a
+     stacked single column on mobile (see the min-width:720px rule for
+     .cs-room-row further down, in the phone-only block) — it keeps its
+     real 8-column layout and scrolls horizontally instead, since a
+     name/dimensions/fill/border-style/color/thickness row squeezed
+     into one narrow column made every control too small to use. The
+     header stays visible (not display:none) so column meaning is
+     never lost while scrolling — it shares .cs-room-row's own
+     min-width via .cs-room-row-header carrying the same class, so it
+     scrolls in sync with the body rows underneath it. */
   .cs-remove-room {
     width: 100%;
   }
@@ -2173,7 +2178,7 @@
   }
 
   .admin-tier-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     padding: 14px;
     border: 1px solid #f3ecff;
