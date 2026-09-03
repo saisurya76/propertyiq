@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getSession, clearSession } from "./studioApi";
 
-function StudioTopBar({ onBackToReport, onSignOut }) {
+function StudioTopBar({ onBackToReport, onSignOut, onManagePlan }) {
   const [session, setSession] = useState(getSession());
 
   const handleSignOutClick = () => {
@@ -22,6 +22,11 @@ function StudioTopBar({ onBackToReport, onSignOut }) {
         <span className="studio-prominent-link" onClick={onBackToReport}>
           ← Back to your report
         </span>
+        {onManagePlan && (
+          <span className="studio-prominent-link" onClick={onManagePlan}>
+            Plans &amp; Pricing
+          </span>
+        )}
         {session && (
           <span className="studio-top-bar-session">
             <strong>{session.email}</strong>

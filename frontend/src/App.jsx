@@ -692,6 +692,40 @@ function App() {
     }
   };
 
+  // A real, previously-missing gap this fixes: SessionBar's "Plan:
+  // Studio Pro" badge is meant to always open Pricing (its own title
+  // attribute literally says "Manage your subscription") but was
+  // wired directly to launchStudio above, inheriting its smart-resume
+  // behavior — meaning a user who'd previously opened a saved design
+  // would click their own plan badge and land back in Construction
+  // Studio instead of Pricing, with genuinely no way to reach Pricing
+  // at all until they explicitly started a new design first. This is
+  // launchStudio's own session-validation logic, but unconditionally
+  // routing to "pricing" — never "construction" — regardless of
+  // resumePropertyId, since a click aimed explicitly at "manage my
+  // plan" should never be redirected into an unrelated design.
+  const goToPricing = async () => {
+    const session = getSession();
+    if (!session) {
+      setStudioView("auth");
+      return;
+    }
+    setCheckingSession(true);
+    try {
+      await studioApi.getStatus();
+      setStudioView("pricing");
+    } catch (err) {
+      if (err.status === 401) {
+        clearSession();
+        setStudioView("auth");
+      } else {
+        setStudioView("pricing");
+      }
+    } finally {
+      setCheckingSession(false);
+    }
+  };
+
   const handleStudioAuthenticated = () => {
     setStudioView("pricing");
   };
@@ -758,7 +792,7 @@ function App() {
   if (studioView === "designs") {
     return (
       <div className="app">
-        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
         <StudioDesigns
           urlCountryContext={urlCountryContext}
           onStartNew={() => {
@@ -779,7 +813,7 @@ function App() {
   if (studioView === "construction") {
     return (
       <div className="app">
-        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
         <ConstructionStudio
           key={studioResetNonce}
           onBack={() => setStudioView("designs")}
@@ -854,7 +888,7 @@ function App() {
   return (
     <div className="app">
 
-      <SessionBar onSignOut={() => handleSignOut("main")} onManagePlan={launchStudio} />
+      <SessionBar onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
 
       {paymentReturnMessage && (
         <div
