@@ -731,6 +731,15 @@ function App() {
   };
 
   const backToReport = () => {
+    // Resets the "smart resume" state a saved-design open sets (see
+    // launchStudio's own comment on why it exists) — a real, confirmed
+    // bug this fixes: without this reset, explicitly leaving back to
+    // the report and then clicking "Studio" again would silently skip
+    // Pricing entirely and jump straight back into that same old
+    // design, since launchStudio still saw resumePropertyId set from
+    // before. Leaving back to the report is a clear enough signal the
+    // user is done with that specific design for now.
+    setResumePropertyId(null);
     setStudioView("main");
   };
 
@@ -745,6 +754,10 @@ function App() {
   };
 
   const handleSignOut = (targetView = "auth") => {
+    // Same reasoning as backToReport's own reset: signing out and a
+    // different person signing back in on the same device must not
+    // carry over an attempt to resume the previous person's design.
+    setResumePropertyId(null);
     clearSession();
     setStudioView(targetView);
   };
