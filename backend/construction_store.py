@@ -26,6 +26,29 @@ def initialize_construction_store() -> None:
                 )
                 """
             )
+            # A real admin lever for a real support scenario: a customer
+            # whose monthly generate quota was consumed by a bug, a
+            # confusing UI moment, or anything else worth a goodwill
+            # reset, without waiting for the calendar month to roll
+            # over. Deliberately NOT deleting rows from
+            # construction_designs itself to achieve this -- that table
+            # is a genuine generate-history log (see count_designs_this_
+            # month's own docstring), and destroying real history to
+            # fake a lower count would make the log dishonest for any
+            # future audit/support need. Instead, count_designs_this_
+            # month only counts designs created AFTER the user's most
+            # recent reset (if one exists and falls within the current
+            # month) -- the full history stays intact, just no longer
+            # counted against this month's quota from that point on.
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS quota_resets (
+                    user_email TEXT PRIMARY KEY,
+                    reset_at TEXT NOT NULL,
+                    admin_note TEXT
+                )
+                """
+            )
         connection.commit()
 
 
@@ -93,9 +116,24 @@ def get_design(design_id: str) -> Optional[dict[str, Any]]:
 
 def count_designs_this_month(user_email: str) -> int:
     """Counts designs created in the current calendar month for a user,
-    used for tier-quota enforcement."""
+    used for tier-quota enforcement. If an admin has reset this user's
+    quota this month (see reset_quota_for_user), only counts designs
+    created AFTER that reset — not from the start of the month — so a
+    reset genuinely gives a fresh count rather than a no-op."""
     now = datetime.now(timezone.utc)
     month_prefix = now.strftime("%Y-%m")
+
+    reset = get_quota_reset(user_email)
+    if reset and reset["reset_at"].startswith(month_prefix):
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT COUNT(*) as cnt FROM construction_designs WHERE user_email = %s AND created_at > %s",
+                    (user_email, reset["reset_at"]),
+                )
+                row = cursor.fetchone()
+        return row["cnt"] if row else 0
+
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -104,3 +142,32 @@ def count_designs_this_month(user_email: str) -> int:
             )
             row = cursor.fetchone()
     return row["cnt"] if row else 0
+
+
+def reset_quota_for_user(user_email: str, admin_note: Optional[str] = None) -> None:
+    """Admin action: gives a user a fresh generate quota for the
+    current month, without touching or deleting any row in
+    construction_designs itself — see initialize_construction_store's
+    own comment on why the history is deliberately preserved. Setting
+    reset_at to right now means every design generated before this
+    moment stops counting against this month's quota; the full history
+    (used for anything else, e.g. real usage analytics) is untouched."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO quota_resets (user_email, reset_at, admin_note)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_email) DO UPDATE SET reset_at = EXCLUDED.reset_at, admin_note = EXCLUDED.admin_note
+                """,
+                (user_email.strip().lower(), now, admin_note),
+            )
+        connection.commit()
+
+
+def get_quota_reset(user_email: str) -> Optional[dict[str, Any]]:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM quota_resets WHERE user_email = %s", (user_email.strip().lower(),))
+            return cursor.fetchone()

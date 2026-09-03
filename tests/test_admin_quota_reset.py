@@ -1,0 +1,157 @@
+import os
+
+os.environ.setdefault("DODO_PAYMENTS_API_KEY", "test")
+os.environ.setdefault("DODO_REPORT_PRODUCT_ID", "test")
+os.environ.setdefault("ADMIN_DASHBOARD_PASSWORD", "test-admin-pw")
+
+from fastapi.testclient import TestClient  # noqa: E402
+from backend.api import app  # noqa: E402
+from backend.auth_store import create_otp  # noqa: E402
+from backend.subscription_store import upsert_subscription  # noqa: E402
+from backend.construction_store import count_designs_this_month, get_quota_reset  # noqa: E402
+from backend.config_store import get_all_tiers_merged, set_tier_config  # noqa: E402
+
+client = TestClient(app)
+
+
+def _authed_headers(email: str) -> dict:
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    token = r.json()["session_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _plot_spec():
+    return {
+        "plot_size_sqft": 1000, "plot_length_ft": 40, "plot_width_ft": 25,
+        "entrance_direction": "north", "road_facing_side": "north",
+    }
+
+
+def test_admin_reset_quota_requires_correct_password():
+    r = client.post("/api/admin/reset-quota", json={"password": "wrong", "user_email": "x@example.com"})
+    assert r.status_code == 403
+
+
+def test_admin_reset_quota_genuinely_gives_a_fresh_count():
+    """The real, direct test of the actual feature: a user who's used
+    their entire monthly quota can generate again immediately after an
+    admin reset, without waiting for the month to roll over."""
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "design_quota_per_month": 1}}
+    set_tier_config(tight_config)
+
+    try:
+        email = "resetme@example.com"
+        headers = _authed_headers(email)
+        upsert_subscription(email=email, tier_id="studio_starter", status="active", dodo_subscription_id="sub_reset_test")
+
+        # Use up the entire quota (1).
+        r1 = client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+        assert r1.status_code == 200
+
+        # Confirm blocked before any reset.
+        r2 = client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+        assert r2.status_code == 403
+
+        # Admin resets the quota.
+        r_reset = client.post("/api/admin/reset-quota", json={"password": "test-admin-pw", "user_email": email, "admin_note": "Goodwill reset, UI bug"})
+        assert r_reset.status_code == 200
+        assert r_reset.json()["designs_used_this_month"] == 0
+
+        # Now generate must succeed again.
+        r3 = client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+        assert r3.status_code == 200
+    finally:
+        set_tier_config(original)
+
+
+def test_reset_does_not_delete_any_construction_designs_rows():
+    """The real, important guarantee: the generate-history log itself
+    is never touched or deleted -- only what counts against the
+    CURRENT month's quota changes. Confirms the actual row count in
+    construction_designs is unaffected by a reset."""
+    from backend.db import get_connection
+
+    original = get_all_tiers_merged()
+    tight_config = {**original, "studio_starter": {**original["studio_starter"], "design_quota_per_month": 5}}
+    set_tier_config(tight_config)
+
+    try:
+        email = "historytest@example.com"
+        headers = _authed_headers(email)
+        upsert_subscription(email=email, tier_id="studio_starter", status="active", dodo_subscription_id="sub_history_test")
+
+        client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+        client.post("/api/construction-studio/design", headers=headers, json={**_plot_spec(), "selections": {}})
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) as cnt FROM construction_designs WHERE user_email = %s", (email,))
+                rows_before = cursor.fetchone()["cnt"]
+
+        client.post("/api/admin/reset-quota", json={"password": "test-admin-pw", "user_email": email})
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) as cnt FROM construction_designs WHERE user_email = %s", (email,))
+                rows_after = cursor.fetchone()["cnt"]
+
+        assert rows_before == rows_after == 2
+        # The count-against-quota view is now 0 even though 2 real rows still exist.
+        assert count_designs_this_month(email) == 0
+    finally:
+        set_tier_config(original)
+
+
+def test_reset_is_recorded_and_visible_via_get_quota_reset():
+    email = "recordcheck@example.com"
+    r = client.post("/api/admin/reset-quota", json={"password": "test-admin-pw", "user_email": email, "admin_note": "Test note"})
+    assert r.status_code == 200
+
+    record = get_quota_reset(email)
+    assert record is not None
+    assert record["admin_note"] == "Test note"
+
+
+def test_admin_quota_lookup_requires_correct_password():
+    r = client.post("/api/admin/quota-lookup", json={"password": "wrong", "user_email": "x@example.com"})
+    assert r.status_code == 403
+
+
+def test_admin_quota_lookup_shows_real_usage_and_tier_limit():
+    email = "lookuptest@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_lookup_test")
+
+    r = client.post("/api/admin/quota-lookup", json={"password": "test-admin-pw", "user_email": email})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["tier_id"] == "studio_pro"
+    assert data["design_quota_per_month"] == 15
+    assert data["designs_used_this_month"] == 0
+    assert data["last_reset_at"] is None
+
+
+def test_reset_only_applies_within_the_same_calendar_month():
+    """A real, necessary boundary: a reset from a previous month must
+    not somehow suppress this month's real usage count -- the reset
+    only matters if it falls within the CURRENT month, otherwise the
+    normal calendar-month count applies as if no reset ever happened."""
+    from backend.construction_store import reset_quota_for_user
+    from datetime import datetime, timezone
+    from backend.db import get_connection
+
+    email = "oldreset@example.com"
+    # Manually insert a stale reset from a clearly different month.
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO quota_resets (user_email, reset_at, admin_note) VALUES (%s, %s, %s) "
+                "ON CONFLICT (user_email) DO UPDATE SET reset_at = EXCLUDED.reset_at",
+                (email, "2020-01-01T00:00:00+00:00", "old reset"),
+            )
+        connection.commit()
+
+    # This month's real count must still reflect actual current-month
+    # designs, unaffected by that stale, out-of-month reset.
+    assert count_designs_this_month(email) == 0

@@ -33,6 +33,7 @@ const MENU_ITEMS = [
   { screen: "grants", label: "Insight Add-on Grants", desc: "Every Insight Add-on purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
   { screen: "refund-requests", label: "Refund Requests", desc: "Review and act on refund requests customers have actually submitted." },
+  { screen: "reset-quota", label: "Reset User Quota", desc: "Give a user a fresh monthly design quota without waiting for the month to roll over." },
 ];
 
 function AdminPanel({ onBack }) {
@@ -67,6 +68,12 @@ function AdminPanel({ onBack }) {
   const [refundRequestsMessage, setRefundRequestsMessage] = useState("");
   const [expandedRequestId, setExpandedRequestId] = useState(null);
   const [decisionForms, setDecisionForms] = useState({});
+
+  // Reset User Quota screen state
+  const [quotaLookupEmail, setQuotaLookupEmail] = useState("");
+  const [quotaInfo, setQuotaInfo] = useState(null);
+  const [quotaResetNote, setQuotaResetNote] = useState("");
+  const [quotaMessage, setQuotaMessage] = useState("");
 
   const login = async (e) => {
     e.preventDefault();
@@ -279,6 +286,39 @@ function AdminPanel({ onBack }) {
       await loadRefundRequests(refundRequestsFilter);
     } catch (err) {
       setError(err.message || "Couldn't deny the request.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const lookupQuota = async () => {
+    setQuotaMessage("");
+    setError("");
+    setQuotaInfo(null);
+    if (!quotaLookupEmail.trim()) return;
+    setLoading(true);
+    try {
+      const res = await studioApi.adminLookupQuota(password, quotaLookupEmail.trim());
+      setQuotaInfo(res);
+    } catch (err) {
+      setError(err.message || "Couldn't look up this user's quota.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetQuota = async () => {
+    setQuotaMessage("");
+    setError("");
+    if (!window.confirm(`Reset the monthly design quota for ${quotaLookupEmail.trim()}? They'll be able to generate again immediately.`)) return;
+    setLoading(true);
+    try {
+      const res = await studioApi.adminResetQuota(password, quotaLookupEmail.trim(), quotaResetNote.trim() || undefined);
+      setQuotaMessage(`Quota reset — ${res.user_email} now shows ${res.designs_used_this_month} used this month.`);
+      setQuotaResetNote("");
+      await lookupQuota();
+    } catch (err) {
+      setError(err.message || "Couldn't reset the quota.");
     } finally {
       setLoading(false);
     }
@@ -1011,6 +1051,60 @@ function AdminPanel({ onBack }) {
                   </div>
                 );
               })
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "reset-quota" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          {quotaMessage && <div className="studio-status-banner">{quotaMessage}</div>}
+
+          <div className="admin-section admin-section-purple">
+            <h3>Reset User Quota</h3>
+            <p className="admin-section-note">
+              Gives a user a fresh monthly design-generate quota immediately, without waiting for the
+              calendar month to roll over — for a real support case (a bug consumed their quota, a
+              confusing moment in the product). This never deletes or touches their design history — only
+              what counts against this month's limit changes, from this moment forward.
+            </p>
+            <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto" }}>
+              <input
+                type="email"
+                placeholder="customer@example.com"
+                value={quotaLookupEmail}
+                onChange={(e) => setQuotaLookupEmail(e.target.value)}
+              />
+              <button className="cs-nav-btn cs-nav-primary" onClick={lookupQuota} disabled={loading || !quotaLookupEmail.trim()}>
+                {loading ? "Looking up..." : "Look up"}
+              </button>
+            </div>
+
+            {quotaInfo && (
+              <>
+                <table className="admin-table" style={{ marginTop: 16 }}>
+                  <tbody>
+                    <tr><td>Tier</td><td style={{ textAlign: "right" }}>{quotaInfo.tier_id || "No active plan"}</td></tr>
+                    <tr><td>Monthly quota</td><td style={{ textAlign: "right" }}>{quotaInfo.design_quota_per_month ?? "Unlimited"}</td></tr>
+                    <tr><td>Used this month</td><td style={{ textAlign: "right" }}><strong>{quotaInfo.designs_used_this_month}</strong></td></tr>
+                    <tr><td>Last admin reset</td><td style={{ textAlign: "right" }}>{quotaInfo.last_reset_at ? new Date(quotaInfo.last_reset_at).toLocaleString() : "Never"}</td></tr>
+                  </tbody>
+                </table>
+
+                <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto", marginTop: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="Note (e.g. reason for the reset)"
+                    value={quotaResetNote}
+                    onChange={(e) => setQuotaResetNote(e.target.value)}
+                  />
+                  <button className="cs-nav-btn cs-nav-primary" onClick={resetQuota} disabled={loading}>
+                    Reset Quota
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </>

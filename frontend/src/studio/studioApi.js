@@ -135,6 +135,12 @@ export const studioApi = {
   adminDenyRefundRequest: (password, requestId, adminResponse) =>
     apiFetch("/api/admin/refund-requests/deny", { method: "POST", body: JSON.stringify({ password, request_id: requestId, admin_response: adminResponse }) }),
 
+  adminLookupQuota: (password, userEmail) =>
+    apiFetch("/api/admin/quota-lookup", { method: "POST", body: JSON.stringify({ password, user_email: userEmail }) }),
+
+  adminResetQuota: (password, userEmail, adminNote) =>
+    apiFetch("/api/admin/reset-quota", { method: "POST", body: JSON.stringify({ password, user_email: userEmail, admin_note: adminNote }) }),
+
   listProperties: () => apiFetch("/api/properties"),
 
   getProperty: (propertyId) => apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`),

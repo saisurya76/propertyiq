@@ -31,6 +31,8 @@ from backend.construction_store import (
     save_design,
     get_design,
     count_designs_this_month,
+    reset_quota_for_user,
+    get_quota_reset,
 )
 
 from backend.property_store import (
@@ -1530,6 +1532,54 @@ def admin_deny_refund_request(request: AdminDenyRefundRequestRequest):
         logger.error(f"admin_deny_refund_request: notification email failed: {exc}")
 
     return {"request": updated}
+
+
+class AdminResetQuotaRequest(BaseModel):
+    password: str
+    user_email: str
+    admin_note: Optional[str] = None
+
+
+@app.post("/api/admin/reset-quota")
+def admin_reset_quota(request: AdminResetQuotaRequest):
+    """Admin-only: gives a user a fresh monthly generate quota, for a
+    real support scenario — a customer whose quota was consumed by a
+    bug or a confusing moment in the product, without making them wait
+    for the calendar month to roll over. See reset_quota_for_user's own
+    docstring for why this never deletes or touches a single row in
+    construction_designs itself — the full generate-history log stays
+    completely intact; only what counts against the CURRENT month's
+    limit changes, from this moment forward."""
+    _require_admin_password(request.password)
+    reset_quota_for_user(request.user_email, request.admin_note)
+    new_count = count_designs_this_month(request.user_email.strip().lower())
+    return {"user_email": request.user_email.strip().lower(), "designs_used_this_month": new_count}
+
+
+class AdminQuotaLookupRequest(BaseModel):
+    password: str
+    user_email: str
+
+
+@app.post("/api/admin/quota-lookup")
+def admin_lookup_quota(request: AdminQuotaLookupRequest):
+    """Admin-only: shows a user's real, current generate-quota usage
+    and tier limit before deciding whether a reset is actually needed —
+    so this isn't a blind action taken on a bare email address alone."""
+    _require_admin_password(request.password)
+    email = request.user_email.strip().lower()
+    tier_id = get_active_tier(email)
+    tier = get_tier(tier_id) if tier_id else None
+    used = count_designs_this_month(email)
+    reset = get_quota_reset(email)
+    return {
+        "user_email": email,
+        "tier_id": tier_id,
+        "design_quota_per_month": tier.get("design_quota_per_month") if tier else None,
+        "designs_used_this_month": used,
+        "last_reset_at": reset["reset_at"] if reset else None,
+    }
+
 
 
 class AdminSettingsRequest(BaseModel):
