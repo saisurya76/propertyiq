@@ -578,14 +578,15 @@ function AdminPanel({ onBack }) {
               return (
                 <Fragment key={tierId}>
                   <div className="admin-tier-row">
-                    <span className="admin-tier-row-name">{tierId}</span>
-                    <span title={tier.price_source === "dodo" ? "Live value from Dodo Payments" : "Dodo price unavailable right now — showing the last known/local fallback value"}>
+                    <span className="admin-tier-row-name" data-label="Tier">{tierId}</span>
+                    <span data-label="Price (from Dodo)" title={tier.price_source === "dodo" ? "Live value from Dodo Payments" : "Dodo price unavailable right now — showing the last known/local fallback value"}>
                       <input
                         type="text"
                         disabled
                         value={`$${tier.price_usd}${tier.price_source === "dodo" ? "" : " (fallback)"}`}
                       />
                     </span>
+                    <span data-label="Generate/mo">
                     <input
                       type="number"
                       value={tier.design_quota_per_month ?? ""}
@@ -594,6 +595,8 @@ function AdminPanel({ onBack }) {
                         updateTierField(tierId, "design_quota_per_month", e.target.value === "" ? null : Number(e.target.value))
                       }
                     />
+                    </span>
+                    <span data-label="Saved designs">
                     <input
                       type="number"
                       value={tier.saved_designs_limit ?? ""}
@@ -602,6 +605,8 @@ function AdminPanel({ onBack }) {
                         updateTierField(tierId, "saved_designs_limit", e.target.value === "" ? null : Number(e.target.value))
                       }
                     />
+                    </span>
+                    <span data-label="Max price watches">
                     <input
                       type="number"
                       value={tier.max_price_watches ?? ""}
@@ -611,12 +616,15 @@ function AdminPanel({ onBack }) {
                         updateTierField(tierId, "max_price_watches", e.target.value === "" ? null : Number(e.target.value))
                       }
                     />
+                    </span>
+                    <span data-label="Label">
                     <input
                       type="text"
                       placeholder="Label"
                       value={tier.label}
                       onChange={(e) => updateTierField(tierId, "label", e.target.value)}
                     />
+                    </span>
                   </div>
                   <div className="admin-tier-features-row">
                     <span className="admin-tier-features-label">Features:</span>

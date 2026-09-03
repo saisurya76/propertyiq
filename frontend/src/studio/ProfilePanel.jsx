@@ -103,18 +103,20 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
             {profile.payments.length === 0 ? (
               <p className="refund-request-intro">{profile.payments_note || "No payments yet."}</p>
             ) : (
-              <table className="admin-table" style={{ marginBottom: 8 }}>
-                <thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
-                <tbody>
-                  {profile.payments.map((p) => (
-                    <tr key={p.payment_id}>
-                      <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
-                      <td>${p.amount_usd} {p.currency?.toUpperCase()}</td>
-                      <td>{p.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="admin-table-scroll" style={{ marginBottom: 8 }}>
+                <table className="admin-table">
+                  <thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {profile.payments.map((p) => (
+                      <tr key={p.payment_id}>
+                        <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
+                        <td>${p.amount_usd} {p.currency?.toUpperCase()}</td>
+                        <td>{p.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {/* 5. Tier upgrade */}

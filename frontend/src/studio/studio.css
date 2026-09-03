@@ -2159,7 +2159,15 @@
     margin-bottom: 4px;
   }
 
-  /* Admin tier config grid: same problem, same fix. */
+  /* Admin tier config grid: same problem, same fix -- but unlike
+     cs-room-row below, several of these fields shared the exact same
+     placeholder text ("unlimited" appeared on two different inputs),
+     so "each input has its own placeholder" genuinely didn't hold up
+     here -- an admin on mobile had no real way to tell which stacked
+     "unlimited" value was the monthly quota vs the saved-designs
+     limit. Real, visible labels via data-label (not just placeholder
+     text, which also isn't picked up by screen readers as a proper
+     label) instead. */
   .admin-tier-row-header {
     display: none;
   }
@@ -2171,6 +2179,18 @@
     border: 1px solid #f3ecff;
     border-radius: 12px;
     margin-bottom: 12px;
+  }
+
+  .admin-tier-row > span[data-label]::before,
+  .admin-tier-row > span.admin-tier-row-name[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--grey-600, #5b6f7c);
+    margin-bottom: 3px;
   }
 
   .admin-tier-row-name {
