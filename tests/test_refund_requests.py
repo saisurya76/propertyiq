@@ -181,3 +181,62 @@ def test_approving_a_nonexistent_request_returns_404():
         "password": "test-admin-pw", "request_id": "does-not-exist", "amount_usd": 9.0, "admin_note": "x",
     })
     assert r.status_code == 404
+
+
+def test_approve_dodo_cancels_subscription_for_subscription_related_reasons():
+    """The real, critical safeguard: approving a first_month_guarantee
+    (or other subscription-related) refund request must also cancel
+    the subscription immediately -- otherwise a customer keeps active,
+    unlimited access after getting their money back."""
+    from backend.subscription_store import upsert_subscription, get_subscription
+
+    email = "guaranteeabuse@example.com"
+    upsert_subscription(email=email, tier_id="studio_unlimited", status="active", dodo_subscription_id="sub_guarantee_test")
+    created = create_refund_request(user_email=email, reason_code="first_month_guarantee", details=None, purchase_reference="pay_guarantee_123")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_guarantee_1"
+    fake_refund.amount = 7900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email"):
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r = client.post("/api/admin/refund-requests/approve-dodo", json={
+            "password": "test-admin-pw", "request_id": created["id"], "payment_id": "pay_guarantee_123",
+        })
+
+    assert r.status_code == 200
+    mock_client_cls.return_value.subscriptions.update.assert_called_once_with("sub_guarantee_test", status="cancelled")
+    assert get_subscription(email)["status"] == "cancelled"
+
+
+def test_approve_dodo_does_not_cancel_subscription_for_one_time_purchase_reasons():
+    """A real, necessary boundary: a refund for an unrelated one-time
+    purchase (a Standard Report, say) must NOT touch a customer's
+    separate, still-valid Studio subscription."""
+    from backend.subscription_store import upsert_subscription, get_subscription
+
+    email = "unrelatedsub@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_unrelated_test")
+    created = create_refund_request(user_email=email, reason_code="report_never_generated", details=None, purchase_reference="pay_report_999")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_unrelated_1"
+    fake_refund.amount = 1900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email"):
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r = client.post("/api/admin/refund-requests/approve-dodo", json={
+            "password": "test-admin-pw", "request_id": created["id"], "payment_id": "pay_report_999",
+        })
+
+    assert r.status_code == 200
+    mock_client_cls.return_value.subscriptions.update.assert_not_called()
+    assert get_subscription(email)["status"] == "active"

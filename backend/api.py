@@ -1114,10 +1114,12 @@ def _require_admin_password(password: str) -> None:
 
 class SubscribeCheckoutRequest(BaseModel):
     tier_id: str
+    currency: Optional[str] = None
 
 
 class InsightCheckoutRequest(BaseModel):
     report_id: str
+    currency: Optional[str] = None
 
 
 @app.post("/api/auth/request-otp")
@@ -1263,14 +1265,25 @@ class AdminIssueRefundRequest(BaseModel):
     payment_id: str
     user_email: str
     reason: Optional[str] = None
+    cancel_subscription: bool = True
 
 
-def _issue_dodo_refund(payment_id: str, user_email: str, reason: Optional[str]) -> dict[str, Any]:
+def _issue_dodo_refund(payment_id: str, user_email: str, reason: Optional[str], dodo_subscription_id: Optional[str] = None) -> dict[str, Any]:
     """The real, shared Dodo-refund-issuing logic — extracted so both
     the standalone admin_issue_refund endpoint and the refund-request
     approval flow below call the exact same real path, rather than two
     slightly different copies of "call Dodo, then record the result"
-    drifting apart over time."""
+    drifting apart over time.
+
+    A real, previously-missing safeguard: when dodo_subscription_id is
+    given, this also cancels that subscription IMMEDIATELY (status=
+    'cancelled', not the deferred cancel_at_next_billing_date used for
+    a customer's own voluntary cancellation) — refunding a subscription
+    payment while leaving the subscription active would let someone
+    get their money back and keep using the product at the same time.
+    Matches standard SaaS refund practice: refunding a subscription
+    charge requires ending the subscription itself, not just reversing
+    the payment."""
     if not DODO_API_KEY:
         raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
 
@@ -1280,6 +1293,17 @@ def _issue_dodo_refund(payment_id: str, user_email: str, reason: Optional[str]) 
     except Exception as exc:
         logger.error(f"_issue_dodo_refund: Dodo API call failed for payment_id={payment_id!r}: {exc}")
         raise HTTPException(status_code=502, detail=f"Dodo rejected the refund request: {exc}")
+
+    if dodo_subscription_id:
+        try:
+            client.subscriptions.update(dodo_subscription_id, status="cancelled")
+            set_status_by_dodo_id(dodo_subscription_id, "cancelled")
+        except Exception as exc:
+            # Logged, not raised -- the money has already been refunded
+            # by this point, which is the more important, harder-to-
+            # reverse action; a cancellation hiccup here needs a manual
+            # follow-up in Dodo's dashboard, not a failed refund.
+            logger.error(f"_issue_dodo_refund: failed to cancel subscription {dodo_subscription_id!r} after refund: {exc}")
 
     return record_dodo_refund(
         dodo_refund_id=refund.refund_id,
@@ -1304,9 +1328,20 @@ def admin_issue_refund(request: AdminIssueRefundRequest):
     status Dodo returns right away; the real, final status (a refund
     can be "pending" before settling) arrives later via the
     refund.succeeded/refund.failed webhook and updates this same
-    record via upsert_refund_status_by_dodo_id."""
+    record via upsert_refund_status_by_dodo_id.
+
+    cancel_subscription defaults to True: a real, previously-missing
+    safeguard against refunding a subscription payment while leaving
+    the subscription itself active, which would let a customer get
+    their money back and keep using the product at the same time. Set
+    to False explicitly for a one-time purchase (report, Insight
+    Add-on) refund, which has no subscription to cancel at all."""
     _require_admin_password(request.password)
-    record = _issue_dodo_refund(request.payment_id, request.user_email, request.reason)
+    dodo_subscription_id = None
+    if request.cancel_subscription:
+        sub = get_subscription(request.user_email)
+        dodo_subscription_id = sub.get("dodo_subscription_id") if sub else None
+    record = _issue_dodo_refund(request.payment_id, request.user_email, request.reason, dodo_subscription_id)
     return {"refund": record}
 
 
@@ -1355,6 +1390,20 @@ def admin_list_refunds(request: AdminAuthRequest):
 # Refund requests — the user-facing intake queue. See
 # refund_request_module_spec.md for the full design.
 # ---------------------------------------------------------------------
+
+# Reason codes for which approving the refund must also cancel the
+# customer's subscription immediately (see admin_approve_refund_
+# request_via_dodo's own docstring for why) — deliberately excludes
+# the one-time-purchase reason codes (report_never_generated,
+# duplicate_charge, report_incorrect, insight_addon_technical_failure),
+# which have no subscription to cancel at all, and where a customer
+# might separately still have an unrelated, still-valid subscription
+# that must not be touched by this refund.
+SUBSCRIPTION_REFUND_REASON_CODES = {
+    "first_month_guarantee",
+    "charged_after_cancellation",
+    "wrong_plan_charged",
+}
 
 class RefundRequestCreate(BaseModel):
     user_email: str
@@ -1446,7 +1495,18 @@ def admin_approve_refund_request_via_dodo(request: AdminApproveRefundRequestDodo
     real refund through Dodo (reusing the exact same _issue_dodo_refund
     path the standalone admin_issue_refund endpoint uses — not a
     separate copy of that logic), then links the request to the
-    resulting refund record."""
+    resulting refund record.
+
+    A real, previously-missing safeguard: for a subscription-related
+    reason (first_month_guarantee, charged_after_cancellation,
+    wrong_plan_charged), this also cancels the customer's subscription
+    immediately — refunding a subscription payment while leaving the
+    subscription itself active would let a customer get their money
+    back and keep using the product at the same time. Deliberately
+    scoped to only those reason codes, not "cancel any subscription
+    this customer happens to have" — a refund for an unrelated one-time
+    purchase (a Standard Report, say) must never touch a separate,
+    still-valid Studio subscription."""
     _require_admin_password(request.password)
 
     matched = next((r for r in list_refund_requests() if r["id"] == request.request_id), None)
@@ -1455,7 +1515,12 @@ def admin_approve_refund_request_via_dodo(request: AdminApproveRefundRequestDodo
     if matched["status"] != "pending":
         raise HTTPException(status_code=409, detail=f"This request is already {matched['status']}, not pending.")
 
-    refund_record = _issue_dodo_refund(request.payment_id, matched["user_email"], matched["reason_code"])
+    dodo_subscription_id = None
+    if matched["reason_code"] in SUBSCRIPTION_REFUND_REASON_CODES:
+        sub = get_subscription(matched["user_email"])
+        dodo_subscription_id = sub.get("dodo_subscription_id") if sub else None
+
+    refund_record = _issue_dodo_refund(request.payment_id, matched["user_email"], matched["reason_code"], dodo_subscription_id)
     updated = approve_refund_request(request.request_id, refund_record["id"], request.admin_response)
 
     try:
@@ -1654,6 +1719,25 @@ def admin_settings(request: AdminSettingsRequest):
     }
 
 
+# The real, previously-missing link between what a visitor sees on the
+# pricing page and what Dodo actually charges them: checkout only ever
+# sent Dodo a product_id, so the ACTUAL billing currency was whatever
+# the product happens to be configured with in Dodo's own dashboard —
+# completely independent of the localized price the visitor was shown.
+# Restricted to Dodo's own real, supported set for the countries this
+# app actually serves (confirmed directly against the SDK's own
+# Currency type) rather than passing through an arbitrary string —
+# an unrecognized value would otherwise make the whole checkout call
+# fail outright instead of just falling back to Dodo's own default.
+SUPPORTED_CHECKOUT_CURRENCIES = {"USD", "INR", "THB", "VND", "IDR", "PHP"}
+
+
+def _validate_checkout_currency(currency: Optional[str]) -> Optional[str]:
+    if currency and currency.upper() in SUPPORTED_CHECKOUT_CURRENCIES:
+        return currency.upper()
+    return None
+
+
 @app.post("/api/subscribe/checkout")
 def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depends(get_current_user_email)):
     """Creates a Dodo checkout session for a subscription tier. The Dodo
@@ -1695,11 +1779,13 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         )
 
     client = get_dodo_client()
+    billing_currency = _validate_checkout_currency(request.currency)
     session = client.checkout_sessions.create(
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": request.tier_id, "user_email": user_email},
         return_url=f"{FRONTEND_URL}/?subscribed=1",
+        **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
     upsert_subscription(
@@ -1746,11 +1832,13 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
         )
 
     client = get_dodo_client()
+    billing_currency = _validate_checkout_currency(request.currency)
     session = client.checkout_sessions.create(
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": "insight_addon", "report_id": request.report_id, "user_email": user_email},
         return_url=f"{FRONTEND_URL}/?insight=1&report_id={request.report_id}",
+        **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
     return {"checkout_url": session.checkout_url if hasattr(session, "checkout_url") else session}

@@ -293,3 +293,137 @@ def test_refund_webhook_creates_a_record_for_a_refund_issued_directly_in_dodo():
     assert len(matching) == 1
     assert matching[0]["user_email"] == "directdodo@example.com"
     assert matching[0]["amount_usd"] == 9.0
+
+
+def test_admin_issue_refund_cancels_the_customers_subscription_by_default():
+    """The real, critical safeguard this turn found and fixed: refunding
+    a subscription payment must also cancel the subscription itself --
+    otherwise a customer gets their money back and keeps active access
+    at the same time."""
+    from backend.subscription_store import upsert_subscription, get_subscription
+
+    email = "refundcancel@example.com"
+    upsert_subscription(email=email, tier_id="studio_unlimited", status="active", dodo_subscription_id="sub_refund_cancel_test")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_cancel_1"
+    fake_refund.amount = 7900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls:
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r = client.post("/api/admin/refunds", json={
+            "password": "test-admin-pw", "payment_id": "pay_cancel_test", "user_email": email,
+        })
+
+    assert r.status_code == 200
+    mock_client_cls.return_value.subscriptions.update.assert_called_once_with("sub_refund_cancel_test", status="cancelled")
+    sub = get_subscription(email)
+    assert sub["status"] == "cancelled"
+
+
+def test_admin_issue_refund_skips_cancellation_when_explicitly_opted_out():
+    """A one-time purchase (Standard Report, Insight Add-on) refund has
+    no subscription to cancel -- admin can explicitly opt out."""
+    from backend.subscription_store import upsert_subscription
+
+    email = "refundnocancel@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_no_cancel_test")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_no_cancel_1"
+    fake_refund.amount = 400
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls:
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        r = client.post("/api/admin/refunds", json={
+            "password": "test-admin-pw", "payment_id": "pay_no_cancel_test", "user_email": email,
+            "cancel_subscription": False,
+        })
+
+    assert r.status_code == 200
+    mock_client_cls.return_value.subscriptions.update.assert_not_called()
+
+
+def test_admin_issue_refund_succeeds_even_if_cancellation_fails():
+    """A real resilience requirement: the money has already been
+    refunded by the time cancellation is attempted -- a cancellation
+    hiccup must not roll back or fail the refund itself."""
+    from backend.subscription_store import upsert_subscription
+
+    email = "cancelfails@example.com"
+    upsert_subscription(email=email, tier_id="studio_unlimited", status="active", dodo_subscription_id="sub_cancel_fails_test")
+
+    fake_refund = MagicMock()
+    fake_refund.refund_id = "refund_cancel_fails_1"
+    fake_refund.amount = 7900
+    fake_refund.currency = "usd"
+    fake_refund.status = "succeeded"
+
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls:
+        mock_client_cls.return_value.refunds.create.return_value = fake_refund
+        mock_client_cls.return_value.subscriptions.update.side_effect = Exception("simulated Dodo outage")
+        r = client.post("/api/admin/refunds", json={
+            "password": "test-admin-pw", "payment_id": "pay_cancel_fails_test", "user_email": email,
+        })
+
+    assert r.status_code == 200
+
+
+def test_subscribe_checkout_passes_real_billing_currency_to_dodo():
+    """Direct, real verification of the currency question: confirms
+    the visitor's actual selected-site currency is genuinely passed to
+    Dodo's own checkout session, not just displayed locally while
+    charging whatever the product happens to default to."""
+    from backend.auth_store import create_otp
+
+    email = "thbcheckout@example.com"
+    code = create_otp(email)
+    verify_r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {verify_r.json()['session_token']}"}
+
+    fake_session = MagicMock()
+    fake_session.checkout_url = "https://checkout.dodopayments.com/fake"
+    fake_session.id = "cs_thb_test"
+
+    with patch("backend.api.PROPERTYIQ_BETA_BYPASS_PAYMENTS", False), \
+         patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_pro": "prod_pro_thb_test"}), \
+         patch("backend.api.get_dodo_client") as mock_get_client:
+        mock_get_client.return_value.checkout_sessions.create.return_value = fake_session
+        r = client.post("/api/subscribe/checkout", headers=headers, json={"tier_id": "studio_pro", "currency": "thb"})
+
+    assert r.status_code == 200
+    call_kwargs = mock_get_client.return_value.checkout_sessions.create.call_args.kwargs
+    assert call_kwargs.get("billing_currency") == "THB"
+
+
+def test_subscribe_checkout_ignores_an_unsupported_currency():
+    """A real safety check: an unrecognized/unsupported currency code
+    must not be passed through to Dodo at all -- falls back to Dodo's
+    own product-default currency instead of a garbage value."""
+    from backend.auth_store import create_otp
+
+    email = "unsupportedcurrency@example.com"
+    code = create_otp(email)
+    verify_r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {verify_r.json()['session_token']}"}
+
+    fake_session = MagicMock()
+    fake_session.checkout_url = "https://checkout.dodopayments.com/fake"
+    fake_session.id = "cs_unsupported_test"
+
+    with patch("backend.api.PROPERTYIQ_BETA_BYPASS_PAYMENTS", False), \
+         patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_pro": "prod_pro_unsupported_test"}), \
+         patch("backend.api.get_dodo_client") as mock_get_client:
+        mock_get_client.return_value.checkout_sessions.create.return_value = fake_session
+        r = client.post("/api/subscribe/checkout", headers=headers, json={"tier_id": "studio_pro", "currency": "ZZZ"})
+
+    assert r.status_code == 200
+    call_kwargs = mock_get_client.return_value.checkout_sessions.create.call_args.kwargs
+    assert "billing_currency" not in call_kwargs
