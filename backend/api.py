@@ -107,6 +107,11 @@ from backend.profile_store import (
     COOLING_OFF_DAYS,
 )
 
+from backend.webhook_store import (
+    initialize_webhook_store,
+    try_claim_webhook_event,
+)
+
 from backend.config_store import (
     initialize_config_store,
     get_tier_config,
@@ -234,6 +239,7 @@ initialize_config_store()
 initialize_subscription_store()
 initialize_refund_store()
 initialize_profile_store()
+initialize_webhook_store()
 initialize_insight_store()
 initialize_challenge_store()
 initialize_price_watch_store()
@@ -2054,6 +2060,18 @@ async def dodo_webhook(request: Request):
     event_type = getattr(event, "type", None) or event.get("type")
     data = getattr(event, "data", None) or event.get("data", {})
     metadata = getattr(data, "metadata", None) or (data.get("metadata") if isinstance(data, dict) else {}) or {}
+
+    # Real, previously-missing webhook idempotency (Dodo's own docs are
+    # explicit this is required): a redelivery of an event already
+    # processed once must be a genuine no-op, not re-run the whole
+    # handler again -- otherwise a customer gets a duplicate payment
+    # confirmation email (or worse) every time Dodo retries a delivery
+    # that actually already succeeded on a prior attempt. Still returns
+    # 200 on a duplicate (not an error) -- from Dodo's side, this
+    # delivery genuinely succeeded; there's nothing wrong to report.
+    webhook_id = request.headers.get("webhook-id", "")
+    if not try_claim_webhook_event(webhook_id, event_type):
+        return {"received": True, "duplicate": True}
 
     tier_id = metadata.get("tier_id")
     user_email = metadata.get("user_email")

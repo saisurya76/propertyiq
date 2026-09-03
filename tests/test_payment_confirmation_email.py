@@ -1,4 +1,5 @@
 import os
+import uuid
 
 os.environ.setdefault("DODO_PAYMENTS_API_KEY", "test")
 os.environ.setdefault("DODO_REPORT_PRODUCT_ID", "test")
@@ -53,14 +54,18 @@ def _fake_webhook_event(event_type, data_attrs):
     return fake_event
 
 
-def _post_webhook(fake_event):
+def _post_webhook(fake_event, webhook_id=None):
     fake_webhook_client = MagicMock()
     fake_webhook_client.webhooks.unwrap.return_value = fake_event
     with patch("backend.api.get_dodo_webhook_client", return_value=fake_webhook_client):
         return client.post(
             "/api/webhooks/dodo",
             content=b"{}",
-            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+            headers={
+                "webhook-id": webhook_id or f"wh_test_{uuid.uuid4().hex}",
+                "webhook-signature": "sig_test",
+                "webhook-timestamp": "0",
+            },
         )
 
 
@@ -197,3 +202,58 @@ def test_confirmation_email_failure_does_not_break_webhook_processing():
 
     assert r.status_code == 200
     mock_grant.assert_called_once_with("report_abc", "emailwillfail@example.com")
+
+
+def test_webhook_redelivery_of_the_same_event_does_not_double_process():
+    """The real, previously-missing safeguard Dodo's own docs require:
+    a redelivery of an event already handled must be a genuine no-op --
+    not send a second confirmation email for the same, single payment."""
+    event = _fake_webhook_event("payment.succeeded", {
+        "subscription_id": None,
+        "payment_id": "pay_dedup_test",
+        "metadata": {"tier_id": "insight_addon", "user_email": "dedup@example.com", "report_id": "report_dedup"},
+        "amount": 400,
+        "currency": "usd",
+        "customer": None,
+    })
+
+    shared_webhook_id = f"wh_dedup_test_{uuid.uuid4().hex}"
+    with patch("backend.api.send_email") as mock_send:
+        r1 = _post_webhook(event, webhook_id=shared_webhook_id)
+        r2 = _post_webhook(event, webhook_id=shared_webhook_id)
+
+    assert r1.status_code == 200
+    assert r1.json().get("duplicate") is not True
+    assert r2.status_code == 200
+    assert r2.json().get("duplicate") is True
+    mock_send.assert_called_once()  # not called twice
+
+
+def test_webhook_with_a_genuinely_different_id_is_processed_normally():
+    """A real, necessary contrast case: two DIFFERENT real events must
+    both be processed -- the dedup check must key on the actual
+    webhook-id, not accidentally suppress unrelated events."""
+    event1 = _fake_webhook_event("payment.succeeded", {
+        "subscription_id": None,
+        "payment_id": "pay_distinct_1",
+        "metadata": {"tier_id": "insight_addon", "user_email": "distinct1@example.com", "report_id": "report_distinct_1"},
+        "amount": 400,
+        "currency": "usd",
+        "customer": None,
+    })
+    event2 = _fake_webhook_event("payment.succeeded", {
+        "subscription_id": None,
+        "payment_id": "pay_distinct_2",
+        "metadata": {"tier_id": "insight_addon", "user_email": "distinct2@example.com", "report_id": "report_distinct_2"},
+        "amount": 400,
+        "currency": "usd",
+        "customer": None,
+    })
+
+    with patch("backend.api.send_email") as mock_send:
+        r1 = _post_webhook(event1)
+        r2 = _post_webhook(event2)
+
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert mock_send.call_count == 2

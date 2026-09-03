@@ -252,7 +252,7 @@ def test_refund_webhook_updates_a_record_issued_via_the_admin_panel():
         response = client.post(
             "/api/webhooks/dodo",
             content=b"{}",
-            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+            headers={"webhook-id": "wh_test_refund_lifecycle", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
         )
 
     assert response.status_code == 200
@@ -285,7 +285,7 @@ def test_refund_webhook_creates_a_record_for_a_refund_issued_directly_in_dodo():
         response = client.post(
             "/api/webhooks/dodo",
             content=b"{}",
-            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+            headers={"webhook-id": "wh_test_refund_direct_dodo", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
         )
 
     assert response.status_code == 200

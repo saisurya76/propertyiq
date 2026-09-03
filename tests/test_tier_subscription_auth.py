@@ -241,7 +241,7 @@ def test_webhook_falls_back_to_subscription_retrieval_when_metadata_missing():
         response = client.post(
             "/api/webhooks/dodo",
             content=b"{}",
-            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+            headers={"webhook-id": "wh_test_fallback_lookup", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
         )
 
     assert response.status_code == 200
@@ -288,7 +288,7 @@ def test_webhook_handles_subscription_updated_event_with_active_status():
         response = client.post(
             "/api/webhooks/dodo",
             content=b"{}",
-            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+            headers={"webhook-id": "wh_test_sub_updated_active", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
         )
 
     assert response.status_code == 200
@@ -323,7 +323,7 @@ def test_webhook_subscription_updated_with_non_active_status_does_not_activate()
         response = client.post(
             "/api/webhooks/dodo",
             content=b"{}",
-            headers={"webhook-id": "wh_test", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
+            headers={"webhook-id": "wh_test_sub_updated_inactive", "webhook-signature": "sig_test", "webhook-timestamp": "0"},
         )
 
     assert response.status_code == 200
