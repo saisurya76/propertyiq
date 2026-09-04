@@ -3032,6 +3032,11 @@ body {
   border-radius: 12px;
   padding: 20px;
   margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ni-comparison-auth-box form {
   max-width: 420px;
 }
 

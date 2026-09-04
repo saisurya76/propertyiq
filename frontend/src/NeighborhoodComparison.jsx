@@ -55,18 +55,33 @@ function NeighborhoodComparison() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  // Ready when the page loads: a previously-created comparison (this
-  // browser's own, via localStorage — the whole page is public/no-
-  // login, so there's no account to attach this to instead) loads its
-  // already-fetched, cached results immediately, no waiting on a live
-  // fetch — refreshed in the background by the hourly monitoring loop
-  // if the visitor turned that on, not by this page load itself.
+  // Ready when the page loads: a previously-created comparison loads
+  // its already-fetched, cached results immediately, no waiting on a
+  // live fetch — refreshed in the background by the hourly monitoring
+  // loop if the visitor turned that on, not by this page load itself.
+  //
+  // A real, deliberate fix: since comparing is now a paid, per-
+  // subscriber feature, this only actually restores anything if the
+  // backend confirms (via is_owner) that the CURRENTLY signed-in
+  // visitor is the same person who created it — not just "a"
+  // comparison_id sitting in this browser's storage. A signed-out
+  // visitor, or a different person on a shared browser/computer,
+  // should never see someone else's (or their own past, now-signed-
+  // out) paid results appear automatically; the stale id is cleared
+  // rather than left to keep trying on every future page load.
   useEffect(() => {
     const savedId = localStorage.getItem(STORAGE_KEY);
     if (!savedId) return;
-    fetch(`${API_BASE}/api/neighborhood-insights/compare/${savedId}`)
+    const currentSession = getSession();
+    fetch(`${API_BASE}/api/neighborhood-insights/compare/${savedId}`, {
+      headers: currentSession?.token ? { Authorization: `Bearer ${currentSession.token}` } : {},
+    })
       .then((res) => { if (!res.ok) throw new Error("not found"); return res.json(); })
       .then((data) => {
+        if (!data.is_owner) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
         setComparisonId(data.comparison_id);
         setResults(data.results);
         setMonitoring(data.monitoring);

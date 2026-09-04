@@ -3060,19 +3060,40 @@ def neighborhood_create_comparison(request: NeighborhoodComparisonCreateRequest,
 
     results = [_fetch_area_comparison_data(area) for area in request.areas]
     record = create_comparison([area.model_dump() for area in request.areas], results, created_by_email=user_email)
+    # Same response shape as neighborhood_get_comparison below (is_owner
+    # instead of the raw email) — the creator is always the owner of
+    # their own just-created comparison.
+    record = {**record, "is_owner": True}
+    record.pop("created_by_email", None)
     return record
 
 
 @app.get("/api/neighborhood-insights/compare/{comparison_id}")
-def neighborhood_get_comparison(comparison_id: str):
+def neighborhood_get_comparison(comparison_id: str, user_email: Optional[str] = Depends(get_current_user_email_optional)):
     """Public: retrieves an existing comparison's current, cached
     results — instant, no re-fetching — so a returning visitor (or the
     same visitor reloading the page) sees the comparison "ready when
     the page loads," refreshed in the background by the hourly
-    monitoring loop rather than on their own page load."""
+    monitoring loop rather than on their own page load.
+
+    A real, deliberate two-part fix: (1) the creator's raw email is
+    never included in this public response at all — anyone with a
+    shared link could otherwise see who created it, a real privacy
+    leak this endpoint's own "public, shareable" design never intended.
+    (2) `is_owner` is computed here instead, comparing the optional
+    signed-in visitor (if any) against the real creator — the frontend
+    uses this to decide whether "ready when the page loads" should
+    actually restore a cached comparison at all. Since this is now a
+    paid, per-subscriber feature, silently showing someone else's (or
+    nobody's, if signed out) previous comparison on a shared browser
+    would be confusing and wrong, not just a stale-cache nicety
+    anymore."""
     record = get_comparison(comparison_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Comparison not found.")
+    is_owner = bool(user_email) and bool(record.get("created_by_email")) and user_email.strip().lower() == record["created_by_email"]
+    record = {**record, "is_owner": is_owner}
+    record.pop("created_by_email", None)
     return record
 
 
@@ -3098,7 +3119,11 @@ def neighborhood_refresh_comparison(comparison_id: str, user_email: str = Depend
     areas = [NeighborhoodComparisonArea(**area) for area in record["areas"]]
     results = [_fetch_area_comparison_data(area) for area in areas]
     update_comparison_results(comparison_id, results)
-    return get_comparison(comparison_id)
+    refreshed = get_comparison(comparison_id)
+    is_owner = user_email.strip().lower() == (refreshed.get("created_by_email") or "")
+    refreshed = {**refreshed, "is_owner": is_owner}
+    refreshed.pop("created_by_email", None)
+    return refreshed
 
 
 class NeighborhoodComparisonMonitorRequest(BaseModel):
@@ -3131,6 +3156,9 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     record = set_monitoring(comparison_id, request.monitoring)
     if record is None:
         raise HTTPException(status_code=404, detail="Comparison not found.")
+    is_owner = bool(user_email) and bool(record.get("created_by_email")) and user_email.strip().lower() == record["created_by_email"]
+    record = {**record, "is_owner": is_owner}
+    record.pop("created_by_email", None)
     return record
 
 

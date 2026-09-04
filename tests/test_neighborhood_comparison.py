@@ -639,3 +639,84 @@ def test_scheduler_keeps_refreshing_while_entitlement_is_still_active():
 
     updated = get_comparison(created["comparison_id"])
     assert updated["monitoring"] is True
+
+
+def test_get_comparison_never_exposes_the_raw_creator_email():
+    """A real, previously-missing privacy fix: anyone with a shared
+    comparison link must never see who created it."""
+    headers = _entitled_headers("privacyowner@example.com")
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        created = client.post(
+            "/api/neighborhood-insights/compare",
+            json={"areas": [_area(), _area(city="Pune")]}, headers=headers,
+        ).json()
+    assert "created_by_email" not in created
+
+    r = client.get(f"/api/neighborhood-insights/compare/{created['comparison_id']}")
+    assert r.status_code == 200
+    assert "created_by_email" not in r.json()
+
+
+def test_get_comparison_reports_is_owner_true_for_the_actual_creator():
+    headers = _entitled_headers("realowner@example.com")
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        created = client.post(
+            "/api/neighborhood-insights/compare",
+            json={"areas": [_area(), _area(city="Pune")]}, headers=headers,
+        ).json()
+    assert created["is_owner"] is True
+
+    r = client.get(f"/api/neighborhood-insights/compare/{created['comparison_id']}", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["is_owner"] is True
+
+
+def test_get_comparison_reports_is_owner_false_for_a_different_signed_in_visitor():
+    owner_headers = _entitled_headers("theowner@example.com")
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        created = client.post(
+            "/api/neighborhood-insights/compare",
+            json={"areas": [_area(), _area(city="Pune")]}, headers=owner_headers,
+        ).json()
+
+    other_headers = _authed_headers("differentvisitor@example.com")
+    r = client.get(f"/api/neighborhood-insights/compare/{created['comparison_id']}", headers=other_headers)
+    assert r.status_code == 200
+    assert r.json()["is_owner"] is False
+
+
+def test_get_comparison_reports_is_owner_false_when_signed_out():
+    """The exact real scenario the user reported: viewing a comparison
+    while signed out (or as nobody in particular) must not silently
+    claim ownership -- the frontend uses this to decide whether to
+    auto-restore a cached comparison_id at all."""
+    headers = _entitled_headers("signedoutcase@example.com")
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        created = client.post(
+            "/api/neighborhood-insights/compare",
+            json={"areas": [_area(), _area(city="Pune")]}, headers=headers,
+        ).json()
+
+    r = client.get(f"/api/neighborhood-insights/compare/{created['comparison_id']}")
+    assert r.status_code == 200
+    assert r.json()["is_owner"] is False
+
+
+def test_refresh_and_monitor_responses_also_omit_the_raw_creator_email():
+    headers = _entitled_headers("refreshprivacy@example.com")
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        created = client.post(
+            "/api/neighborhood-insights/compare",
+            json={"areas": [_area(), _area(city="Pune")]}, headers=headers,
+        ).json()
+
+    refreshed = client.post(f"/api/neighborhood-insights/compare/{created['comparison_id']}/refresh", headers=headers).json()
+    assert "created_by_email" not in refreshed
+    assert refreshed["is_owner"] is True
+
+    monitored = client.post(
+        f"/api/neighborhood-insights/compare/{created['comparison_id']}/monitor",
+        json={"monitoring": True}, headers=headers,
+    ).json()
+    assert "created_by_email" not in monitored
+    assert monitored["is_owner"] is True
