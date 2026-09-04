@@ -2492,6 +2492,7 @@ class NeighborhoodResaleSignalResponse(BaseModel):
 # CORS at all, which is what actually fixes it. The key itself is read
 # from an env var, never hardcoded here.
 LOCATIONIQ_API_KEY = os.environ.get("LOCATIONIQ_API_KEY", "")
+OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
 LOCATIONIQ_BASE = "https://us1.locationiq.com/v1"
 
 
@@ -2654,8 +2655,112 @@ COMPARISON_COUNTRY_CURRENCY = {
     "vietnam": "VND", "indonesia": "IDR",
 }
 
+# OpenWeather's own 1-5 scale for its Air Pollution API (not the more
+# familiar 0-500 US EPA scale) — labelled honestly as OpenWeather's own
+# scale in the response rather than silently presented as if it were
+# the EPA one, since the numbers mean something different.
+OPENWEATHER_AQI_LABELS = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}
 
-def _resolve_comparables_city(city: str, locality: Optional[str], property_type: str) -> tuple[list, str]:
+
+def _fetch_air_quality(lat: float, lon: float) -> dict[str, Any]:
+    """Real, free, per-location air quality via OpenWeatherMap's Air
+    Pollution API (lat/lon-based, global coverage) — genuinely
+    buildable, unlike most of the other area-comparison metrics
+    requested alongside it (traffic congestion, job prospects,
+    business environment, ease of living, tourism index, food safety,
+    municipality rankings, disease data): none of those have a real,
+    free, per-neighborhood API available worldwide, only paid/limited
+    ones or country-specific annual reports — so they're surfaced
+    honestly as "not available" in the comparison table rather than
+    filled in with invented numbers, which would be actively
+    misleading in a tool people use to make a real property decision.
+
+    Cached 6 hours per rounded coordinate (air quality doesn't
+    meaningfully change minute to minute, and this avoids refetching
+    for the same area across different visitors/comparisons)."""
+    if not OPENWEATHER_API_KEY:
+        return {"has_data": False, "reason": "not_configured"}
+
+    cache_key = f"air_quality:{round(lat, 3)}:{round(lon, 3)}"
+    cached = _get_cached_json(cache_key, ttl_hours=6)
+    if cached is not None:
+        return cached
+
+    try:
+        resp = requests.get(
+            "https://api.openweathermap.org/data/2.5/air_pollution",
+            params={"lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY},
+            timeout=6,
+        )
+        if resp.status_code != 200:
+            return {"has_data": False, "reason": "fetch_failed"}
+        data = resp.json()
+        entry = data["list"][0]
+        aqi = entry["main"]["aqi"]
+        result = {
+            "has_data": True,
+            "aqi": aqi,
+            "aqi_label": OPENWEATHER_AQI_LABELS.get(aqi, "Unknown"),
+            "scale": "OpenWeather 1-5 (1=Good, 5=Very Poor)",
+            "pm2_5": entry["components"].get("pm2_5"),
+            "pm10": entry["components"].get("pm10"),
+        }
+        _set_cached_json(cache_key, result)
+        return result
+    except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
+        logger.error(f"_fetch_air_quality: lookup failed for ({lat}, {lon}): {exc}")
+        return {"has_data": False, "reason": "fetch_failed"}
+
+
+def _compute_overall_ranking(resale: dict, air_quality: dict, flood_risk: dict, infrastructure: dict) -> dict[str, Any]:
+    """A transparent, explainable score out of 100 built ONLY from
+    metrics this comparison genuinely has real data for — deliberately
+    not a black-box number, and deliberately not folding in any of the
+    unavailable metrics (traffic, job prospects, tourism, etc. — see
+    _fetch_air_quality's own docstring for why those aren't real data
+    here) as if they were silently factored in. `contributors` lists
+    exactly which real signals were actually used, so the score is
+    honest about its own limited inputs rather than implying a
+    comprehensive livability index it doesn't actually have the data
+    to back up."""
+    score = 50.0  # neutral baseline
+    contributors = []
+
+    if resale["has_data"]:
+        # More comparable listings = a more liquid, active resale
+        # market — a real, if partial, positive signal.
+        bonus = min(resale["comparable_count"] * 1.5, 15)
+        score += bonus
+        contributors.append("resale market activity")
+
+    if air_quality.get("has_data"):
+        # OpenWeather's 1 (Good) to 5 (Very Poor) scale, inverted:
+        # aqi=1 -> +20, aqi=5 -> -20.
+        score += (3 - air_quality["aqi"]) * 10
+        contributors.append("air quality")
+
+    if flood_risk["has_data"]:
+        # More nearby water bodies is a genuine flood-risk proxy, not
+        # a certainty — penalized lightly, capped so one river doesn't
+        # dominate the whole score.
+        score -= min(flood_risk["nearby_water_count"] * 3, 15)
+        contributors.append("flood-risk proximity")
+
+    if infrastructure.get("has_data"):
+        score += 5
+        contributors.append("infrastructure news activity")
+
+    score = max(0, min(100, round(score)))
+    return {
+        "has_data": len(contributors) > 0,
+        "score": score,
+        "contributors": contributors,
+        "note": "Computed only from the real metrics available above — does not include traffic, job market, "
+                "tourism, or other requested metrics with no genuine free per-area data source.",
+    }
+
+
+def _resolve_comparables_city(city: str, locality: Optional[str], property_type: str) -> tuple:
     """A real, previously-missing fallback: get_comparables only
     matches an EXACT known city name — for an area selected at
     locality/mandal/suburb level (e.g. "Gandipet Mandal" or
@@ -2691,7 +2796,7 @@ def _resolve_comparables_city(city: str, locality: Optional[str], property_type:
     return [], city
 
 
-def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict[str, Any]:
+def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict:
     """The real per-area data pull, reusing exactly the same functions
     (and their own caching/honesty behavior) the single-area page
     already relies on — a comparison is genuinely the same real data,
@@ -2727,17 +2832,23 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict[str, A
         except Exception as exc:
             logger.error(f"_fetch_area_comparison_data: flood-risk lookup failed for {area.city!r}: {exc}")
 
+    air_quality = {"has_data": False, "reason": "no_coordinates"}
+    if area.lat is not None and area.lon is not None:
+        air_quality = _fetch_air_quality(area.lat, area.lon)
+
+    overall_ranking = _compute_overall_ranking(resale, air_quality, flood_risk, infrastructure)
+
     return {
         "city": area.city,
         "country": area.country,
         "locality": area.locality,
         "resale_signal": resale,
         "infrastructure": infrastructure,
+        "air_quality": air_quality,
+        "overall_ranking": overall_ranking,
         "flood_risk": flood_risk,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
-
-
 @app.post("/api/neighborhood-insights/compare")
 def neighborhood_create_comparison(request: NeighborhoodComparisonCreateRequest):
     """Public (no auth, same reasoning as every other neighborhood-

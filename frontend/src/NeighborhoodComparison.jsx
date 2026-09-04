@@ -2,6 +2,22 @@ import { useEffect, useRef, useState } from "react";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 const MAX_AREAS = 5;
+
+// Requested but honestly not buildable today: no genuine free,
+// real, per-area (not just country-level) API exists for any of
+// these worldwide — shown as explicit "Not available" rows rather
+// than fabricated numbers, which would be actively misleading in a
+// tool people use to make a real property decision.
+const NOT_YET_AVAILABLE_METRICS = [
+  "Traffic congestion",
+  "Job prospects",
+  "Business environment",
+  "Ease of living",
+  "Tourism index",
+  "Food safety",
+  "Municipality rankings",
+  "Disease / health risk data",
+];
 const STORAGE_KEY = "propertyiq_ni_comparison_id";
 
 function emptyArea() {
@@ -230,7 +246,20 @@ function NeighborhoodComparison() {
               </thead>
               <tbody>
                 <tr>
-                  <td>Avg. price/sqft</td>
+                  <td>Overall ranking</td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.overall_ranking.has_data
+                        ? <>
+                            <strong>{r.overall_ranking.score} / 100</strong>
+                            <div className="ni-comparison-resolved-note">from {r.overall_ranking.contributors.join(", ")}</div>
+                          </>
+                        : "Not enough data yet"}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Avg. price/sqft <span className="ni-comparison-metric-label">(appreciation / resale value proxy)</span></td>
                   {results.map((r, i) => (
                     <td key={i}>
                       {r.resale_signal.has_data
@@ -251,7 +280,20 @@ function NeighborhoodComparison() {
                   ))}
                 </tr>
                 <tr>
-                  <td>Nearby water bodies</td>
+                  <td>Air pollution index</td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.air_quality.has_data
+                        ? <>
+                            {r.air_quality.aqi_label} ({r.air_quality.aqi}/5)
+                            <div className="ni-comparison-resolved-note">PM2.5: {r.air_quality.pm2_5} · {r.air_quality.scale}</div>
+                          </>
+                        : "Not available"}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Nearby water bodies <span className="ni-comparison-metric-label">(flood-risk proxy)</span></td>
                   {results.map((r, i) => (
                     <td key={i}>{r.flood_risk.has_data ? r.flood_risk.nearby_water_count : "—"}</td>
                   ))}
@@ -264,9 +306,20 @@ function NeighborhoodComparison() {
                     </td>
                   ))}
                 </tr>
+                {NOT_YET_AVAILABLE_METRICS.map((metric) => (
+                  <tr key={metric} className="ni-comparison-unavailable-row">
+                    <td>{metric}</td>
+                    {results.map((_, i) => (
+                      <td key={i}>Not available</td>
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+          <p className="ni-comparison-honesty-note">
+            "Not available" rows have no genuine free, per-area data source today — shown honestly rather than filled in with invented numbers.
+          </p>
         </>
       )}
     </div>

@@ -199,3 +199,101 @@ def test_comparison_endpoint_reflects_the_resolved_city_fallback():
     for result in data["results"]:
         assert result["resale_signal"]["has_data"] is True
         assert result["resale_signal"]["resolved_city"] == "Hyderabad"
+
+
+def test_air_quality_returns_not_configured_when_no_api_key(monkeypatch):
+    """Honest, real behavior: with no OpenWeather key set, air quality
+    reports itself as unavailable rather than silently returning
+    fabricated numbers."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "OPENWEATHER_API_KEY", "")
+    result = api_module._fetch_air_quality(17.4, 78.4)
+    assert result["has_data"] is False
+    assert result["reason"] == "not_configured"
+
+
+def test_air_quality_parses_a_real_openweather_response_shape(monkeypatch):
+    """Confirms the parsing matches OpenWeather's actual, real Air
+    Pollution API response shape (main.aqi 1-5 scale + components)."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "OPENWEATHER_API_KEY", "fake_key_123")
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    class FakeResp:
+        status_code = 200
+        def json(self):
+            return {"list": [{"main": {"aqi": 4}, "components": {"pm2_5": 55.2, "pm10": 88.1, "co": 500, "no2": 20, "o3": 60, "so2": 5, "nh3": 1}}]}
+
+    monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: FakeResp())
+    result = api_module._fetch_air_quality(13.7, 100.5)
+    assert result["has_data"] is True
+    assert result["aqi"] == 4
+    assert result["aqi_label"] == "Poor"
+    assert result["pm2_5"] == 55.2
+
+
+def test_air_quality_handles_a_real_fetch_failure_honestly(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "OPENWEATHER_API_KEY", "fake_key_123")
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+
+    class FakeResp:
+        status_code = 500
+        def json(self):
+            return {}
+
+    monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: FakeResp())
+    result = api_module._fetch_air_quality(13.7, 100.5)
+    assert result["has_data"] is False
+    assert result["reason"] == "fetch_failed"
+
+
+def test_overall_ranking_is_computed_only_from_genuinely_available_metrics():
+    from backend.api import _compute_overall_ranking
+
+    resale = {"has_data": True, "comparable_count": 10}
+    air_quality = {"has_data": True, "aqi": 1}
+    flood_risk = {"has_data": True, "nearby_water_count": 0}
+    infrastructure = {"has_data": True}
+
+    result = _compute_overall_ranking(resale, air_quality, flood_risk, infrastructure)
+    assert result["has_data"] is True
+    assert 0 <= result["score"] <= 100
+    assert "resale market activity" in result["contributors"]
+    assert "air quality" in result["contributors"]
+    assert "flood-risk proximity" in result["contributors"]
+    assert "infrastructure news activity" in result["contributors"]
+
+
+def test_overall_ranking_scores_worse_air_quality_lower():
+    from backend.api import _compute_overall_ranking
+
+    no_data = {"has_data": False}
+    good_air = _compute_overall_ranking(no_data, {"has_data": True, "aqi": 1}, no_data, no_data)
+    bad_air = _compute_overall_ranking(no_data, {"has_data": True, "aqi": 5}, no_data, no_data)
+    assert good_air["score"] > bad_air["score"]
+
+
+def test_overall_ranking_honest_when_nothing_is_available():
+    from backend.api import _compute_overall_ranking
+
+    no_data = {"has_data": False}
+    result = _compute_overall_ranking(no_data, no_data, no_data, no_data)
+    assert result["has_data"] is False
+    assert result["contributors"] == []
+
+
+def test_comparison_endpoint_includes_air_quality_and_overall_ranking(monkeypatch):
+    """End-to-end: the real comparison endpoint response includes both
+    new fields, not just the underlying helper functions in isolation."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "OPENWEATHER_API_KEY", "")  # not configured is fine -- still must appear, honestly empty
+    areas = [_area(city="Hyderabad"), _area(city="Pune")]
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        r = client.post("/api/neighborhood-insights/compare", json={"areas": areas})
+    assert r.status_code == 200
+    for result in r.json()["results"]:
+        assert "air_quality" in result
+        assert "overall_ranking" in result
+        assert result["air_quality"]["has_data"] is False  # no key configured in this test env
