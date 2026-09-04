@@ -3160,3 +3160,48 @@ body {
     text-align: left;
   }
 }
+
+.ni-emi-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.ni-emi-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.ni-emi-inputs input {
+  padding: 10px 12px;
+  border: 1px solid #d6dbe3;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  box-sizing: border-box;
+}
+
+.ni-emi-result {
+  margin-top: 18px;
+  background: #f7f9fb;
+  border: 1px solid #e2e5eb;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.ni-emi-result-headline {
+  font-size: 26px;
+  font-weight: 800;
+  color: #059669;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 640px) {
+  .ni-emi-inputs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

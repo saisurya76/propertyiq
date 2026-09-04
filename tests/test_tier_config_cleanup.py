@@ -37,7 +37,10 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
     team_seats (property-sharing endpoint), property_url_import and
     price_drop_alert (their own respective feature gates), area_comparison
     (Neighborhood Insights compare/refresh/monitor-on endpoints),
-    property_assessment (the main /assess endpoint)."""
+    property_assessment (the main /assess endpoint), emi_calculator and
+    amortization_projector (their own respective Neighborhood Insights
+    endpoints, gated independently of each other per an explicit
+    business decision)."""
     assert set(ALL_FEATURES) == {
         "similar_property_suggestions",
         "vastu_compliance",
@@ -49,6 +52,8 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
         "price_drop_alert",
         "area_comparison",
         "property_assessment",
+        "emi_calculator",
+        "amortization_projector",
     }
 
 

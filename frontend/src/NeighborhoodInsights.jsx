@@ -3,6 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 import NeighborhoodComparison from "./NeighborhoodComparison";
+import EmiCalculator from "./EmiCalculator";
+import AmortizationProjector from "./AmortizationProjector";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 
@@ -947,6 +949,18 @@ function NeighborhoodInsights({ countryCode }) {
       {sectionVisibility.comparison && (
         <div className="ni-card">
           <NeighborhoodComparison currency={country.currency} />
+        </div>
+      )}
+
+      {sectionVisibility.emi_calculator && (
+        <div className="ni-card">
+          <EmiCalculator currency={country.currency} />
+        </div>
+      )}
+
+      {sectionVisibility.amortization_projector && (
+        <div className="ni-card">
+          <AmortizationProjector currency={country.currency} />
         </div>
       )}
 

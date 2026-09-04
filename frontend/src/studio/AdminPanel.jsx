@@ -757,6 +757,8 @@ function AdminPanel({ onBack }) {
                   { key: "resale_signal", label: "Resale demand signal" },
                   { key: "extended_metrics", label: "More about this area (air quality, rankings, etc.)" },
                   { key: "comparison", label: "Compare areas (paid feature)" },
+                  { key: "emi_calculator", label: "EMI calculator (paid feature)" },
+                  { key: "amortization_projector", label: "Amortization projector (paid feature)" },
                   { key: "checklist", label: "Buyer's due-diligence checklist" },
                   { key: "authority_contacts", label: "Local authority contacts" },
                   { key: "cross_sell", label: "PropertyIQ cross-sell card" },

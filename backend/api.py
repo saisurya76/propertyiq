@@ -80,6 +80,8 @@ from backend.discipline_overlays import compute_structural_overlay, compute_plum
 from backend.comparables import get_comparables, average_price_per_sqft, ALL_COMPARABLES
 from backend.neighborhood_infrastructure import get_infrastructure_summary
 
+from backend.loan_calculator import build_amortization_schedule, summarize_loan
+
 from backend.neighborhood_comparison_store import (
     initialize_neighborhood_comparison_store,
     create_comparison,
@@ -2684,6 +2686,90 @@ def neighborhood_extended_metrics(city: str, country: str = "India", lat: Option
     }
 
 
+class EmiCalculatorRequest(BaseModel):
+    principal: float
+    annual_rate_percent: float
+    tenure_years: float
+
+
+@app.post("/api/neighborhood-insights/emi-calculator")
+def neighborhood_emi_calculator(request: EmiCalculatorRequest, user_email: str = Depends(get_current_user_email)):
+    """A real, deliberate paid-feature gate — same has_feature() pattern
+    every other tier feature in this app uses, gated separately from
+    the other 3 new Neighborhood Insights panels per the real, explicit
+    business decision to gate each one independently. Pure, standard
+    financial math (see loan_calculator.py's own module docstring) —
+    no external data, no honesty/estimate concerns of the kind the
+    rest of this page has to navigate."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "emi_calculator"):
+        raise HTTPException(
+            status_code=403,
+            detail="The EMI calculator requires an active Studio subscription that includes this feature.",
+        )
+    try:
+        return summarize_loan(request.principal, request.annual_rate_percent, request.tenure_years)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class AmortizationRequest(BaseModel):
+    principal: float
+    annual_rate_percent: float
+    tenure_years: float
+
+
+@app.post("/api/neighborhood-insights/amortization-schedule")
+def neighborhood_amortization_schedule(request: AmortizationRequest, user_email: str = Depends(get_current_user_email)):
+    """Gated separately from emi_calculator, per the real, explicit
+    decision to keep each of the 4 new panels independently
+    tier-configurable — a tier could plausibly include one without
+    the other, e.g. a quick EMI estimate for everyone but the full
+    month-by-month projection reserved for a higher tier."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "amortization_projector"):
+        raise HTTPException(
+            status_code=403,
+            detail="The amortization projector requires an active Studio subscription that includes this feature.",
+        )
+    try:
+        return {"schedule": build_amortization_schedule(request.principal, request.annual_rate_percent, request.tenure_years)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/neighborhood-insights/amortization-schedule/export")
+def neighborhood_amortization_export(principal: float, annual_rate_percent: float, tenure_years: float, user_email: str = Depends(get_current_user_email)):
+    """Real CSV export (not JSON) — the actual, practical format
+    request: a month-by-month schedule is genuinely tabular data,
+    and CSV opens directly in Excel/Sheets with zero conversion,
+    unlike JSON which would need reformatting before it's usable the
+    way a borrower would actually want to use this (sort, chart,
+    total a specific year's interest, etc.)."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "amortization_projector"):
+        raise HTTPException(
+            status_code=403,
+            detail="The amortization projector requires an active Studio subscription that includes this feature.",
+        )
+    try:
+        schedule = build_amortization_schedule(principal, annual_rate_percent, tenure_years)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    import io
+    import csv as csv_module
+    buffer = io.StringIO()
+    writer = csv_module.DictWriter(buffer, fieldnames=["month", "payment", "principal_component", "interest_component", "remaining_balance"])
+    writer.writeheader()
+    writer.writerows(schedule)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=amortization_schedule.csv"},
+    )
+
+
 class NeighborhoodComparisonArea(BaseModel):
     city: str
     country: str = "India"
@@ -3215,7 +3301,7 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     return record
 
 
-NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "checklist", "authority_contacts", "cross_sell", "share"]
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "emi_calculator", "amortization_projector", "checklist", "authority_contacts", "cross_sell", "share"]
 NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
 
 
