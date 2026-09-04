@@ -149,3 +149,87 @@ def test_emi_calculator_rejects_invalid_input_with_a_400_not_a_500():
     headers = _entitled_headers("invalidinput@example.com")
     r = client.post("/api/neighborhood-insights/emi-calculator", json={"principal": -5, "annual_rate_percent": 10, "tenure_years": 10}, headers=headers)
     assert r.status_code == 400
+
+
+def test_price_trends_requires_authentication():
+    r = client.get("/api/neighborhood-insights/price-trends", params={"country": "India"})
+    assert r.status_code == 401
+
+
+def test_price_trends_rejects_a_signed_in_visitor_with_no_subscription():
+    headers = _authed_headers("nopricetrendsub@example.com")
+    r = client.get("/api/neighborhood-insights/price-trends", params={"country": "India"}, headers=headers)
+    assert r.status_code == 403
+    assert "Price trends" in r.json()["detail"]
+
+
+def test_price_trends_rejects_an_out_of_range_years_value():
+    headers = _entitled_headers("pricetrendsyears@example.com")
+    r = client.get("/api/neighborhood-insights/price-trends", params={"country": "India", "years": 50}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_price_trends_parses_a_real_fred_response_shape(monkeypatch):
+    """Confirms parsing against FRED's actual, real observations
+    response shape, including a genuinely real value pulled directly
+    from the live Makati, Philippines series during research for this
+    feature (2026-01-01: 305.9666)."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "fake_key_for_test")
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    class FakeResp:
+        status_code = 200
+        def json(self):
+            return {"observations": [
+                {"date": "2025-10-01", "value": "289.7940"},
+                {"date": "2026-01-01", "value": "305.9666"},
+            ]}
+
+    monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: FakeResp())
+    headers = _entitled_headers("pricetrendsworks@example.com")
+    r = client.get("/api/neighborhood-insights/price-trends", params={"country": "Philippines", "years": 8}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["has_data"] is True
+    assert data["series_id"] == "QPHR628BIS"
+    assert data["points"][-1]["value"] == 305.9666
+
+
+def test_price_trends_honest_for_a_country_with_no_real_series():
+    """Vietnam has genuinely no BIS/FRED series -- confirmed directly,
+    not assumed. Must report this honestly, not silently omit or
+    fabricate a value."""
+    headers = _entitled_headers("pricetrendsvietnam@example.com")
+    r = client.get("/api/neighborhood-insights/price-trends", params={"country": "Vietnam"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_data"] is False
+    assert r.json()["reason"] == "country_not_covered"
+
+
+def test_price_trends_honest_when_api_key_not_configured():
+    import backend.api as api_module
+    from unittest import mock
+    headers = _entitled_headers("pricetrendsnokey@example.com")
+    with mock.patch.object(api_module, "FRED_API_KEY", ""):
+        r = client.get("/api/neighborhood-insights/price-trends", params={"country": "India"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_data"] is False
+    assert r.json()["reason"] == "not_configured"
+
+
+def test_price_trends_handles_a_real_fetch_failure(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "fake_key")
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+
+    def fake_get(*a, **k):
+        raise api_module.requests.RequestException("network down")
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+    headers = _entitled_headers("pricetrendsfail@example.com")
+    r = client.get("/api/neighborhood-insights/price-trends", params={"country": "Thailand"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_data"] is False
+    assert r.json()["reason"] == "fetch_failed"

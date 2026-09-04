@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 import NeighborhoodComparison from "./NeighborhoodComparison";
+import PriceTrends from "./PriceTrends";
 import EmiCalculator from "./EmiCalculator";
 import AmortizationProjector from "./AmortizationProjector";
 
@@ -949,6 +950,12 @@ function NeighborhoodInsights({ countryCode }) {
       {sectionVisibility.comparison && (
         <div className="ni-card">
           <NeighborhoodComparison currency={country.currency} />
+        </div>
+      )}
+
+      {sectionVisibility.price_trends && (
+        <div className="ni-card">
+          <PriceTrends country={country.name} />
         </div>
       )}
 

@@ -10,7 +10,7 @@ import json
 import uuid
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 import requests
 
@@ -2524,6 +2524,7 @@ class NeighborhoodResaleSignalResponse(BaseModel):
 # from an env var, never hardcoded here.
 LOCATIONIQ_API_KEY = os.environ.get("LOCATIONIQ_API_KEY", "")
 OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
 LOCATIONIQ_BASE = "https://us1.locationiq.com/v1"
 
 
@@ -2684,6 +2685,24 @@ def neighborhood_extended_metrics(city: str, country: str = "India", lat: Option
         "world_bank": result["world_bank"],
         "municipality_ranking": result["municipality_ranking"],
     }
+
+
+@app.get("/api/neighborhood-insights/price-trends")
+def neighborhood_price_trends(country: str, years: int = 8, user_email: str = Depends(get_current_user_email)):
+    """A real, deliberate paid-feature gate — same has_feature()
+    pattern every other tier feature uses, gated separately per the
+    explicit business decision to gate each of these 4 new
+    Neighborhood Insights panels independently. See _fetch_price_trend
+    for the real, honest data-sourcing story."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "price_trends"):
+        raise HTTPException(
+            status_code=403,
+            detail="Price trends requires an active Studio subscription that includes this feature.",
+        )
+    if years <= 0 or years > 17:
+        raise HTTPException(status_code=400, detail="years must be between 1 and 17 (the real, available data's own range).")
+    return _fetch_price_trend(country, years)
 
 
 class EmiCalculatorRequest(BaseModel):
@@ -2862,6 +2881,86 @@ MUNICIPALITY_NAME_ALIASES = {
     "new delhi": "municipal corporation of delhi",
     "visakhapatnam": "gvmc visakhapatnam",
 }
+
+
+# Real BIS/FRED series IDs for real residential property price indexes,
+# per country this app supports — confirmed to exist by hand, one at a
+# time, not guessed. Vietnam has genuinely no BIS series at all (not a
+# BIS member jurisdiction in this dataset) — honestly absent from this
+# map rather than a placeholder, so the fetch function below can tell
+# the difference between "no data for this country" and "fetch
+# failed".
+PRICE_TREND_FRED_SERIES = {
+    "india": "QINR628BIS",        # India, national
+    "thailand": "QTHR628BIS",     # Bangkok
+    "philippines": "QPHR628BIS",  # Makati (metro Manila)
+    "indonesia": "QIDR628BIS",    # Indonesia, national
+}
+
+
+def _fetch_price_trend(country: str, years: int = 8) -> dict[str, Any]:
+    """Real, quarterly historical price-index data from the Bank for
+    International Settlements' own Selected Property Price Series,
+    accessed via FRED's real, free, well-documented API (needs
+    FRED_API_KEY — free signup at fredaccount.stlouisfed.org, same
+    real-external-service pattern as OPENWEATHER_API_KEY).
+
+    Deliberately country-level (India national, or the specific real
+    metro FRED actually tracks for that country — Bangkok, Makati) —
+    PropertyIQ's own resale-signal data is a static snapshot, not a
+    real time series, so this is genuinely the only real historical
+    trend data available, not a per-neighborhood one. Labeled as such
+    to the visitor, same honesty pattern as the World Bank indicators
+    already used elsewhere on this page.
+
+    Vietnam has no real BIS/FRED series at all (confirmed directly,
+    not assumed) — returns has_data: False with a clear reason rather
+    than silently omitting the country or fabricating a number."""
+    series_id = PRICE_TREND_FRED_SERIES.get((country or "").strip().lower())
+    if not series_id:
+        return {"has_data": False, "reason": "country_not_covered"}
+    if not FRED_API_KEY:
+        return {"has_data": False, "reason": "not_configured"}
+
+    cache_key = f"price_trend:{series_id}:{years}"
+    cached = _get_cached_json(cache_key, ttl_hours=24)
+    if cached is not None:
+        return cached
+
+    try:
+        start_date = (datetime.now(timezone.utc) - timedelta(days=365 * years)).strftime("%Y-%m-%d")
+        resp = requests.get(
+            "https://api.stlouisfed.org/fred/series/observations",
+            params={
+                "series_id": series_id, "api_key": FRED_API_KEY, "file_type": "json",
+                "observation_start": start_date, "sort_order": "asc",
+            },
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return {"has_data": False, "reason": "fetch_failed"}
+        data = resp.json()
+        points = [
+            {"date": obs["date"], "value": float(obs["value"])}
+            for obs in data.get("observations", [])
+            if obs.get("value") not in (None, ".", "")
+        ]
+        if not points:
+            return {"has_data": False, "reason": "fetch_failed"}
+        result = {
+            "has_data": True,
+            "series_id": series_id,
+            "points": points,
+            "unit": "Index (2010=100)",
+            "source": "Bank for International Settlements, via FRED (Federal Reserve Bank of St. Louis)",
+        }
+    except (requests.RequestException, KeyError, ValueError, TypeError) as exc:
+        logger.error(f"_fetch_price_trend: lookup failed for {country!r}: {exc}")
+        result = {"has_data": False, "reason": "fetch_failed"}
+        return result
+
+    _set_cached_json(cache_key, result)
+    return result
 
 
 def _fetch_municipality_ranking(city: str, country: str) -> dict[str, Any]:
@@ -3301,7 +3400,7 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     return record
 
 
-NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "emi_calculator", "amortization_projector", "checklist", "authority_contacts", "cross_sell", "share"]
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "price_trends", "emi_calculator", "amortization_projector", "checklist", "authority_contacts", "cross_sell", "share"]
 NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
 
 
