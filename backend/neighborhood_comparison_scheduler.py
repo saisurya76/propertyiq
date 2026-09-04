@@ -12,7 +12,7 @@ shutdown.
 import asyncio
 import logging
 
-from backend.neighborhood_comparison_store import list_monitored_comparisons, update_comparison_results
+from backend.neighborhood_comparison_store import list_monitored_comparisons, update_comparison_results, set_monitoring
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,27 @@ async def _refresh_one_comparison(comparison: dict) -> None:
     # NeighborhoodComparisonArea model this needs) imports this
     # scheduler module itself, at startup, to launch the loop below.
     from backend.api import _fetch_area_comparison_data, NeighborhoodComparisonArea
+    from backend.subscription_store import get_active_tier
+    from backend.config_store import has_feature
+
+    # A real, necessary re-check every cycle, not just at creation time:
+    # "keep monitoring" is a paid feature that costs real, recurring
+    # backend work on every single refresh — a subscription cancelled
+    # (or downgraded to a tier without this feature) after monitoring
+    # was turned on must not keep getting free, ongoing refreshes
+    # forever. Auto-disables monitoring rather than silently skipping
+    # the refresh forever, so the comparison's own "keep monitoring"
+    # toggle stays honest about its real, current state next time
+    # anyone loads the page.
+    created_by = comparison.get("created_by_email")
+    tier_id = get_active_tier(created_by) if created_by else None
+    if not tier_id or not has_feature(tier_id, "area_comparison"):
+        set_monitoring(comparison["comparison_id"], False)
+        logger.info(
+            "Disabled monitoring for comparison %s: creator %s no longer has an active area_comparison entitlement",
+            comparison["comparison_id"], created_by,
+        )
+        return
 
     areas = [NeighborhoodComparisonArea(**area) for area in comparison["areas"]]
     results = [_fetch_area_comparison_data(area) for area in areas]

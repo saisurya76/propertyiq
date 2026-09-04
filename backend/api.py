@@ -109,6 +109,7 @@ from backend.auth_store import (
 from backend.auth import (
     send_otp_email,
     get_current_user_email,
+    get_current_user_email_optional,
     send_email,
 )
 
@@ -3027,22 +3028,38 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict:
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 @app.post("/api/neighborhood-insights/compare")
-def neighborhood_create_comparison(request: NeighborhoodComparisonCreateRequest):
-    """Public (no auth, same reasoning as every other neighborhood-
-    insights endpoint): creates a new side-by-side comparison of up to
-    MAX_AREAS_PER_COMPARISON areas — any city, any country, no
-    relation required between them. Fetches each area's real data
-    (resale signal, infrastructure news, flood-risk proximity) using
-    the exact same functions/caching the single-area page already
-    uses, then persists the result set so it can be reloaded instantly
-    (get_comparison below) rather than re-fetched on every visit."""
+def neighborhood_create_comparison(request: NeighborhoodComparisonCreateRequest, user_email: str = Depends(get_current_user_email)):
+    """A real, deliberate paid-feature gate — same has_feature() pattern
+    every other tier feature in this app uses, not a separate one-off
+    check. Requires an active Studio subscription whose tier includes
+    "area_comparison". Unlike the rest of Neighborhood Insights (public,
+    no login), creating a comparison is the one action here that costs
+    real backend work (external API calls, an hourly background
+    refresh if monitored) — viewing an already-created comparison by
+    its own ID stays free/no-login (see neighborhood_get_comparison
+    below), matching how a shared report link elsewhere in the app
+    works: the creator pays, a shared link is free to view.
+
+    Fetches each area's real data (resale signal, infrastructure news,
+    flood-risk proximity, air quality, World Bank indicators,
+    municipality rankings) using the exact same functions/caching the
+    single-area page already uses, then persists the result set so it
+    can be reloaded instantly (get_comparison below) rather than
+    re-fetched on every visit."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "area_comparison"):
+        raise HTTPException(
+            status_code=403,
+            detail="Comparing areas requires an active Studio subscription that includes the area comparison feature.",
+        )
+
     if len(request.areas) > MAX_AREAS_PER_COMPARISON:
         raise HTTPException(status_code=400, detail=f"A comparison can include at most {MAX_AREAS_PER_COMPARISON} areas.")
     if len(request.areas) < 2:
         raise HTTPException(status_code=400, detail="A comparison needs at least 2 areas.")
 
     results = [_fetch_area_comparison_data(area) for area in request.areas]
-    record = create_comparison([area.model_dump() for area in request.areas], results)
+    record = create_comparison([area.model_dump() for area in request.areas], results, created_by_email=user_email)
     return record
 
 
@@ -3060,11 +3077,21 @@ def neighborhood_get_comparison(comparison_id: str):
 
 
 @app.post("/api/neighborhood-insights/compare/{comparison_id}/refresh")
-def neighborhood_refresh_comparison(comparison_id: str):
-    """Manually re-fetches a comparison's data right now, independent
-    of the hourly monitoring loop — for a visitor who wants current
-    data immediately rather than waiting for the next scheduled
-    refresh."""
+def neighborhood_refresh_comparison(comparison_id: str, user_email: str = Depends(get_current_user_email)):
+    """Gated the same as creating a comparison (has_feature check) —
+    a refresh triggers the exact same real external API calls a
+    creation does, so letting anyone with a shared link trigger
+    unlimited free refreshes would be the same cost exposure as
+    letting them create comparisons for free. Manually re-fetches a
+    comparison's data right now, independent of the hourly monitoring
+    loop, for a visitor who wants current data immediately."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "area_comparison"):
+        raise HTTPException(
+            status_code=403,
+            detail="Refreshing a comparison requires an active Studio subscription that includes the area comparison feature.",
+        )
+
     record = get_comparison(comparison_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Comparison not found.")
@@ -3079,12 +3106,28 @@ class NeighborhoodComparisonMonitorRequest(BaseModel):
 
 
 @app.post("/api/neighborhood-insights/compare/{comparison_id}/monitor")
-def neighborhood_set_comparison_monitoring(comparison_id: str, request: NeighborhoodComparisonMonitorRequest):
-    """Public: toggles "keep monitoring" for a comparison — once on,
-    the hourly background loop (neighborhood_comparison_scheduler.py)
-    picks it up and refreshes its data automatically, with no visitor
-    needing to be on the page (or even have the app open) for it to
-    stay current."""
+def neighborhood_set_comparison_monitoring(comparison_id: str, request: NeighborhoodComparisonMonitorRequest, user_email: Optional[str] = Depends(get_current_user_email_optional)):
+    """Turning monitoring ON is gated the same as creating a comparison
+    — it commits to ongoing, recurring backend cost via the hourly
+    scheduler, so it needs the same real entitlement check. Turning it
+    OFF is always allowed with no login required at all — stopping an
+    ongoing cost is never something to paywall, and anyone who can see
+    the toggle (the page it's on) should be able to turn it off.
+
+    Once on, the hourly background loop
+    (neighborhood_comparison_scheduler.py) picks this comparison up
+    and refreshes its data automatically — and re-verifies the
+    creator's entitlement is still active before every single refresh,
+    since a subscription cancelled after this was turned on must not
+    keep getting free, ongoing refreshes forever."""
+    if request.monitoring:
+        tier_id = get_active_tier(user_email) if user_email else None
+        if not tier_id or not has_feature(tier_id, "area_comparison"):
+            raise HTTPException(
+                status_code=403,
+                detail="Keeping a comparison monitored requires an active Studio subscription that includes the area comparison feature.",
+            )
+
     record = set_monitoring(comparison_id, request.monitoring)
     if record is None:
         raise HTTPException(status_code=404, detail="Comparison not found.")

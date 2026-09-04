@@ -96,3 +96,18 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="Session expired or invalid. Please sign in again.")
 
     return email
+
+
+def get_current_user_email_optional(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    """Same real session lookup as get_current_user_email, for the one
+    real case that needs it: an endpoint usable both signed-out (e.g.
+    turning OFF a comparison's monitoring, never paywalled) and
+    signed-in with an entitlement check the caller applies itself (e.g.
+    turning monitoring ON). Returns None rather than raising 401 for a
+    missing/invalid/expired session — the caller decides what None
+    means for its own action, this dependency just doesn't force every
+    caller to be logged in to use the endpoint at all."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.removeprefix("Bearer ").strip()
+    return get_session_email(token)

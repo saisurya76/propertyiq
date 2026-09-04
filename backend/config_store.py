@@ -34,6 +34,7 @@ DEFAULT_TIER_CONFIG = {
             "standard_suppliers",
             "property_url_import",
             "price_drop_alert",
+            "area_comparison",
         ],
         "design_quota_per_month": 3,
         "saved_designs_limit": 2,
@@ -49,6 +50,7 @@ DEFAULT_TIER_CONFIG = {
             "premium_global_suppliers",
             "property_url_import",
             "price_drop_alert",
+            "area_comparison",
         ],
         "design_quota_per_month": 15,
         "saved_designs_limit": 10,
@@ -66,6 +68,7 @@ DEFAULT_TIER_CONFIG = {
             "team_seats",
             "property_url_import",
             "price_drop_alert",
+            "area_comparison",
         ],
         "design_quota_per_month": None,  # None = unlimited
         "saved_designs_limit": None,  # None = unlimited
@@ -223,6 +226,7 @@ ALL_FEATURES = [
     "team_seats",
     "property_url_import",
     "price_drop_alert",
+    "area_comparison",
 ]
 
 

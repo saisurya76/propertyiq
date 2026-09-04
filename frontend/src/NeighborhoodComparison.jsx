@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { studioApi, getSession, saveSession } from "./studio/studioApi";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 const MAX_AREAS = 5;
@@ -42,6 +43,17 @@ function NeighborhoodComparison() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const debounceRefs = useRef({});
+
+  // A real, deliberate paid feature (see the backend's own gate on
+  // /api/neighborhood-insights/compare) — everything else on this
+  // page stays free/no-login, so this is the one piece of state here
+  // tracking a signed-in session at all.
+  const [session, setSession] = useState(() => getSession());
+  const [authStep, setAuthStep] = useState(null); // null | "email" | "code" | "paywall"
+  const [authEmail, setAuthEmail] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   // Ready when the page loads: a previously-created comparison (this
   // browser's own, via localStorage — the whole page is public/no-
@@ -129,15 +141,29 @@ function NeighborhoodComparison() {
     setError("");
     setLoading(true);
     try {
+      const currentSession = getSession();
       const res = await fetch(`${API_BASE}/api/neighborhood-insights/compare`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentSession?.token ? { Authorization: `Bearer ${currentSession.token}` } : {}),
+        },
         body: JSON.stringify({
           areas: validAreas.map((a) => ({
             city: a.city, country: a.country || "Unknown", locality: a.locality, lat: a.lat, lon: a.lon,
           })),
         }),
       });
+      if (res.status === 401) {
+        setAuthStep("email");
+        setLoading(false);
+        return;
+      }
+      if (res.status === 403) {
+        setAuthStep("paywall");
+        setLoading(false);
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || "Couldn't create the comparison.");
@@ -159,7 +185,19 @@ function NeighborhoodComparison() {
     if (!comparisonId) return;
     setRefreshing(true);
     try {
-      const res = await fetch(`${API_BASE}/api/neighborhood-insights/compare/${comparisonId}/refresh`, { method: "POST" });
+      const currentSession = getSession();
+      const res = await fetch(`${API_BASE}/api/neighborhood-insights/compare/${comparisonId}/refresh`, {
+        method: "POST",
+        headers: currentSession?.token ? { Authorization: `Bearer ${currentSession.token}` } : {},
+      });
+      if (res.status === 401) {
+        setAuthStep("email");
+        return;
+      }
+      if (res.status === 403) {
+        setAuthStep("paywall");
+        return;
+      }
       const data = await res.json();
       setResults(data.results);
       setLastRefreshedAt(data.last_refreshed_at);
@@ -174,11 +212,26 @@ function NeighborhoodComparison() {
     if (!comparisonId) return;
     const next = !monitoring;
     try {
+      const currentSession = getSession();
       const res = await fetch(`${API_BASE}/api/neighborhood-insights/compare/${comparisonId}/monitor`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Turning OFF never needs auth at all (see the backend's own
+          // gate) — only include the header when turning ON, and only
+          // if actually signed in.
+          ...(next && currentSession?.token ? { Authorization: `Bearer ${currentSession.token}` } : {}),
+        },
         body: JSON.stringify({ monitoring: next }),
       });
+      if (res.status === 401) {
+        setAuthStep("email");
+        return;
+      }
+      if (res.status === 403) {
+        setAuthStep("paywall");
+        return;
+      }
       const data = await res.json();
       setMonitoring(data.monitoring);
     } catch {
@@ -186,12 +239,49 @@ function NeighborhoodComparison() {
     }
   };
 
+  const submitAuthEmail = async (e) => {
+    e.preventDefault();
+    if (!authEmail.trim()) return;
+    setAuthError("");
+    setAuthLoading(true);
+    try {
+      await studioApi.requestOtp(authEmail.trim());
+      setAuthStep("code");
+    } catch (err) {
+      setAuthError(err.message || "Couldn't send the code. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const submitAuthCode = async (e) => {
+    e.preventDefault();
+    if (!authCode.trim()) return;
+    setAuthError("");
+    setAuthLoading(true);
+    try {
+      const result = await studioApi.verifyOtp(authEmail.trim(), authCode.trim());
+      saveSession(result.session_token, authEmail.trim());
+      setSession(getSession());
+      setAuthStep(null);
+      // Retry the compare action now that a session exists — the
+      // visitor already filled in their areas, no need to make them
+      // click Compare a second time.
+      await handleCompare();
+    } catch (err) {
+      setAuthError(err.message || "That code didn't work. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   return (
     <div className="ni-comparison-section">
-      <h3>Compare Areas</h3>
+      <h3>Compare Areas <span className="ni-comparison-paid-badge">Studio subscribers</span></h3>
       <p className="ni-comparison-intro">
         Compare up to {MAX_AREAS} areas — any city, any country — side by side on resale activity,
-        upcoming infrastructure, and flood-risk proximity.
+        upcoming infrastructure, and flood-risk proximity. Free to search and browse addresses below —
+        signing in and an active Studio plan is needed to run the actual comparison.
       </p>
 
       {areas.map((area, index) => (
@@ -228,6 +318,63 @@ function NeighborhoodComparison() {
       </div>
 
       {error && <p className="ni-comparison-error">{error}</p>}
+
+      {authStep === "email" && (
+        <div className="ni-comparison-auth-box">
+          <h4>Sign in to compare areas</h4>
+          <p className="ni-comparison-intro">Comparing areas is a Studio subscriber feature. We'll email you a 6-digit code — no password needed.</p>
+          <form onSubmit={submitAuthEmail}>
+            {authError && <p className="ni-comparison-error">{authError}</p>}
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              autoFocus
+              required
+            />
+            <button type="submit" className="ni-primary-btn" disabled={authLoading} style={{ marginTop: 10 }}>
+              {authLoading ? "Sending..." : "Send code"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {authStep === "code" && (
+        <div className="ni-comparison-auth-box">
+          <h4>Enter your code</h4>
+          <p className="ni-comparison-intro">We sent a 6-digit code to <strong>{authEmail}</strong>. It expires in 10 minutes.</p>
+          <form onSubmit={submitAuthCode}>
+            {authError && <p className="ni-comparison-error">{authError}</p>}
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="123456"
+              value={authCode}
+              onChange={(e) => setAuthCode(e.target.value)}
+              autoFocus
+              required
+            />
+            <button type="submit" className="ni-primary-btn" disabled={authLoading} style={{ marginTop: 10 }}>
+              {authLoading ? "Verifying..." : "Verify & compare"}
+            </button>
+          </form>
+          <span className="ni-comparison-back-link" onClick={() => setAuthStep("email")}>← Use a different email</span>
+        </div>
+      )}
+
+      {authStep === "paywall" && (
+        <div className="ni-comparison-auth-box">
+          <h4>Subscribe to compare areas</h4>
+          <p className="ni-comparison-intro">
+            Comparing areas is a Studio subscriber feature{session?.email ? ` — ${session.email} doesn't currently have an active plan that includes it` : ""}.
+            Subscribe to Studio Starter, Pro, or Unlimited to unlock it.
+          </p>
+          <a href="https://app.propertyiqweb.com/" target="_blank" rel="noopener noreferrer" className="ni-primary-btn" style={{ display: "inline-block", textDecoration: "none" }}>
+            View Studio plans →
+          </a>
+        </div>
+      )}
 
       {results && (
         <>

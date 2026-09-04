@@ -4,11 +4,18 @@
 every hour so it's ready with fresh data the next time the page loads,
 rather than the visitor waiting on a live fetch.
 
-Deliberately not tied to a user account — Neighborhood Insights is a
-public, no-signup page (same reasoning as its own resale-signal and
-autocomplete endpoints), so a comparison is identified purely by its
-own generated ID, the same pattern price_watches already uses for a
-no-login "watch" that still needs to persist and be found again later.
+A paid, tier-gated feature (real business decision, not a technical
+default) — creating a comparison requires an active subscription whose
+tier includes the "area_comparison" feature, enforced in api.py via
+the same has_feature() gate every other tier feature uses. Recording
+who created it (created_by_email) is what makes the hourly monitoring
+loop able to re-check that entitlement is still valid before each
+refresh (see neighborhood_comparison_scheduler.py) — a subscription
+cancelled after monitoring was turned on must not keep getting free,
+ongoing refreshes forever. Viewing an already-created comparison by
+its own ID stays free/no-login, matching how a shared report link
+elsewhere in the app works: the creator pays, a shared link is free to
+view.
 """
 
 import json
@@ -31,21 +38,34 @@ def initialize_neighborhood_comparison_store() -> None:
                     areas TEXT NOT NULL,
                     results TEXT NOT NULL,
                     monitoring BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_by_email TEXT,
                     created_at TEXT NOT NULL,
                     last_refreshed_at TEXT NOT NULL
                 )
                 """
             )
+            # A real, necessary migration for any comparison created
+            # before this column existed — added via ALTER TABLE rather
+            # than assuming CREATE TABLE IF NOT EXISTS alone handles it,
+            # since that statement is a no-op once the table already
+            # exists from an earlier deploy.
+            cursor.execute(
+                "ALTER TABLE neighborhood_comparisons ADD COLUMN IF NOT EXISTS created_by_email TEXT"
+            )
         connection.commit()
 
 
-def create_comparison(areas: list[dict[str, Any]], results: list[dict[str, Any]]) -> dict[str, Any]:
+def create_comparison(areas: list[dict[str, Any]], results: list[dict[str, Any]], created_by_email: Optional[str] = None) -> dict[str, Any]:
     """`areas` is the caller-supplied list of up to MAX_AREAS_PER_COMPARISON
     {city, country, locality, lat, lon} dicts; `results` is the already-
     fetched comparison data per area (fetching itself is the API layer's
     job, same division of responsibility as price_watch_store's own
     create_price_watch/api_create_price_watch split) — this function is
-    persistence only."""
+    persistence only.
+
+    created_by_email is the paying subscriber who created this
+    comparison — recorded so the monitoring scheduler can re-verify
+    their entitlement is still active before each hourly refresh."""
     if len(areas) > MAX_AREAS_PER_COMPARISON:
         raise ValueError(f"A comparison can include at most {MAX_AREAS_PER_COMPARISON} areas.")
     if len(areas) < 2:
@@ -58,10 +78,11 @@ def create_comparison(areas: list[dict[str, Any]], results: list[dict[str, Any]]
             cursor.execute(
                 """
                 INSERT INTO neighborhood_comparisons
-                    (comparison_id, areas, results, monitoring, created_at, last_refreshed_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (comparison_id, areas, results, monitoring, created_by_email, created_at, last_refreshed_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (comparison_id, json.dumps(areas), json.dumps(results), False, now, now),
+                (comparison_id, json.dumps(areas), json.dumps(results), False,
+                 created_by_email.strip().lower() if created_by_email else None, now, now),
             )
         connection.commit()
     return get_comparison(comparison_id)
