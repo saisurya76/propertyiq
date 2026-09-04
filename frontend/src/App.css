@@ -3062,3 +3062,61 @@ body {
   cursor: pointer;
   text-decoration: underline;
 }
+
+.ni-comparison-tier-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.ni-comparison-tier-card {
+  background: white;
+  border: 1px solid #d6dbe3;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.ni-comparison-tier-card h5 {
+  margin: 0 0 6px;
+  color: #0b2545;
+  font-size: 15px;
+}
+
+.ni-comparison-tier-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: #059669;
+  margin-bottom: 10px;
+}
+
+.ni-comparison-tier-price-period {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.ni-comparison-tier-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12.5px;
+  color: #4b5563;
+}
+
+.ni-comparison-tier-features li {
+  padding: 3px 0;
+  text-transform: capitalize;
+}
+
+.ni-comparison-tier-highlight {
+  color: #059669 !important;
+  font-weight: 700;
+  text-transform: none !important;
+}
+
+@media (max-width: 640px) {
+  .ni-comparison-tier-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

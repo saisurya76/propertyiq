@@ -33,7 +33,24 @@ function emptyArea() {
   return { city: "", country: "", locality: "", lat: null, lon: null, addressQuery: "", suggestions: [] };
 }
 
-function NeighborhoodComparison() {
+function formatPrice(usdAmount, currency, fxRates) {
+  const rate = fxRates?.[currency];
+  if (!rate) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(usdAmount);
+  }
+  const converted = usdAmount * rate;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: converted >= 100 ? 0 : 2,
+    }).format(converted);
+  } catch {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(usdAmount);
+  }
+}
+
+function NeighborhoodComparison({ currency = "USD" }) {
   const [areas, setAreas] = useState([emptyArea(), emptyArea()]);
   const [comparisonId, setComparisonId] = useState(null);
   const [results, setResults] = useState(null);
@@ -54,6 +71,7 @@ function NeighborhoodComparison() {
   const [authCode, setAuthCode] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [paywallTiers, setPaywallTiers] = useState(null); // null = not loaded yet
 
   // Ready when the page loads: a previously-created comparison loads
   // its already-fetched, cached results immediately, no waiting on a
@@ -89,6 +107,29 @@ function NeighborhoodComparison() {
       })
       .catch(() => localStorage.removeItem(STORAGE_KEY));
   }, []);
+
+  // Loaded lazily, only once the paywall actually needs to show real
+  // prices/features — not on every page load, since most visitors
+  // never hit this. Fetches the real, live tier config (the exact same
+  // /api/tiers the pricing page itself uses, real Dodo-overlaid prices
+  // included) and shows only the tiers that genuinely include
+  // area_comparison right now — if an admin changes which tiers have
+  // it, this reflects that automatically with no separate list to
+  // keep in sync here.
+  useEffect(() => {
+    if (authStep !== "paywall" || paywallTiers !== null) return;
+    Promise.all([
+      fetch(`${API_BASE}/api/tiers`).then((r) => r.json()),
+      fetch(`${API_BASE}/api/fx-rates`).then((r) => r.json()),
+    ])
+      .then(([tiers, fxRates]) => {
+        const qualifying = Object.entries(tiers)
+          .filter(([, tier]) => (tier.features || []).includes("area_comparison"))
+          .map(([tierId, tier]) => ({ tierId, ...tier }));
+        setPaywallTiers({ tiers: qualifying, fxRates });
+      })
+      .catch(() => setPaywallTiers({ tiers: [], fxRates: {} }));
+  }, [authStep, paywallTiers]);
 
   const updateArea = (index, patch) => {
     setAreas((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)));
@@ -380,12 +421,43 @@ function NeighborhoodComparison() {
 
       {authStep === "paywall" && (
         <div className="ni-comparison-auth-box">
-          <h4>Subscribe to compare areas</h4>
+          <h4>Unlock area comparison{session?.email ? ` for ${session.email}` : ""}</h4>
           <p className="ni-comparison-intro">
-            Comparing areas is a Studio subscriber feature{session?.email ? ` — ${session.email} doesn't currently have an active plan that includes it` : ""}.
-            Subscribe to Studio Starter, Pro, or Unlimited to unlock it.
+            Comparing areas is a Studio subscriber feature. Here's what you'd get with each plan that includes it:
           </p>
-          <a href="https://app.propertyiqweb.com/" target="_blank" rel="noopener noreferrer" className="ni-primary-btn" style={{ display: "inline-block", textDecoration: "none" }}>
+
+          {!paywallTiers && <p className="ni-comparison-intro">Loading plans...</p>}
+
+          {paywallTiers && paywallTiers.tiers.length === 0 && (
+            <p className="ni-comparison-intro">
+              No current plan includes area comparison yet — check back soon, or contact support.
+            </p>
+          )}
+
+          {paywallTiers && paywallTiers.tiers.length > 0 && (
+            <div className="ni-comparison-tier-cards">
+              {paywallTiers.tiers.map((tier) => (
+                <div key={tier.tierId} className="ni-comparison-tier-card">
+                  <h5>{tier.label}</h5>
+                  <div className="ni-comparison-tier-price">
+                    {formatPrice(tier.price_usd, currency, paywallTiers.fxRates)}
+                    <span className="ni-comparison-tier-price-period">/mo</span>
+                  </div>
+                  <ul className="ni-comparison-tier-features">
+                    {tier.design_quota_per_month !== 0 && (
+                      <li>{tier.design_quota_per_month === null ? "Unlimited designs/month" : `${tier.design_quota_per_month} designs/month`}</li>
+                    )}
+                    {tier.features.filter((f) => f !== "area_comparison").slice(0, 3).map((f) => (
+                      <li key={f}>{f.replace(/_/g, " ")}</li>
+                    ))}
+                    <li className="ni-comparison-tier-highlight">Area comparison ✓</li>
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <a href="https://app.propertyiqweb.com/" target="_blank" rel="noopener noreferrer" className="ni-primary-btn" style={{ display: "inline-block", textDecoration: "none", marginTop: 14 }}>
             View Studio plans →
           </a>
         </div>

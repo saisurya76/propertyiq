@@ -843,7 +843,7 @@ function NeighborhoodInsights({ countryCode }) {
 
       {sectionVisibility.comparison && (
         <div className="ni-card">
-          <NeighborhoodComparison />
+          <NeighborhoodComparison currency={country.currency} />
         </div>
       )}
 
