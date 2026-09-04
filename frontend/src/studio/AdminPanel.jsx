@@ -764,7 +764,7 @@ function AdminPanel({ onBack }) {
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`ni-toggle-${key}`}>{label}</label>
-                    <span className="admin-switch">
+                    <label className="admin-switch" htmlFor={`ni-toggle-${key}`}>
                       <input
                         id={`ni-toggle-${key}`}
                         type="checkbox"
@@ -772,7 +772,7 @@ function AdminPanel({ onBack }) {
                         onChange={() => toggleNiSection(key)}
                       />
                       <span className="admin-slider"></span>
-                    </span>
+                    </label>
                   </div>
                 ))}
                 <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveNiSectionVisibility} disabled={loading}>
@@ -808,7 +808,7 @@ function AdminPanel({ onBack }) {
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`homepage-toggle-${key}`}>{label}</label>
-                    <span className="admin-switch">
+                    <label className="admin-switch" htmlFor={`homepage-toggle-${key}`}>
                       <input
                         id={`homepage-toggle-${key}`}
                         type="checkbox"
@@ -816,7 +816,7 @@ function AdminPanel({ onBack }) {
                         onChange={() => toggleHomepagePanel(key)}
                       />
                       <span className="admin-slider"></span>
-                    </span>
+                    </label>
                   </div>
                 ))}
                 <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveHomepagePanelVisibility} disabled={loading}>
