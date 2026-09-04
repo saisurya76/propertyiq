@@ -4341,9 +4341,94 @@ def api_list_shared_properties(user_email: str = Depends(get_current_user_email)
     return {"properties": list_properties_shared_with_user(user_email)}
 
 
+@app.post("/api/properties/import")
+def api_import_property(request: CreatePropertyRequest, user_email: str = Depends(get_current_user_email)):
+    """Real, practical answer to a real constraint: saved_designs_limit
+    caps how many designs can be kept at once, with no way to archive
+    one externally and free the slot back up until now. Takes the same
+    real shape /api/properties/{id}/export produces (and the same
+    shape the regular create-property endpoint already accepts) — an
+    import is not a special, separate code path, just the ordinary
+    create flow fed a design that happens to have come from a JSON
+    file instead of the Construction Studio wizard. Same
+    saved_designs_limit gate as any other new save — importing doesn't
+    bypass the quota it exists to enforce.
+
+    Registered BEFORE /api/properties/{property_id} deliberately, same
+    reasoning as shared-with-me just above — otherwise the generic
+    {property_id} route would swallow this literal path, treating
+    "import" as a property ID."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id:
+        raise HTTPException(status_code=403, detail="Saving designs requires an active Studio subscription.")
+
+    tier = get_tier(tier_id)
+    limit = tier.get("saved_designs_limit", 0) if tier else 0
+
+    if not request.floors:
+        raise HTTPException(status_code=400, detail="A property must have at least one floor")
+
+    prop = create_property_if_under_limit(
+        limit=limit,
+        user_email=user_email,
+        name=request.name,
+        plot_spec=request.plot_spec.model_dump(),
+        selections=request.selections,
+        labor_selections=request.labor_selections,
+        site_elements=[e.model_dump() for e in request.site_elements],
+        floors=[f.model_dump() for f in request.floors],
+        supplier_preferences=request.supplier_preferences,
+    )
+    if prop is None:
+        used = count_saved_properties(user_email)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Saved design limit reached ({used}/{limit}) for the {tier['label']} tier. "
+                   f"Delete an existing saved design or upgrade your plan before importing another.",
+        )
+    return prop
+
+
 @app.get("/api/properties/{property_id}")
 def api_get_property(property_id: str, user_email: str = Depends(get_current_user_email)):
     return _require_own_property(property_id, user_email)
+
+
+@app.get("/api/properties/{property_id}/export")
+def api_export_property(property_id: str, user_email: str = Depends(get_current_user_email)):
+    """Real, practical answer to a real constraint: saved_designs_limit
+    caps how many designs can be kept at once, with no way to archive
+    one externally and free the slot back up until now. Returns the
+    same real shape a fresh /api/properties POST accepts — same
+    fields, JSON, no format conversion — so a re-import is a direct,
+    lossless round-trip, not a lossy re-interpretation of the original
+    design. Deliberately excludes server-assigned/ownership fields
+    (property_id, user_email, locked, timestamps, shared_with_emails)
+    that don't belong in a re-importable file: the new owner, new ID,
+    and fresh timestamps are assigned properly on import instead,
+    exactly as they would be for a brand-new design.
+
+    Same permission level as viewing the design (_require_own_property,
+    which also allows a shared team_seats collaborator, not just the
+    owner) — exporting is a read, not an account-level action like
+    deleting or managing sharing."""
+    prop = _require_own_property(property_id, user_email)
+    return {
+        "name": prop["name"],
+        "plot_spec": prop["plot_spec"],
+        "selections": prop["selections"],
+        "labor_selections": prop["labor_selections"],
+        "site_elements": prop["site_elements"],
+        "supplier_preferences": prop["supplier_preferences"],
+        "floors": [
+            {"floor_number": f["floor_number"], "floor_label": f["floor_label"], "rooms": f["rooms"]}
+            for f in prop["floors"]
+        ],
+        # Not used on import at all -- included only so a visitor
+        # opening the raw exported file can see what it originally
+        # was and when, without needing to re-import it first to find out.
+        "_exported_from": {"original_name": prop["name"], "originally_created_at": prop["created_at"]},
+    }
 
 
 @app.put("/api/properties/{property_id}")

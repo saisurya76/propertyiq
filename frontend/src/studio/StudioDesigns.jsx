@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
 
 function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
   const [properties, setProperties] = useState(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [busyPropertyId, setBusyPropertyId] = useState(null); // which card is mid-export/delete, so its own buttons show a real "working" state without blocking the rest of the list
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   const fetchProperties = () =>
     studioApi
@@ -27,6 +30,66 @@ function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
     fetchProperties().finally(() => setRefreshing(false));
   };
 
+  // A real, practical answer to a real constraint: saved_designs_limit
+  // caps how many designs can be kept at once, with previously no way
+  // to archive one externally and free the slot back up. Downloads the
+  // exact same JSON shape a re-import accepts — a real, lossless
+  // round-trip, not a display-only summary.
+  const handleExport = async (e, propertyId, name) => {
+    e.stopPropagation(); // the whole card is clickable to open the design -- exporting shouldn't also open it
+    setBusyPropertyId(propertyId);
+    setError("");
+    try {
+      const data = await studioApi.exportProperty(propertyId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name.replace(/[^a-z0-9]+/gi, "_")}.propertyiq-design.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "Couldn't export this design.");
+    } finally {
+      setBusyPropertyId(null);
+    }
+  };
+
+  const handleDelete = async (e, propertyId, name) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${name}"? This can't be undone — export it first if you want to keep a copy.`)) return;
+    setBusyPropertyId(propertyId);
+    setError("");
+    try {
+      await studioApi.deleteProperty(propertyId);
+      setProperties((prev) => prev.filter((p) => p.property_id !== propertyId));
+    } catch (err) {
+      setError(err.message || "Couldn't delete this design.");
+    } finally {
+      setBusyPropertyId(null);
+    }
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets the same file be re-selected later if the first attempt fails
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      await studioApi.importProperty(parsed);
+      await fetchProperties();
+    } catch (err) {
+      setError(err.message || "Couldn't import that file — make sure it's a design exported from PropertyIQ.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="studio-designs">
       <div className="studio-designs-header-row">
@@ -45,9 +108,18 @@ function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
         </button>
       </div>
 
-      <button type="button" className="cs-nav-btn cs-nav-primary studio-designs-new-btn" onClick={onStartNew}>
-        + Start New Design
-      </button>
+      <div className="studio-designs-actions-row">
+        <button type="button" className="cs-nav-btn cs-nav-primary studio-designs-new-btn" onClick={onStartNew}>
+          + Start New Design
+        </button>
+        <button type="button" className="cs-nav-btn" onClick={handleImportClick} disabled={importing}>
+          {importing ? "Importing..." : "⬆ Import a design"}
+        </button>
+        <input ref={fileInputRef} type="file" accept="application/json" style={{ display: "none" }} onChange={handleImportFile} />
+      </div>
+      <p className="studio-subtext studio-designs-hint">
+        Running low on your saved-design limit? Export a design to a file, delete it here, and import it back later when you have room.
+      </p>
 
       {error && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{error}</div>}
 
@@ -71,6 +143,7 @@ function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
             const designCountry = p.country || "India";
             const siteCountry = urlCountryContext ? urlCountryContext.name : "India";
             const crossSiteLocked = designCountry !== siteCountry;
+            const isBusy = busyPropertyId === p.property_id;
             return (
               <div key={p.property_id} className="studio-design-card" onClick={() => onResume(p.property_id)}>
                 <div className="studio-design-card-header">
@@ -88,6 +161,14 @@ function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
                 <p className="studio-design-card-updated">
                   Updated {new Date(p.updated_at).toLocaleDateString()}
                 </p>
+                <div className="studio-design-card-actions">
+                  <button type="button" className="studio-design-card-action-btn" disabled={isBusy} onClick={(e) => handleExport(e, p.property_id, p.name)}>
+                    ⬇ Export
+                  </button>
+                  <button type="button" className="studio-design-card-action-btn studio-design-card-delete-btn" disabled={isBusy} onClick={(e) => handleDelete(e, p.property_id, p.name)}>
+                    🗑 Delete
+                  </button>
+                </div>
               </div>
             );
           })}

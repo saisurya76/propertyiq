@@ -2740,3 +2740,54 @@
   color: #dc2626;
   margin-top: 6px;
 }
+
+.studio-designs-actions-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.studio-designs-hint {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.studio-design-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f1eafb;
+}
+
+.studio-design-card-action-btn {
+  background: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #ede4fc;
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.studio-design-card-action-btn:hover {
+  background: #ede4fc;
+}
+
+.studio-design-card-action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.studio-design-card-delete-btn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.studio-design-card-delete-btn:hover {
+  background: #fee2e2;
+}

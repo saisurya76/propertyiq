@@ -479,3 +479,85 @@ def test_property_created_without_supplier_preferences_defaults_cleanly():
     }, headers=headers)
     assert create_resp.status_code == 200
     assert create_resp.json()["supplier_preferences"] == {}
+
+
+def test_export_returns_a_reimportable_shape_without_server_assigned_fields():
+    """Confirms the exported JSON is a real, faithful shape (matching
+    what /api/properties accepts) and deliberately excludes
+    server-assigned/ownership fields that shouldn't be re-imported as-is."""
+    headers = _signin_with_tier("pytest_export_shape@example.com")
+    payload = _base_payload("Export Shape Test")
+    payload["floors"] = [{"floor_number": 0, "floor_label": "Ground Floor", "rooms": [{"name": "Kitchen", "x": 0, "y": 0, "length": 8, "width": 6}]}]
+    created = client.post("/api/properties", headers=headers, json=payload).json()
+
+    r = client.get(f"/api/properties/{created['property_id']}/export", headers=headers)
+    assert r.status_code == 200
+    exported = r.json()
+
+    assert "property_id" not in exported
+    assert "user_email" not in exported
+    assert "locked" not in exported
+    assert "shared_with_emails" not in exported
+    assert exported["name"] == "Export Shape Test"
+    assert exported["floors"][0]["rooms"][0]["name"] == "Kitchen"
+
+
+def test_export_requires_ownership_or_shared_access():
+    headers = _signin_with_tier("pytest_export_owner@example.com")
+    created = client.post("/api/properties", headers=headers, json=_base_payload()).json()
+
+    other_headers = _signin_with_tier("pytest_export_stranger@example.com")
+    r = client.get(f"/api/properties/{created['property_id']}/export", headers=other_headers)
+    assert r.status_code == 403
+
+
+def test_full_export_then_import_round_trip_is_lossless():
+    """The real, direct proof of the actual feature this was built for:
+    export a design, delete it (freeing its saved_designs_limit slot),
+    then import it back and confirm it's the same design."""
+    headers = _signin_with_tier("pytest_roundtrip@example.com")
+    payload = _base_payload("Round Trip Test")
+    payload["floors"] = [
+        {"floor_number": 0, "floor_label": "Ground Floor", "rooms": [{"name": "Living Room", "x": 0, "y": 0, "length": 12, "width": 10}]},
+        {"floor_number": 1, "floor_label": "First Floor", "rooms": [{"name": "Bedroom", "x": 0, "y": 0, "length": 10, "width": 10}]},
+    ]
+    created = client.post("/api/properties", headers=headers, json=payload).json()
+    exported = client.get(f"/api/properties/{created['property_id']}/export", headers=headers).json()
+
+    client.delete(f"/api/properties/{created['property_id']}", headers=headers)
+    assert client.get(f"/api/properties/{created['property_id']}", headers=headers).status_code == 404
+
+    reimported = client.post("/api/properties/import", headers=headers, json=exported).json()
+    assert reimported["property_id"] != created["property_id"]  # a genuinely new design, not the same row
+    assert reimported["name"] == "Round Trip Test"
+    assert len(reimported["floors"]) == 2
+    assert reimported["floors"][1]["rooms"][0]["name"] == "Bedroom"
+
+
+def test_import_requires_active_subscription():
+    code = create_otp("pytest_import_nosub@example.com")
+    r = client.post("/api/auth/verify-otp", json={"email": "pytest_import_nosub@example.com", "code": code})
+    headers = {"Authorization": f"Bearer {r.json()['session_token']}"}
+    r2 = client.post("/api/properties/import", headers=headers, json=_base_payload())
+    assert r2.status_code == 403
+
+
+def test_import_respects_saved_designs_limit():
+    """Real, direct proof importing doesn't bypass the same quota a
+    normal save is gated by."""
+    headers = _signin_with_tier("pytest_import_limit@example.com", tier_id="studio_starter")
+    payload = _base_payload("Filler")
+    client.post("/api/properties", headers=headers, json=payload)
+    client.post("/api/properties", headers=headers, json=payload)  # studio_starter's saved_designs_limit is 2
+
+    r = client.post("/api/properties/import", headers=headers, json=_base_payload("One Too Many"))
+    assert r.status_code == 403
+    assert "saved design limit" in r.json()["detail"].lower()
+
+
+def test_import_rejects_a_design_with_no_floors():
+    headers = _signin_with_tier("pytest_import_nofloors@example.com")
+    payload = _base_payload()
+    payload["floors"] = []
+    r = client.post("/api/properties/import", headers=headers, json=payload)
+    assert r.status_code == 400

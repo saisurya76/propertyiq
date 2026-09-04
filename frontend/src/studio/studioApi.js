@@ -172,6 +172,12 @@ export const studioApi = {
   deleteProperty: (propertyId) =>
     apiFetch(`/api/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
 
+  exportProperty: (propertyId) =>
+    apiFetch(`/api/properties/${encodeURIComponent(propertyId)}/export`),
+
+  importProperty: (payload) =>
+    apiFetch("/api/properties/import", { method: "POST", body: JSON.stringify(payload) }),
+
   getOrderStatus: (orderId) =>
     apiFetch(`/api/orders/${encodeURIComponent(orderId)}/status`),
 
