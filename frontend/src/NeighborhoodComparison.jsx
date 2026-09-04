@@ -249,10 +249,10 @@ function NeighborhoodComparison() {
                   <td>Overall ranking</td>
                   {results.map((r, i) => (
                     <td key={i}>
-                      {r.overall_ranking.has_data
+                      {r.overall_ranking?.has_data
                         ? <>
-                            <strong>{r.overall_ranking.score} / 100</strong>
-                            <div className="ni-comparison-resolved-note">from {r.overall_ranking.contributors.join(", ")}</div>
+                            <strong>{r.overall_ranking?.score} / 100</strong>
+                            <div className="ni-comparison-resolved-note">from {r.overall_ranking?.contributors.join(", ")}</div>
                           </>
                         : "Not enough data yet"}
                     </td>
@@ -262,11 +262,11 @@ function NeighborhoodComparison() {
                   <td>Avg. price/sqft <span className="ni-comparison-metric-label">(appreciation / resale value proxy)</span></td>
                   {results.map((r, i) => (
                     <td key={i}>
-                      {r.resale_signal.has_data
+                      {r.resale_signal?.has_data
                         ? <>
-                            {r.resale_signal.currency} {r.resale_signal.average_price_per_sqft.toLocaleString()}
-                            {r.resale_signal.resolved_city && (
-                              <div className="ni-comparison-resolved-note">via {r.resale_signal.resolved_city} city data</div>
+                            {r.resale_signal?.currency} {r.resale_signal?.average_price_per_sqft.toLocaleString()}
+                            {r.resale_signal?.resolved_city && (
+                              <div className="ni-comparison-resolved-note">via {r.resale_signal?.resolved_city} city data</div>
                             )}
                           </>
                         : "No data"}
@@ -276,17 +276,17 @@ function NeighborhoodComparison() {
                 <tr>
                   <td>Comparable listings</td>
                   {results.map((r, i) => (
-                    <td key={i}>{r.resale_signal.has_data ? r.resale_signal.comparable_count : "—"}</td>
+                    <td key={i}>{r.resale_signal?.has_data ? r.resale_signal?.comparable_count : "—"}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Air pollution index</td>
                   {results.map((r, i) => (
                     <td key={i}>
-                      {r.air_quality.has_data
+                      {r.air_quality?.has_data
                         ? <>
-                            {r.air_quality.aqi_label} ({r.air_quality.aqi}/5)
-                            <div className="ni-comparison-resolved-note">PM2.5: {r.air_quality.pm2_5} · {r.air_quality.scale}</div>
+                            {r.air_quality?.aqi_label} ({r.air_quality?.aqi}/5)
+                            <div className="ni-comparison-resolved-note">PM2.5: {r.air_quality?.pm2_5} · {r.air_quality?.scale}</div>
                           </>
                         : "Not available"}
                     </td>
@@ -295,14 +295,14 @@ function NeighborhoodComparison() {
                 <tr>
                   <td>Nearby water bodies <span className="ni-comparison-metric-label">(flood-risk proxy)</span></td>
                   {results.map((r, i) => (
-                    <td key={i}>{r.flood_risk.has_data ? r.flood_risk.nearby_water_count : "—"}</td>
+                    <td key={i}>{r.flood_risk?.has_data ? r.flood_risk?.nearby_water_count : "—"}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Infrastructure news</td>
                   {results.map((r, i) => (
                     <td key={i} className="ni-comparison-summary-cell">
-                      {r.infrastructure.has_data ? r.infrastructure.summary : "No recent news found"}
+                      {r.infrastructure?.has_data ? r.infrastructure?.summary : "No recent news found"}
                     </td>
                   ))}
                 </tr>
