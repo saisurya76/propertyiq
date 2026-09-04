@@ -31,14 +31,21 @@ function formatPrice(usdAmount, currency, fxRates) {
   }
 }
 
-function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructionStudio, onSignOut }) {
+function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructionStudio, onSignOut, contextMessage }) {
   const { requireTerms, TermsGateModal } = useTermsGate();
   const [showRefundRequest, setShowRefundRequest] = useState(false);
   const [tiers, setTiers] = useState(null);
   const [fxRates, setFxRates] = useState(null);
   const [status, setStatus] = useState(null);
   const [loadingTierId, setLoadingTierId] = useState(null);
-  const [message, setMessage] = useState("");
+  // Seeded from contextMessage when this screen was reached because a
+  // specific paid action (e.g. generating a property assessment) hit
+  // its own subscription gate — makes it obvious this is a real,
+  // deliberate feature requirement, not a confusing bounce back to
+  // Pricing for no visible reason. Separate from the generic checkout/
+  // refresh messages this same state is used for elsewhere below, so
+  // neither overwrites the other unexpectedly.
+  const [message, setMessage] = useState(contextMessage || "");
   const [error, setError] = useState("");
   const [insightUnlocked, setInsightUnlocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

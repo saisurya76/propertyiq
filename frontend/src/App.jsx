@@ -220,6 +220,12 @@ function App() {
   // fallback is still correct for the "manage my plan" entry point,
   // just not for a paid action that got interrupted by a 401.
   const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment"
+  // Shown on the Pricing screen specifically when a paid action (not
+  // the generic "manage my plan" entry point) is what actually sent
+  // the visitor there — without this, landing on Pricing right after
+  // signing in looks like a confusing bounce/loop rather than the
+  // real, deliberate "you need an active plan for this" gate it is.
+  const [pricingContextMessage, setPricingContextMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
@@ -648,6 +654,9 @@ function App() {
         return;
       }
       if (response.status === 403) {
+        setPricingContextMessage(
+          "Generating a property assessment requires an active Studio plan that includes this feature. Pick a plan below to continue."
+        );
         setStudioView("pricing");
         return;
       }
@@ -734,6 +743,7 @@ function App() {
   // resumePropertyId, since a click aimed explicitly at "manage my
   // plan" should never be redirected into an unrelated design.
   const goToPricing = async () => {
+    setPricingContextMessage(""); // the generic "manage my plan" entry point, not a feature gate
     const session = getSession();
     if (!session) {
       setStudioView("auth");
@@ -762,6 +772,7 @@ function App() {
       generateAssessment();
       return;
     }
+    setPricingContextMessage(""); // reached auth via the generic "manage my plan" path, not a feature gate
     setStudioView("pricing");
   };
 
@@ -830,7 +841,7 @@ function App() {
             {quotaMessage}
           </div>
         )}
-        <StudioPricing reportId={reportId} currency={currency} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} />
+        <StudioPricing reportId={reportId} currency={currency} onBack={backToReport} onLaunchConstructionStudio={launchConstructionStudio} onSignOut={handleSignOut} contextMessage={pricingContextMessage} />
         <LegalFooter />
         <ScrollToTopBottom />
       </div>
