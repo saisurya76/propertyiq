@@ -457,7 +457,7 @@ function NeighborhoodComparison({ currency = "USD" }) {
             </div>
           )}
 
-          <a href="https://app.propertyiqweb.com/" target="_blank" rel="noopener noreferrer" className="ni-primary-btn" style={{ display: "inline-block", textDecoration: "none", marginTop: 14 }}>
+          <a href="https://app.propertyiqweb.com/?view=pricing" target="_blank" rel="noopener noreferrer" className="ni-primary-btn" style={{ display: "inline-block", textDecoration: "none", marginTop: 14 }}>
             View Studio plans →
           </a>
         </div>

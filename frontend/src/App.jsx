@@ -200,6 +200,17 @@ function App() {
     if (typeof window !== "undefined" && window.location.pathname === "/admin") {
       return "admin";
     }
+    // A real, deliberate deep link: other pages on the site (e.g.
+    // Neighborhood Insights' own paywall) link here with ?view=pricing
+    // so "View Studio plans" actually lands on Pricing, not just the
+    // homepage — session-aware the same way goToPricing/
+    // handleStudioAuthenticated already are, so a signed-out visitor
+    // goes through sign-in first and still ends up on Pricing
+    // afterward, rather than the deep link silently doing nothing for
+    // exactly the visitors who need it most.
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "pricing") {
+      return getSession() ? "pricing" : "auth";
+    }
     return "main";
   }); // "main" | "auth" | "pricing" | "construction" | "admin"
   const [loading, setLoading] = useState(false);
