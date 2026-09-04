@@ -550,7 +550,24 @@ def build_assessment(data: PropertyRequest):
     return run_assessment(property_input)
 
 @app.post("/assess")
-def assess(data: PropertyRequest):
+def assess(data: PropertyRequest, user_email: str = Depends(get_current_user_email)):
+    """A real, deliberate paid-feature gate — same has_feature() pattern
+    area_comparison and every other tier feature in this app use.
+    Requires an active Studio subscription whose tier includes
+    "property_assessment". A real, significant business change from
+    this endpoint's own prior state: confirmed directly that this was
+    completely public/free with zero auth before this, AND that the
+    separate one-time "Standard Report" purchase flow
+    (/create-checkout, a genuinely different product) was never once
+    called from any frontend UI at all — the entire assessment flow
+    was giving away the full result for free with no working path to
+    a paid version of it whatsoever."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "property_assessment"):
+        raise HTTPException(
+            status_code=403,
+            detail="Generating a property assessment requires an active Studio subscription that includes this feature.",
+        )
 
     assessment = build_assessment(data)
 

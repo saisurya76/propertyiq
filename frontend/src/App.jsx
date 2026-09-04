@@ -213,6 +213,13 @@ function App() {
     }
     return "main";
   }); // "main" | "auth" | "pricing" | "construction" | "admin"
+  // Tracks WHY the auth screen was opened, so a successful sign-in can
+  // retry the actual action the visitor wanted (e.g. re-run the
+  // property assessment they just filled in) instead of always
+  // landing on Pricing regardless of what triggered it — that generic
+  // fallback is still correct for the "manage my plan" entry point,
+  // just not for a paid action that got interrupted by a 401.
+  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment"
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
@@ -620,12 +627,14 @@ function App() {
 
     try {
       setLoading(true);
+      const session = getSession();
       const response = await fetch(
         "https://propertyiq-api-q21y.onrender.com/assess",
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
           body: JSON.stringify(
               buildRequestPayload()
@@ -633,6 +642,15 @@ function App() {
         }
       );
 
+      if (response.status === 401) {
+        setPendingAuthAction("assessment");
+        setStudioView("auth");
+        return;
+      }
+      if (response.status === 403) {
+        setStudioView("pricing");
+        return;
+      }
       if (!response.ok) {
           throw new Error("Assessment failed.");
       }
@@ -738,6 +756,12 @@ function App() {
   };
 
   const handleStudioAuthenticated = () => {
+    if (pendingAuthAction === "assessment") {
+      setPendingAuthAction(null);
+      setStudioView("main");
+      generateAssessment();
+      return;
+    }
     setStudioView("pricing");
   };
 

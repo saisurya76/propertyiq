@@ -36,7 +36,8 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
     region), priority_cad_formats (DXF dimension annotations),
     team_seats (property-sharing endpoint), property_url_import and
     price_drop_alert (their own respective feature gates), area_comparison
-    (Neighborhood Insights compare/refresh/monitor-on endpoints)."""
+    (Neighborhood Insights compare/refresh/monitor-on endpoints),
+    property_assessment (the main /assess endpoint)."""
     assert set(ALL_FEATURES) == {
         "similar_property_suggestions",
         "vastu_compliance",
@@ -47,6 +48,7 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
         "property_url_import",
         "price_drop_alert",
         "area_comparison",
+        "property_assessment",
     }
 
 
