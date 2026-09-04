@@ -109,6 +109,68 @@ def create_price_watch(
     return get_price_watch(watch_id)
 
 
+def create_price_watch_if_under_limit(
+    *,
+    max_watches: Optional[int],
+    email: str,
+    price: float,
+    city: str,
+    property_type: str,
+    area_value: float,
+    target_price: float,
+    area_unit: str = "sqft",
+    url: Optional[str] = None,
+    location: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    """Race-safe version of create_price_watch, same pattern as
+    construction_store.py's save_design_if_under_quota: a Postgres
+    advisory transaction lock keyed per-user, real count re-checked
+    inside the lock immediately before the insert. Returns None if
+    max_watches would be exceeded."""
+    if price <= 0 or area_value <= 0 or target_price <= 0:
+        raise ValueError("Price, area, and target price must all be greater than zero.")
+    if area_unit not in ("sqft", "sqm"):
+        raise ValueError("area_unit must be 'sqft' or 'sqm'.")
+    if "@" not in email:
+        raise ValueError("A valid email is required to be notified.")
+    email = email.strip().lower()
+    if not city or not city.strip():
+        raise ValueError("City is required.")
+    if not property_type or not property_type.strip():
+        raise ValueError("Property type is required.")
+
+    watch_id = uuid.uuid4().hex[:10]
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (email,))
+
+            if max_watches is not None:
+                cursor.execute(
+                    "SELECT COUNT(*) AS count FROM price_watches WHERE email = %s AND status = 'active'",
+                    (email,),
+                )
+                current_count = cursor.fetchone()["count"]
+                if current_count >= max_watches:
+                    connection.rollback()
+                    return None
+
+            cursor.execute(
+                """
+                INSERT INTO price_watches
+                    (watch_id, email, url, price, city, property_type, area_value, area_unit,
+                     target_price, status, created_at, last_checked_at, location)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (watch_id, email, url, price, city, property_type, area_value, area_unit,
+                 target_price, "active", now, None, location),
+            )
+        connection.commit()
+
+    return get_price_watch(watch_id)
+
+
 def get_price_watch(watch_id: str) -> Optional[dict[str, Any]]:
     with get_connection() as connection:
         with connection.cursor() as cursor:

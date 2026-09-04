@@ -169,6 +169,82 @@ def create_property(
     return get_property(property_id)
 
 
+def create_property_if_under_limit(
+    *,
+    limit: Optional[int],
+    user_email: str,
+    name: str,
+    plot_spec: dict[str, Any],
+    selections: dict[str, str],
+    labor_selections: dict[str, str],
+    site_elements: list[dict[str, Any]],
+    floors: list[dict[str, Any]],
+    supplier_preferences: Optional[dict[str, list[str]]] = None,
+) -> Optional[dict[str, Any]]:
+    """The real, race-safe version of the limit-then-save sequence the
+    create-property endpoint needs — same real TOCTOU gap and same fix
+    as construction_store.py's save_design_if_under_quota (see that
+    function's own docstring for the full reasoning): the endpoint's
+    own saved_designs_limit check and the actual save were two entirely
+    separate, unsynchronized operations, letting two concurrent saves
+    for the same user each pass the check before either one's insert
+    landed.
+
+    Fixed the identical way: a real Postgres advisory transaction lock
+    (pg_advisory_xact_lock, keyed by a hash of the user's own email),
+    held for this one transaction's lifetime, with the real count
+    re-read INSIDE that lock immediately before the insert. Returns
+    None (and saves nothing) if the limit would be exceeded.
+
+    A new function rather than changing create_property itself, same
+    reasoning as save_design_if_under_quota's own: this locked,
+    limit-aware path is specific to the one real caller that needs
+    race-safety (the create-property endpoint)."""
+    user_email = user_email.strip().lower()
+    property_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (user_email,))
+
+            if limit is not None:
+                cursor.execute("SELECT COUNT(*) AS n FROM properties WHERE user_email = %s", (user_email,))
+                current_count = cursor.fetchone()["n"]
+                if current_count >= limit:
+                    connection.rollback()
+                    return None
+
+            cursor.execute(
+                """
+                INSERT INTO properties (
+                    property_id, user_email, name, plot_spec, selections, labor_selections,
+                    site_elements, supplier_preferences, locked, locked_at, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, NULL, %s, %s)
+                """,
+                (
+                    property_id, user_email, name, json.dumps(plot_spec), json.dumps(selections),
+                    json.dumps(labor_selections), json.dumps(site_elements),
+                    json.dumps(supplier_preferences or {}), now, now,
+                ),
+            )
+            for floor in floors:
+                cursor.execute(
+                    """
+                    INSERT INTO property_floors (
+                        floor_id, property_id, floor_number, floor_label, rooms, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        str(uuid.uuid4()), property_id, floor["floor_number"], floor["floor_label"],
+                        json.dumps(floor["rooms"]), now, now,
+                    ),
+                )
+        connection.commit()
+
+    return get_property(property_id)
+
+
 def list_properties_for_user(user_email: str) -> list[dict[str, Any]]:
     """Summary list for the Studio landing page — doesn't include full
     floor room data, just enough to show a picker (name, plot size,
