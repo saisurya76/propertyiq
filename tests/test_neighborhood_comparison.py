@@ -297,3 +297,79 @@ def test_comparison_endpoint_includes_air_quality_and_overall_ranking(monkeypatc
         assert "air_quality" in result
         assert "overall_ranking" in result
         assert result["air_quality"]["has_data"] is False  # no key configured in this test env
+
+
+def test_world_bank_indicators_parses_a_real_response_shape(monkeypatch):
+    """Confirms parsing matches the World Bank API's actual, documented
+    response shape: a 2-element array, [0]=metadata, [1]=list of
+    entries with value/date."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    def fake_get(url, params=None, timeout=None):
+        class FakeResp:
+            status_code = 200
+            def json(self):
+                if "SL.UEM.TOTL.ZS" in url:
+                    return [{"page": 1}, [{"value": 7.3, "date": "2024"}]]
+                if "NY.GDP.MKTP.KD.ZG" in url:
+                    return [{"page": 1}, [{"value": 6.1, "date": "2024"}]]
+                if "ST.INT.ARVL" in url:
+                    return [{"page": 1}, [{"value": 18000000, "date": "2023"}]]
+                if "SP.DYN.LE00.IN" in url:
+                    return [{"page": 1}, [{"value": 70.2, "date": "2022"}]]
+                return [{"page": 1}, []]
+        return FakeResp()
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+    result = api_module._fetch_world_bank_indicators("India")
+    assert result["has_data"] is True
+    assert result["unemployment_rate"]["value"] == 7.3
+    assert result["gdp_growth"]["value"] == 6.1
+    assert result["tourist_arrivals"]["value"] == 18000000
+    assert result["life_expectancy"]["value"] == 70.2
+
+
+def test_world_bank_indicators_honest_for_unrecognized_country():
+    from backend.api import _fetch_world_bank_indicators
+    result = _fetch_world_bank_indicators("Atlantis")
+    assert result["has_data"] is False
+    assert result["reason"] == "country_not_recognized"
+
+
+def test_world_bank_indicators_handles_a_real_fetch_failure(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+
+    def fake_get(*a, **k):
+        raise api_module.requests.RequestException("network error")
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+    result = api_module._fetch_world_bank_indicators("Thailand")
+    assert result["has_data"] is False
+    assert result["reason"] == "fetch_failed"
+
+
+def test_comparison_endpoint_includes_world_bank_data(monkeypatch):
+    """End-to-end: the real comparison endpoint response includes the
+    world_bank field."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    def fake_get(url, params=None, timeout=None):
+        class FakeResp:
+            status_code = 200
+            def json(self):
+                return [{"page": 1}, [{"value": 5.0, "date": "2024"}]]
+        return FakeResp()
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+    areas = [_area(city="Hyderabad"), _area(city="Pune")]
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        r = client.post("/api/neighborhood-insights/compare", json={"areas": areas})
+    assert r.status_code == 200
+    for result in r.json()["results"]:
+        assert "world_bank" in result
+        assert result["world_bank"]["has_data"] is True

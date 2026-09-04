@@ -10,13 +10,9 @@ const MAX_AREAS = 5;
 // tool people use to make a real property decision.
 const NOT_YET_AVAILABLE_METRICS = [
   "Traffic congestion",
-  "Job prospects",
-  "Business environment",
   "Ease of living",
-  "Tourism index",
   "Food safety",
   "Municipality rankings",
-  "Disease / health risk data",
 ];
 const STORAGE_KEY = "propertyiq_ni_comparison_id";
 
@@ -306,6 +302,46 @@ function NeighborhoodComparison() {
                     </td>
                   ))}
                 </tr>
+                <tr>
+                  <td>Job prospects <span className="ni-comparison-metric-label">(country-level unemployment rate)</span></td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.world_bank?.has_data && r.world_bank?.unemployment_rate
+                        ? `${r.world_bank.unemployment_rate.value.toFixed(1)}% (${r.world_bank.unemployment_rate.year})`
+                        : "Not available"}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Business environment <span className="ni-comparison-metric-label">(country-level GDP growth)</span></td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.world_bank?.has_data && r.world_bank?.gdp_growth
+                        ? `${r.world_bank.gdp_growth.value.toFixed(1)}% (${r.world_bank.gdp_growth.year})`
+                        : "Not available"}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Tourism index <span className="ni-comparison-metric-label">(country-level annual arrivals)</span></td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.world_bank?.has_data && r.world_bank?.tourist_arrivals
+                        ? `${Math.round(r.world_bank.tourist_arrivals.value / 1000000)}M/yr (${r.world_bank.tourist_arrivals.year})`
+                        : "Not available"}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Diseases <span className="ni-comparison-metric-label">(country-level life expectancy proxy)</span></td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.world_bank?.has_data && r.world_bank?.life_expectancy
+                        ? `${r.world_bank.life_expectancy.value.toFixed(1)} yrs (${r.world_bank.life_expectancy.year})`
+                        : "Not available"}
+                    </td>
+                  ))}
+                </tr>
                 {NOT_YET_AVAILABLE_METRICS.map((metric) => (
                   <tr key={metric} className="ni-comparison-unavailable-row">
                     <td>{metric}</td>
@@ -318,7 +354,8 @@ function NeighborhoodComparison() {
             </table>
           </div>
           <p className="ni-comparison-honesty-note">
-            "Not available" rows have no genuine free, per-area data source today — shown honestly rather than filled in with invented numbers.
+            "Not available" rows have no genuine free data source today — shown honestly rather than filled in with invented numbers.
+            Rows marked "country-level" are real World Bank data for the whole country, not this specific area — most useful when comparing across countries, less so between two areas of the same city.
           </p>
         </>
       )}

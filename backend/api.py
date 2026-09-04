@@ -2662,6 +2662,93 @@ COMPARISON_COUNTRY_CURRENCY = {
 OPENWEATHER_AQI_LABELS = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}
 
 
+# A reasonably comprehensive (not exhaustive) country-name -> ISO
+# alpha-2 map, covering the countries this comparison feature is most
+# likely to actually see searched, for the World Bank API calls below
+# (which require an ISO2/ISO3 country code, not a free-text name). An
+# unrecognized country name honestly falls through to "not available"
+# for these specific rows rather than guessing.
+COUNTRY_NAME_TO_ISO2 = {
+    "india": "IN", "thailand": "TH", "philippines": "PH", "vietnam": "VN", "indonesia": "ID",
+    "united states": "US", "united states of america": "US", "usa": "US",
+    "united kingdom": "GB", "uk": "GB", "united arab emirates": "AE", "uae": "AE",
+    "singapore": "SG", "malaysia": "MY", "china": "CN", "japan": "JP", "south korea": "KR",
+    "korea": "KR", "australia": "AU", "canada": "CA", "germany": "DE", "france": "FR",
+    "spain": "ES", "italy": "IT", "netherlands": "NL", "sri lanka": "LK", "bangladesh": "BD",
+    "nepal": "NP", "pakistan": "PK", "saudi arabia": "SA", "qatar": "QA", "turkey": "TR",
+    "egypt": "EG", "south africa": "ZA", "nigeria": "NG", "kenya": "KE", "brazil": "BR",
+    "mexico": "MX", "argentina": "AR", "russia": "RU", "new zealand": "NZ", "cambodia": "KH",
+    "laos": "LA", "myanmar": "MM", "hong kong": "HK", "taiwan": "TW",
+}
+
+# World Bank indicator codes used below — all real, standard WDI codes,
+# not invented ones. Each is genuinely country-level, not area-specific
+# (see _fetch_world_bank_indicators' own docstring for why that
+# distinction matters and is shown honestly to the user).
+WORLD_BANK_INDICATORS = {
+    "unemployment_rate": "SL.UEM.TOTL.ZS",       # job prospects proxy
+    "gdp_growth": "NY.GDP.MKTP.KD.ZG",           # business environment proxy
+    "tourist_arrivals": "ST.INT.ARVL",           # tourism index proxy
+    "life_expectancy": "SP.DYN.LE00.IN",         # health/disease-burden proxy
+}
+
+
+def _fetch_world_bank_indicators(country: str) -> dict[str, Any]:
+    """Real, free, no-API-key-required country-level economic/health
+    data from the World Bank's own Open Data API — genuinely real
+    numbers, not fabricated, for 4 of the requested metrics (job
+    prospects, business environment, tourism index, disease/health
+    outcomes) that have no free API at the actual neighborhood/city
+    level anywhere in the world.
+
+    Honestly COUNTRY-level, not area-specific — two areas in the same
+    country will show identical values here, which the frontend labels
+    clearly rather than presenting as if it were neighborhood data.
+    Still real, useful signal for a CROSS-country comparison (e.g.
+    Hyderabad vs Bangkok), just not for comparing two areas of the
+    same city.
+
+    A handful of remaining requested metrics (traffic congestion, ease
+    of living, food safety, municipality rankings) still have no real
+    free API at any granularity — country or area — worldwide, and
+    stay honestly marked "Not available" rather than approximated with
+    something that isn't real."""
+    iso2 = COUNTRY_NAME_TO_ISO2.get((country or "").strip().lower())
+    if not iso2:
+        return {"has_data": False, "reason": "country_not_recognized"}
+
+    cache_key = f"world_bank:{iso2}"
+    cached = _get_cached_json(cache_key, ttl_hours=24 * 30)  # these change yearly at most
+    if cached is not None:
+        return cached
+
+    result = {"has_data": False, "reason": "fetch_failed"}
+    try:
+        values = {}
+        for label, code in WORLD_BANK_INDICATORS.items():
+            resp = requests.get(
+                f"https://api.worldbank.org/v2/country/{iso2}/indicator/{code}",
+                params={"format": "json", "mrv": 1},
+                timeout=6,
+            )
+            if resp.status_code != 200:
+                continue
+            data = resp.json()
+            if len(data) < 2 or not data[1]:
+                continue
+            entry = data[1][0]
+            if entry.get("value") is not None:
+                values[label] = {"value": entry["value"], "year": entry.get("date")}
+        if values:
+            result = {"has_data": True, "country": country, **values}
+    except (requests.RequestException, KeyError, IndexError, ValueError, TypeError) as exc:
+        logger.error(f"_fetch_world_bank_indicators: lookup failed for {country!r}: {exc}")
+        result = {"has_data": False, "reason": "fetch_failed"}
+
+    _set_cached_json(cache_key, result)
+    return result
+
+
 def _fetch_air_quality(lat: float, lon: float) -> dict[str, Any]:
     """Real, free, per-location air quality via OpenWeatherMap's Air
     Pollution API (lat/lon-based, global coverage) — genuinely
@@ -2836,6 +2923,8 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict:
     if area.lat is not None and area.lon is not None:
         air_quality = _fetch_air_quality(area.lat, area.lon)
 
+    world_bank = _fetch_world_bank_indicators(area.country)
+
     overall_ranking = _compute_overall_ranking(resale, air_quality, flood_risk, infrastructure)
 
     return {
@@ -2845,6 +2934,7 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict:
         "resale_signal": resale,
         "infrastructure": infrastructure,
         "air_quality": air_quality,
+        "world_bank": world_bank,
         "overall_ranking": overall_ranking,
         "flood_risk": flood_risk,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
