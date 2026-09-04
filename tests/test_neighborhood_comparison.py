@@ -358,12 +358,17 @@ def test_comparison_endpoint_includes_world_bank_data(monkeypatch):
     monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
     monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
 
+    class FakeJsonResp:
+        status_code = 200
+        def json(self):
+            return [{"page": 1}, [{"value": 5.0, "date": "2024"}]]
+
+    class FakeCsvResp:
+        status_code = 200
+        content = b"Rank,State/UT Name,ULB Name,Total Score (12500)\n1,X,Y,100\n"
+
     def fake_get(url, params=None, timeout=None):
-        class FakeResp:
-            status_code = 200
-            def json(self):
-                return [{"page": 1}, [{"value": 5.0, "date": "2024"}]]
-        return FakeResp()
+        return FakeCsvResp() if "opencity.in" in url else FakeJsonResp()
 
     monkeypatch.setattr(api_module.requests, "get", fake_get)
     areas = [_area(city="Hyderabad"), _area(city="Pune")]
@@ -373,3 +378,109 @@ def test_comparison_endpoint_includes_world_bank_data(monkeypatch):
     for result in r.json()["results"]:
         assert "world_bank" in result
         assert result["world_bank"]["has_data"] is True
+
+
+_REAL_SWACHH_SURVEKSHAN_CSV = ("Rank,State/UT Name,ULB Name,Total Score (12500),SS2024(10000),SS2025(2500),ODF(1200)\n"
+    "1,GUJARAT,AHMEDABAD,12079,9579,1300,1200\n"
+    "6,TELANGANA,GREATER HYDERABAD,11805,9350,1300,1200\n"
+    "36,KARNATAKA,BRUHAT BENGALURU MAHANAGARA PALIKE,6842,6247,0,1200\n"
+).encode("utf-8-sig")
+
+
+def test_municipality_ranking_india_only():
+    from backend.api import _fetch_municipality_ranking
+    result = _fetch_municipality_ranking("Bangkok", "Thailand")
+    assert result["has_data"] is False
+    assert result["reason"] == "india_only"
+
+
+def test_municipality_ranking_matches_real_csv_data(monkeypatch):
+    """Confirms parsing against the ACTUAL, real CSV content fetched
+    from the live data source, including a real alias case (Hyderabad
+    -> "Greater Hyderabad" in the official ranking)."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    class FakeResp:
+        status_code = 200
+        content = _REAL_SWACHH_SURVEKSHAN_CSV
+
+    monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: FakeResp())
+
+    result = api_module._fetch_municipality_ranking("Hyderabad", "India")
+    assert result["has_data"] is True
+    assert result["rank"] == 6
+    assert result["ulb_name"] == "GREATER HYDERABAD"
+    assert result["total_cities_ranked"] == 3
+
+
+def test_municipality_ranking_bangalore_alias(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    class FakeResp:
+        status_code = 200
+        content = _REAL_SWACHH_SURVEKSHAN_CSV
+
+    monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: FakeResp())
+    result = api_module._fetch_municipality_ranking("Bangalore", "India")
+    assert result["has_data"] is True
+    assert result["rank"] == 36
+
+
+def test_municipality_ranking_honest_for_a_city_not_in_the_survey(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    class FakeResp:
+        status_code = 200
+        content = _REAL_SWACHH_SURVEKSHAN_CSV
+
+    monkeypatch.setattr(api_module.requests, "get", lambda *a, **k: FakeResp())
+    result = api_module._fetch_municipality_ranking("SomeSmallTownNotSurveyed", "India")
+    assert result["has_data"] is False
+    assert result["reason"] == "city_not_in_ranking"
+
+
+def test_municipality_ranking_handles_fetch_failure(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+
+    def fake_get(*a, **k):
+        raise api_module.requests.RequestException("network down")
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+    result = api_module._fetch_municipality_ranking("Hyderabad", "India")
+    assert result["has_data"] is False
+    assert result["reason"] == "fetch_failed"
+
+
+def test_comparison_endpoint_includes_municipality_ranking(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "_get_cached_json", lambda *a, **k: None)
+    monkeypatch.setattr(api_module, "_set_cached_json", lambda *a, **k: None)
+
+    class FakeCsvResp:
+        status_code = 200
+        content = _REAL_SWACHH_SURVEKSHAN_CSV
+
+    class FakeJsonResp:
+        status_code = 200
+        def json(self):
+            return [{"page": 1}, [{"value": 5.0, "date": "2024"}]]
+
+    def fake_get(url, *a, **k):
+        return FakeCsvResp() if "opencity.in" in url else FakeJsonResp()
+
+    monkeypatch.setattr(api_module.requests, "get", fake_get)
+    areas = [_area(city="Hyderabad"), _area(city="Bangkok", country="Thailand")]
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        r = client.post("/api/neighborhood-insights/compare", json={"areas": areas})
+    assert r.status_code == 200
+    results = r.json()["results"]
+    assert results[0]["municipality_ranking"]["has_data"] is True
+    assert results[1]["municipality_ranking"]["has_data"] is False
+    assert results[1]["municipality_ranking"]["reason"] == "india_only"

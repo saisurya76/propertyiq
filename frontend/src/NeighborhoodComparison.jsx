@@ -8,13 +8,25 @@ const MAX_AREAS = 5;
 // these worldwide — shown as explicit "Not available" rows rather
 // than fabricated numbers, which would be actively misleading in a
 // tool people use to make a real property decision.
-const NOT_YET_AVAILABLE_METRICS = [
-  "Traffic congestion",
-  "Ease of living",
-  "Food safety",
-  "Municipality rankings",
+// No genuine free structured API exists anywhere for these 3 — rather
+// than fabricate a number, each area gets a real, working search link
+// pre-filled with that specific area's name, so a visitor can look
+// into it themselves with one click instead of hitting a dead end.
+const SEARCHABLE_UNAVAILABLE_METRICS = [
+  { label: "Traffic congestion", query: "traffic congestion" },
+  { label: "Ease of living", query: "ease of living index" },
+  { label: "Food safety", query: "food safety hygiene rating" },
 ];
 const STORAGE_KEY = "propertyiq_ni_comparison_id";
+
+function searchLinkFor(query, area) {
+  // locality is typically already the full, descriptive address
+  // string (e.g. "Gachibowli, Hyderabad, Telangana, India") -- using
+  // it alone avoids an awkward repeated city/country when it's
+  // present, falling back to city+country when it isn't.
+  const place = area.locality || [area.city, area.country].filter(Boolean).join(", ");
+  return `https://www.google.com/search?q=${encodeURIComponent(`${query} ${place}`)}`;
+}
 
 function emptyArea() {
   return { city: "", country: "", locality: "", lat: null, lon: null, addressQuery: "", suggestions: [] };
@@ -342,11 +354,30 @@ function NeighborhoodComparison() {
                     </td>
                   ))}
                 </tr>
-                {NOT_YET_AVAILABLE_METRICS.map((metric) => (
-                  <tr key={metric} className="ni-comparison-unavailable-row">
-                    <td>{metric}</td>
-                    {results.map((_, i) => (
-                      <td key={i}>Not available</td>
+                <tr>
+                  <td>Municipality rankings <span className="ni-comparison-metric-label">(India: Swachh Survekshan)</span></td>
+                  {results.map((r, i) => (
+                    <td key={i}>
+                      {r.municipality_ranking?.has_data
+                        ? <>
+                            Rank {r.municipality_ranking.rank} of {r.municipality_ranking.total_cities_ranked}
+                            <div className="ni-comparison-resolved-note">{r.municipality_ranking.ulb_name} · {r.municipality_ranking.source}</div>
+                          </>
+                        : r.municipality_ranking?.reason === "india_only"
+                          ? "India only"
+                          : "Not available"}
+                    </td>
+                  ))}
+                </tr>
+                {SEARCHABLE_UNAVAILABLE_METRICS.map(({ label, query }) => (
+                  <tr key={label} className="ni-comparison-unavailable-row">
+                    <td>{label}</td>
+                    {results.map((r, i) => (
+                      <td key={i}>
+                        <a href={searchLinkFor(query, r)} target="_blank" rel="noopener noreferrer" className="ni-comparison-search-link">
+                          Search for this ↗
+                        </a>
+                      </td>
                     ))}
                   </tr>
                 ))}
@@ -354,7 +385,7 @@ function NeighborhoodComparison() {
             </table>
           </div>
           <p className="ni-comparison-honesty-note">
-            "Not available" rows have no genuine free data source today — shown honestly rather than filled in with invented numbers.
+            "Not available" rows have no genuine free data source today. Rows with a "Search for this" link have no structured data source we could verify either — rather than guess a number, it opens a real search for that specific area so you can look into it yourself.
             Rows marked "country-level" are real World Bank data for the whole country, not this specific area — most useful when comparing across countries, less so between two areas of the same city.
           </p>
         </>

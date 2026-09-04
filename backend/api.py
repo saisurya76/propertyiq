@@ -2693,6 +2693,91 @@ WORLD_BANK_INDICATORS = {
 }
 
 
+# Real, live, no-API-key CSV of India's official Swachh Survekshan
+# (national municipal cleanliness ranking) "Million Plus Cities"
+# results — genuinely dynamic and scalable, not a hand-typed table:
+# fetched and cached fresh, so a new survey year publishing new numbers
+# is picked up automatically the next time the cache expires, with no
+# code change needed. Republished with clean structure (and its own
+# real sourcing credit to the original government portal, sbmurban.org)
+# by opencity.in, an Indian open-government-data initiative — the
+# direct CSV download requires no API key or signup at all.
+SWACHH_SURVEKSHAN_CSV_URL = (
+    "https://data.opencity.in/dataset/4d4028fe-afed-4b7d-a5de-3b9ff5df8662/"
+    "resource/0e6e43e6-439d-4b07-b304-b718624c2abc/download/"
+    "82e5386e-97ca-47bc-bf3a-52f376c21e63.csv"
+)
+
+# A handful of known real-world name variants between how a city shows
+# up in this ranking (an ULB/municipal-corporation name, sometimes with
+# a "Greater"/"(M. Corp)" qualifier) and how it's commonly searched —
+# without this, an honest, correct match would be missed on a purely
+# literal string comparison.
+MUNICIPALITY_NAME_ALIASES = {
+    "hyderabad": "greater hyderabad",
+    "bangalore": "bruhat bengaluru mahanagara palike",
+    "bengaluru": "bruhat bengaluru mahanagara palike",
+    "mumbai": "greater mumbai",
+    "delhi": "municipal corporation of delhi",
+    "new delhi": "municipal corporation of delhi",
+    "visakhapatnam": "gvmc visakhapatnam",
+}
+
+
+def _fetch_municipality_ranking(city: str, country: str) -> dict[str, Any]:
+    """India-only (this specific national survey has no equivalent
+    PropertyIQ has found for any other country — see this module's
+    other honesty notes for the metrics with no real source at all).
+    Real, live data, cached 24h — matches this area's city against the
+    ranking's own municipal-corporation ("ULB") name, using
+    MUNICIPALITY_NAME_ALIASES for the common real-world naming
+    differences, then a substring fallback for anything else. A
+    locality/mandal-level search (not the city itself) is handled the
+    same way _resolve_comparables_city already does, by matching
+    against whatever real city name it already resolved."""
+    if (country or "").strip().lower() != "india":
+        return {"has_data": False, "reason": "india_only"}
+
+    cache_key = "municipality_ranking:swachh_survekshan"
+    cached = _get_cached_json(cache_key, ttl_hours=24)
+    rows = cached
+    if rows is None:
+        try:
+            resp = requests.get(SWACHH_SURVEKSHAN_CSV_URL, timeout=8)
+            if resp.status_code != 200:
+                return {"has_data": False, "reason": "fetch_failed"}
+            import csv as csv_module
+            import io
+            # decode('utf-8-sig') strips a leading BOM (present in the
+            # real, live CSV this fetches) -- without it, the first
+            # column's key becomes "\ufeffRank" instead of "Rank",
+            # silently breaking every single row's lookup below.
+            reader = csv_module.DictReader(io.StringIO(resp.content.decode("utf-8-sig")))
+            rows = list(reader)
+            _set_cached_json(cache_key, rows)
+        except (requests.RequestException, ValueError) as exc:
+            logger.error(f"_fetch_municipality_ranking: fetch failed: {exc}")
+            return {"has_data": False, "reason": "fetch_failed"}
+
+    city_lower = city.strip().lower()
+    search_name = MUNICIPALITY_NAME_ALIASES.get(city_lower, city_lower)
+    for row in rows:
+        ulb_name = (row.get("ULB Name") or "").strip().lower()
+        if search_name in ulb_name or ulb_name in search_name:
+            try:
+                return {
+                    "has_data": True,
+                    "rank": int(row["Rank"]),
+                    "total_cities_ranked": len(rows),
+                    "ulb_name": row["ULB Name"].strip(),
+                    "score": row.get("Total Score (12500)"),
+                    "source": "Swachh Survekshan (Ministry of Housing & Urban Affairs, via sbmurban.org)",
+                }
+            except (KeyError, ValueError):
+                continue
+    return {"has_data": False, "reason": "city_not_in_ranking"}
+
+
 def _fetch_world_bank_indicators(country: str) -> dict[str, Any]:
     """Real, free, no-API-key-required country-level economic/health
     data from the World Bank's own Open Data API — genuinely real
@@ -2924,6 +3009,7 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict:
         air_quality = _fetch_air_quality(area.lat, area.lon)
 
     world_bank = _fetch_world_bank_indicators(area.country)
+    municipality_ranking = _fetch_municipality_ranking(infra_city, area.country)
 
     overall_ranking = _compute_overall_ranking(resale, air_quality, flood_risk, infrastructure)
 
@@ -2935,6 +3021,7 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict:
         "infrastructure": infrastructure,
         "air_quality": air_quality,
         "world_bank": world_bank,
+        "municipality_ranking": municipality_ranking,
         "overall_ranking": overall_ranking,
         "flood_risk": flood_risk,
         "fetched_at": datetime.now(timezone.utc).isoformat(),

@@ -3001,3 +3001,14 @@ body {
   margin-top: 10px;
   font-style: italic;
 }
+
+.ni-comparison-search-link {
+  color: #059669;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.ni-comparison-search-link:hover {
+  text-decoration: underline;
+}
