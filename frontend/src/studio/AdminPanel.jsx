@@ -29,6 +29,7 @@ const MENU_ITEMS = [
   { screen: "tiers", label: "Tier Configuration", desc: "Prices, quotas, and which features each tier includes." },
   { screen: "gemini", label: "Property URL Import — Gemini API Key", desc: "The LLM fallback key used when free structured-data extraction isn't enough." },
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
+  { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any of the 5 free homepage panels (Instant Property Score, Hidden Deal, Red Flag Hunt, Should I Buy This, Price Drop Alert)." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
   { screen: "grants", label: "Insight Add-on Grants", desc: "Every Insight Add-on purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
@@ -53,6 +54,8 @@ function AdminPanel({ onBack }) {
   const [geminiSaveMessage, setGeminiSaveMessage] = useState("");
   const [niSectionVisibility, setNiSectionVisibility] = useState(null);
   const [niVisibilitySaveMessage, setNiVisibilitySaveMessage] = useState("");
+  const [homepagePanelVisibility, setHomepagePanelVisibility] = useState(null);
+  const [homepageVisibilitySaveMessage, setHomepageVisibilitySaveMessage] = useState("");
 
   // Refunds screen state
   const [refundLookupEmail, setRefundLookupEmail] = useState("");
@@ -87,6 +90,7 @@ function AdminPanel({ onBack }) {
       setAllFeatures(data.all_features || []);
       setGeminiKeyConfigured(!!data.gemini_api_key_configured);
       setNiSectionVisibility(data.ni_section_visibility || null);
+      setHomepagePanelVisibility(data.homepage_panel_visibility || null);
       setAuthed(true);
     } catch (err) {
       setError(err.message || "Incorrect password.");
@@ -189,6 +193,25 @@ function AdminPanel({ onBack }) {
       setNiVisibilitySaveMessage("Section visibility saved.");
     } catch (err) {
       setError(err.message || "Couldn't save section visibility.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleHomepagePanel = (panel) => {
+    setHomepagePanelVisibility((prev) => ({ ...prev, [panel]: !prev[panel] }));
+  };
+
+  const saveHomepagePanelVisibility = async () => {
+    setHomepageVisibilitySaveMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await studioApi.adminUpdateSettings(password, undefined, undefined, homepagePanelVisibility);
+      setHomepagePanelVisibility(res.homepage_panel_visibility || homepagePanelVisibility);
+      setHomepageVisibilitySaveMessage("Panel visibility saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save panel visibility.");
     } finally {
       setLoading(false);
     }
@@ -756,6 +779,50 @@ function AdminPanel({ onBack }) {
                   {loading ? "Saving..." : "Save"}
                 </button>
                 {niVisibilitySaveMessage && <div className="studio-status-banner">{niVisibilitySaveMessage}</div>}
+              </>
+            ) : (
+              <p className="admin-empty-note">Loading...</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "homepage" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section">
+            <h3>Homepage — Free Quick-Check Panels</h3>
+            <p className="admin-section-note">
+              Show or hide any of the 5 free homepage panels without a code change or redeploy — useful for
+              temporarily hiding a panel while sorting out an issue with it, without taking the homepage down.
+            </p>
+            {homepagePanelVisibility ? (
+              <>
+                {[
+                  { key: "instant_property_score", label: "Instant Property Score (Free, No Signup)" },
+                  { key: "hidden_deal", label: "Hidden Deal — What Did PropertyIQ Find? (Free)" },
+                  { key: "red_flag_hunt", label: "Red Flag Hunt — Can You Spot the Red Flags? (Free)" },
+                  { key: "challenge_a_friend", label: "Should I Buy This? — Challenge a Friend (Free)" },
+                  { key: "price_drop_alert", label: "Price Drop Alert — Let PropertyIQ Watch For You (Free)" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="admin-toggle-row">
+                    <label htmlFor={`homepage-toggle-${key}`}>{label}</label>
+                    <span className="admin-switch">
+                      <input
+                        id={`homepage-toggle-${key}`}
+                        type="checkbox"
+                        checked={!!homepagePanelVisibility[key]}
+                        onChange={() => toggleHomepagePanel(key)}
+                      />
+                      <span className="admin-slider"></span>
+                    </span>
+                  </div>
+                ))}
+                <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveHomepagePanelVisibility} disabled={loading}>
+                  {loading ? "Saving..." : "Save"}
+                </button>
+                {homepageVisibilitySaveMessage && <div className="studio-status-banner">{homepageVisibilitySaveMessage}</div>}
               </>
             ) : (
               <p className="admin-empty-note">Loading...</p>

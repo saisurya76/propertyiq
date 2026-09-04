@@ -162,6 +162,21 @@ function App() {
   // underlying URL/pathname never actually changes during a session.
   const urlCountryContext = useMemo(() => detectCountryCodeFromUrl(), []);
 
+  // Defaults to everything visible so the panels render immediately on
+  // first paint rather than waiting on a fetch — matches Neighborhood
+  // Insights' own section-visibility pattern (same reasoning: an admin
+  // controls this operationally, without a redeploy).
+  const [homepagePanelVisibility, setHomepagePanelVisibility] = useState({
+    instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
+    challenge_a_friend: true, price_drop_alert: true,
+  });
+  useEffect(() => {
+    fetch("https://propertyiq-api-q21y.onrender.com/api/homepage-panels/visibility")
+      .then((res) => res.json())
+      .then(setHomepagePanelVisibility)
+      .catch(() => {}); // keep the all-visible default on any failure
+  }, []);
+
   const [formData, setFormData] = useState({
     country: urlCountryContext ? urlCountryContext.name : "India",
     stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
@@ -1149,35 +1164,45 @@ function App() {
         </div>
       </div>
 
+      {homepagePanelVisibility.instant_property_score && (
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="⚡ Instant Property Score (Free, No Signup)" defaultOpen={false} color="blue">
           <InstantScorePanel country={formData.country} />
         </CollapsiblePanel>
       </div>
+      )}
 
+      {homepagePanelVisibility.hidden_deal && (
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="🔍 Hidden Deal — What Did PropertyIQ Find? (Free)" defaultOpen={false} color="blue">
           <HiddenDealPanel country={formData.country} />
         </CollapsiblePanel>
       </div>
+      )}
 
+      {homepagePanelVisibility.red_flag_hunt && (
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="🚩 Red Flag Hunt — Can You Spot the Red Flags? (Free)" defaultOpen={false} color="blue">
           <RedFlagHuntPanel country={formData.country} />
         </CollapsiblePanel>
       </div>
+      )}
 
+      {homepagePanelVisibility.challenge_a_friend && (
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="🎯 Should I Buy This? — Challenge a Friend (Free)" defaultOpen={false} color="blue">
           <ChallengeCreatePanel country={formData.country} />
         </CollapsiblePanel>
       </div>
+      )}
 
+      {homepagePanelVisibility.price_drop_alert && (
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="💰 Price Drop Alert — Let PropertyIQ Watch For You (Free)" defaultOpen={false} color="blue">
           <PriceWatchPanel country={formData.country} onLaunchStudio={launchStudio} />
         </CollapsiblePanel>
       </div>
+      )}
 
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="Property Assessment" defaultOpen={true} color="violet">

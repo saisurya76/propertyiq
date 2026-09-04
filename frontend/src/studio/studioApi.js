@@ -102,8 +102,8 @@ export const studioApi = {
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
 
-  adminUpdateSettings: (password, geminiApiKey, niSectionVisibility) =>
-    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility }) }),
+  adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility) =>
+    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility }) }),
 
   adminLookupPayments: (password, email) =>
     apiFetch("/api/admin/payments", { method: "POST", body: JSON.stringify({ password, email }) }),

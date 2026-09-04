@@ -1257,6 +1257,8 @@ def admin_overview(request: AdminAuthRequest):
         # section, so the admin panel can render the real, current
         # toggles rather than assuming everything defaults to visible.
         "ni_section_visibility": get_ni_section_visibility(),
+        # Same real reasoning, for the 5 free homepage quick-check panels.
+        "homepage_panel_visibility": get_homepage_panel_visibility(),
     }
 
 
@@ -1757,6 +1759,7 @@ class AdminSettingsRequest(BaseModel):
     password: str
     gemini_api_key: Optional[str] = None
     ni_section_visibility: Optional[dict[str, bool]] = None
+    homepage_panel_visibility: Optional[dict[str, bool]] = None
 
 
 @app.post("/api/admin/settings")
@@ -1788,9 +1791,17 @@ def admin_settings(request: AdminSettingsRequest):
         current.update(request.ni_section_visibility)
         set_app_setting(NI_VISIBILITY_SETTING_KEY, json.dumps(current))
 
+    if request.homepage_panel_visibility is not None:
+        # Same real, deliberate merge-not-overwrite reasoning as
+        # ni_section_visibility just above.
+        current_panels = get_homepage_panel_visibility()
+        current_panels.update(request.homepage_panel_visibility)
+        set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(current_panels))
+
     return {
         "gemini_api_key_configured": bool(get_gemini_api_key()),
         "ni_section_visibility": get_ni_section_visibility(),
+        "homepage_panel_visibility": get_homepage_panel_visibility(),
     }
 
 
@@ -3232,6 +3243,37 @@ def neighborhood_section_visibility():
     needing a code change for something that's really an operational,
     not a code, decision."""
     return get_ni_section_visibility()
+
+
+HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert"]
+HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
+
+
+def get_homepage_panel_visibility() -> dict[str, bool]:
+    """Same real, deliberate reasoning as get_ni_section_visibility
+    just above: every one of the 5 free homepage quick-check panels
+    defaults to visible until an admin explicitly hides one, so a
+    fresh install or a panel added after this feature shipped never
+    silently disappears just because it isn't in the saved config
+    yet."""
+    raw = get_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY)
+    saved = {}
+    if raw:
+        try:
+            saved = json.loads(raw)
+        except json.JSONDecodeError:
+            saved = {}
+    return {panel: saved.get(panel, True) for panel in HOMEPAGE_PANELS}
+
+
+@app.get("/api/homepage-panels/visibility")
+def homepage_panel_visibility():
+    """Public: which of the 5 free homepage quick-check panels
+    (Instant Property Score, Hidden Deal, Red Flag Hunt, Should I Buy
+    This, Price Drop Alert) should currently render — same real,
+    no-redeploy-needed operational control as Neighborhood Insights'
+    own section visibility."""
+    return get_homepage_panel_visibility()
 
 
 @app.get("/api/neighborhood-insights/resale-signal")

@@ -421,3 +421,62 @@ def test_extended_metrics_works_without_coordinates():
     r = client.get("/api/neighborhood-insights/extended-metrics?city=Hyderabad&country=India")
     assert r.status_code == 200
     assert r.json()["air_quality"]["has_data"] is False
+
+
+def test_homepage_panel_visibility_defaults_all_panels_to_visible():
+    """Same real reasoning as the NI section-visibility default: a
+    fresh install must never silently hide a free homepage panel just
+    because it isn't yet in the saved config."""
+    with patch("backend.api.get_app_setting", return_value=None):
+        r = client.get("/api/homepage-panels/visibility")
+    assert r.status_code == 200
+    data = r.json()
+    for panel in ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert"]:
+        assert data[panel] is True
+
+
+def test_admin_can_hide_a_specific_homepage_panel_without_auth_required_on_read():
+    import json as json_module
+    saved_state = {}
+
+    def fake_get_app_setting(key):
+        return json_module.dumps(saved_state.get(key)) if key in saved_state else None
+
+    def fake_set_app_setting(key, value):
+        saved_state[key] = json_module.loads(value)
+
+    with patch("backend.api.get_app_setting", side_effect=fake_get_app_setting), \
+         patch("backend.api.set_app_setting", side_effect=fake_set_app_setting), \
+         patch("backend.api._require_admin_password"):
+        r = client.post("/api/admin/settings", json={"password": "test", "homepage_panel_visibility": {"hidden_deal": False}})
+        assert r.status_code == 200
+        assert r.json()["homepage_panel_visibility"]["hidden_deal"] is False
+        assert r.json()["homepage_panel_visibility"]["instant_property_score"] is True  # untouched, stays default
+
+        r2 = client.get("/api/homepage-panels/visibility")
+        assert r2.json()["hidden_deal"] is False
+        assert r2.json()["instant_property_score"] is True
+
+
+def test_admin_settings_requires_the_real_admin_password_for_homepage_panels():
+    r = client.post("/api/admin/settings", json={"password": "definitely_wrong_password", "homepage_panel_visibility": {"red_flag_hunt": False}})
+    assert r.status_code == 403
+
+
+def test_toggling_one_homepage_panel_does_not_reset_a_previously_hidden_one():
+    import json as json_module
+    saved_state = {}
+
+    def fake_get_app_setting(key):
+        return json_module.dumps(saved_state.get(key)) if key in saved_state else None
+
+    def fake_set_app_setting(key, value):
+        saved_state[key] = json_module.loads(value)
+
+    with patch("backend.api.get_app_setting", side_effect=fake_get_app_setting), \
+         patch("backend.api.set_app_setting", side_effect=fake_set_app_setting), \
+         patch("backend.api._require_admin_password"):
+        client.post("/api/admin/settings", json={"password": "test", "homepage_panel_visibility": {"price_drop_alert": False}})
+        r = client.post("/api/admin/settings", json={"password": "test", "homepage_panel_visibility": {"challenge_a_friend": False}})
+        assert r.json()["homepage_panel_visibility"]["price_drop_alert"] is False  # still hidden from the first request
+        assert r.json()["homepage_panel_visibility"]["challenge_a_friend"] is False
