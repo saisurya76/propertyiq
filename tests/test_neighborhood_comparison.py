@@ -139,3 +139,63 @@ def test_a_single_area_failing_does_not_break_the_whole_comparison():
 
 def test_store_max_areas_constant_matches_the_real_requirement():
     assert MAX_AREAS_PER_COMPARISON == 5
+
+
+def test_currency_matches_the_areas_real_country_not_hardcoded_india():
+    """The exact real bug reported: Bangkok, Thailand showed its price
+    in INR because currency was hardcoded regardless of country."""
+    areas = [_area(city="Hyderabad"), _area(city="Bangkok", country="Thailand", locality="Bangkok, Thailand", lat=13.7, lon=100.5)]
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        r = client.post("/api/neighborhood-insights/compare", json={"areas": areas})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["results"][0]["resale_signal"]["currency"] == "INR"
+    assert data["results"][1]["resale_signal"]["currency"] == "THB"
+
+
+def test_locality_level_search_falls_back_to_the_parent_city_for_resale_data():
+    """The other exact real bug reported: searching a specific
+    locality/mandal (not the city itself) returned "No data" even
+    though real data exists for the parent city it belongs to."""
+    from backend.api import _resolve_comparables_city
+
+    comps, resolved_city = _resolve_comparables_city(
+        "Gandipet mandal", "Gandipet mandal, Hyderabad, Telangana, India", "Apartment"
+    )
+    assert len(comps) > 0
+    assert resolved_city == "Hyderabad"
+
+    comps2, resolved_city2 = _resolve_comparables_city(
+        "Marredpally", "Marredpally, Hyderabad, Telangana, India", "Apartment"
+    )
+    assert len(comps2) > 0
+    assert resolved_city2 == "Hyderabad"
+
+
+def test_a_genuinely_unknown_locality_still_honestly_reports_no_data():
+    """The fallback must not invent a match where none genuinely
+    exists -- an area with no real parent-city match anywhere in its
+    address stays has_data=False, not silently mapped to a wrong city."""
+    from backend.api import _resolve_comparables_city
+
+    comps, resolved_city = _resolve_comparables_city(
+        "Nowhereville", "Nowhereville, Nowhereland", "Apartment"
+    )
+    assert comps == []
+
+
+def test_comparison_endpoint_reflects_the_resolved_city_fallback():
+    """End-to-end: a locality-level search through the real API
+    endpoint gets real resale data via the parent-city fallback, not
+    just at the unit-tested helper level."""
+    areas = [
+        {"city": "Gandipet mandal", "country": "India", "locality": "Gandipet mandal, Hyderabad, Telangana, India", "lat": 17.4, "lon": 78.3, "property_type": "Apartment"},
+        {"city": "Marredpally", "country": "India", "locality": "Marredpally, Hyderabad, Telangana, India", "lat": 17.45, "lon": 78.5, "property_type": "Apartment"},
+    ]
+    with patch("backend.api.neighborhood_nearby", return_value=[]):
+        r = client.post("/api/neighborhood-insights/compare", json={"areas": areas})
+    assert r.status_code == 200
+    data = r.json()
+    for result in data["results"]:
+        assert result["resale_signal"]["has_data"] is True
+        assert result["resale_signal"]["resolved_city"] == "Hyderabad"

@@ -5,6 +5,7 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 import os
+import re
 import json
 import uuid
 import asyncio
@@ -76,7 +77,7 @@ from backend.thai_traditional_engine import (
 from backend.compliance_rules import get_vastu_rules, get_thai_rules
 from backend.design_disciplines import group_by_discipline
 from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
-from backend.comparables import get_comparables, average_price_per_sqft
+from backend.comparables import get_comparables, average_price_per_sqft, ALL_COMPARABLES
 from backend.neighborhood_infrastructure import get_infrastructure_summary
 
 from backend.neighborhood_comparison_store import (
@@ -2641,6 +2642,55 @@ class NeighborhoodComparisonCreateRequest(BaseModel):
     areas: list[NeighborhoodComparisonArea]
 
 
+# Real, previously-missing fix: resale currency was hardcoded to INR
+# for every area regardless of its actual country, so a Bangkok/Manila/
+# etc. area showed its price in INR — genuinely wrong, not just a
+# display nicety. Covers every country get_comparables' own static
+# dataset has real listings for; PROPERTYIQ_DEFAULT_CURRENCY (INR) is
+# the fallback for anywhere else, matching the rest of the app's own
+# India-first default.
+COMPARISON_COUNTRY_CURRENCY = {
+    "india": "INR", "thailand": "THB", "philippines": "PHP",
+    "vietnam": "VND", "indonesia": "IDR",
+}
+
+
+def _resolve_comparables_city(city: str, locality: Optional[str], property_type: str) -> tuple[list, str]:
+    """A real, previously-missing fallback: get_comparables only
+    matches an EXACT known city name — for an area selected at
+    locality/mandal/suburb level (e.g. "Gandipet Mandal" or
+    "Marredpally", both real Hyderabad-area searches that surfaced
+    this bug), the address the frontend extracted as `city` is often
+    that locality name itself, not the parent city the comparables
+    dataset actually has data for, so the direct lookup came back
+    genuinely empty even though real data for the parent city exists.
+
+    Tries the exact city first; if that's empty, checks whether any
+    city get_comparables actually has data for appears as its own word
+    within the full, original locality/address string (which — unlike
+    the possibly-mis-extracted `city` field — usually still contains
+    the real city name somewhere, e.g. "Gandipet Mandal, Hyderabad,
+    Telangana, India"). Returns the comparables found AND the city name
+    that actually produced them, so the caller can be honest about
+    which city the resale figure is really for."""
+    comps = get_comparables(city, property_type)
+    if comps:
+        return comps, city
+    if not locality:
+        return [], city
+
+    locality_lower = locality.lower()
+    known_cities = sorted({c.city for c in ALL_COMPARABLES}, key=len, reverse=True)
+    for known_city in known_cities:
+        if known_city.lower() == city.lower():
+            continue  # already tried above
+        if re.search(rf"\b{re.escape(known_city.lower())}\b", locality_lower):
+            fallback_comps = get_comparables(known_city, property_type)
+            if fallback_comps:
+                return fallback_comps, known_city
+    return [], city
+
+
 def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict[str, Any]:
     """The real per-area data pull, reusing exactly the same functions
     (and their own caching/honesty behavior) the single-area page
@@ -2648,20 +2698,25 @@ def _fetch_area_comparison_data(area: NeighborhoodComparisonArea) -> dict[str, A
     just fetched for several areas and laid out side by side, not a
     separate, parallel data pipeline that could quietly drift from
     what the rest of the page shows."""
-    comps = get_comparables(area.city, area.property_type)
+    currency = COMPARISON_COUNTRY_CURRENCY.get((area.country or "").strip().lower(), "INR")
+    comps, resolved_city = _resolve_comparables_city(area.city, area.locality, area.property_type)
     if comps:
         is_live = len(comps) == 1 and comps[0].developer == "Live market data"
         resale = {
             "has_data": True,
             "comparable_count": len(comps),
             "average_price_per_sqft": average_price_per_sqft(comps),
-            "currency": "INR",
+            "currency": currency,
             "data_source": "live" if is_live else "static_snapshot",
+            "resolved_city": resolved_city if resolved_city.lower() != area.city.lower() else None,
         }
     else:
-        resale = {"has_data": False, "comparable_count": 0, "average_price_per_sqft": 0, "currency": "INR", "data_source": "none"}
+        resale = {"has_data": False, "comparable_count": 0, "average_price_per_sqft": 0, "currency": currency, "data_source": "none", "resolved_city": None}
 
-    infrastructure = get_infrastructure_summary(area.city, area.country)
+    # Same real fallback for the infrastructure-news lookup: it also
+    # only searches well for a real city name, not a locality/mandal.
+    infra_city = resolved_city if comps else area.city
+    infrastructure = get_infrastructure_summary(infra_city, area.country)
 
     flood_risk = {"has_data": False, "nearby_water_count": 0}
     if area.lat is not None and area.lon is not None:

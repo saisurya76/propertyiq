@@ -2972,3 +2972,10 @@ body {
     align-items: stretch;
   }
 }
+
+.ni-comparison-resolved-note {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+  margin-top: 2px;
+}

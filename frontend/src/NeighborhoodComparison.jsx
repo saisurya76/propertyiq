@@ -234,7 +234,12 @@ function NeighborhoodComparison() {
                   {results.map((r, i) => (
                     <td key={i}>
                       {r.resale_signal.has_data
-                        ? `${r.resale_signal.currency} ${r.resale_signal.average_price_per_sqft.toLocaleString()}`
+                        ? <>
+                            {r.resale_signal.currency} {r.resale_signal.average_price_per_sqft.toLocaleString()}
+                            {r.resale_signal.resolved_city && (
+                              <div className="ni-comparison-resolved-note">via {r.resale_signal.resolved_city} city data</div>
+                            )}
+                          </>
                         : "No data"}
                     </td>
                   ))}
