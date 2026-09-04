@@ -387,3 +387,37 @@ def test_autocomplete_searches_globally_when_country_is_explicitly_empty(monkeyp
 
     client.get("/api/neighborhood-insights/autocomplete?q=Lisbon+Alfama&country=")
     assert "countrycodes" not in captured["params"]
+
+
+def test_extended_metrics_returns_all_four_real_metric_groups(monkeypatch):
+    """Confirms the new single-area endpoint returns the same real
+    metric groups the comparison feature already computes, reusing
+    _fetch_area_comparison_data directly rather than a second,
+    separate implementation."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    r = client.get("/api/neighborhood-insights/extended-metrics?city=Hyderabad&country=India&lat=17.4&lon=78.4")
+    assert r.status_code == 200
+    data = r.json()
+    assert "air_quality" in data
+    assert "overall_ranking" in data
+    assert "world_bank" in data
+    assert "municipality_ranking" in data
+
+
+def test_extended_metrics_municipality_ranking_is_india_only(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    r = client.get("/api/neighborhood-insights/extended-metrics?city=Bangkok&country=Thailand&lat=13.7&lon=100.5")
+    assert r.status_code == 200
+    assert r.json()["municipality_ranking"]["has_data"] is False
+    assert r.json()["municipality_ranking"]["reason"] == "india_only"
+
+
+def test_extended_metrics_works_without_coordinates():
+    """A real, graceful degradation: no lat/lon (e.g. a locality that
+    hasn't been geocoded yet) must not error, just report the
+    coordinate-dependent pieces as honestly unavailable."""
+    r = client.get("/api/neighborhood-insights/extended-metrics?city=Hyderabad&country=India")
+    assert r.status_code == 200
+    assert r.json()["air_quality"]["has_data"] is False

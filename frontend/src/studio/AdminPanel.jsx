@@ -732,6 +732,8 @@ function AdminPanel({ onBack }) {
                   { key: "flood_risk", label: "Flood & waterlogging risk" },
                   { key: "infrastructure", label: "Upcoming infrastructure" },
                   { key: "resale_signal", label: "Resale demand signal" },
+                  { key: "extended_metrics", label: "More about this area (air quality, rankings, etc.)" },
+                  { key: "comparison", label: "Compare areas (paid feature)" },
                   { key: "checklist", label: "Buyer's due-diligence checklist" },
                   { key: "authority_contacts", label: "Local authority contacts" },
                   { key: "cross_sell", label: "PropertyIQ cross-sell card" },

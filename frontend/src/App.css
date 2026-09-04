@@ -3120,3 +3120,43 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.ni-extended-metrics {
+  display: flex;
+  flex-direction: column;
+}
+
+.ni-extended-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0f4;
+  font-size: 14px;
+}
+
+.ni-extended-metric-row:last-child {
+  border-bottom: none;
+}
+
+.ni-extended-metric-label {
+  font-weight: 600;
+  color: #4b5563;
+  flex-shrink: 0;
+}
+
+.ni-extended-metric-value {
+  color: #0b2545;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .ni-extended-metric-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ni-extended-metric-value {
+    text-align: left;
+  }
+}

@@ -304,6 +304,8 @@ function NeighborhoodInsights({ countryCode }) {
   const [waterBodies, setWaterBodies] = useState([]);
   const [infraState, setInfraState] = useState("idle"); // "idle" | "loading" | "done" | "error"
   const [infraData, setInfraData] = useState(null);
+  const [extendedState, setExtendedState] = useState("idle"); // "idle" | "loading" | "done" | "error"
+  const [extendedMetrics, setExtendedMetrics] = useState(null);
 
   const mapRef = useRef(null);
   const mapContainerRef = useRef(null);
@@ -390,6 +392,25 @@ function NeighborhoodInsights({ countryCode }) {
       setInfraState("done");
     } catch {
       setInfraState("error");
+    }
+
+    // The same real metrics (air quality, overall ranking, World Bank
+    // indicators, municipality rankings) the area-comparison feature
+    // already computes — reused here via the same backend function so
+    // this page and that one can never quietly show different numbers
+    // for the same real-world data.
+    setExtendedState("loading");
+    try {
+      const params = new URLSearchParams({ city, country: country.name, property_type: propertyType });
+      if (selectedPlace.lat != null) params.set("lat", selectedPlace.lat);
+      if (selectedPlace.lon != null) params.set("lon", selectedPlace.lon);
+      if (selectedPlace.label) params.set("locality", selectedPlace.label);
+      const res = await fetch(`${API_BASE}/api/neighborhood-insights/extended-metrics?${params.toString()}`);
+      const data = await res.json();
+      setExtendedMetrics(data);
+      setExtendedState("done");
+    } catch {
+      setExtendedState("error");
     }
   };
 
@@ -791,6 +812,88 @@ function NeighborhoodInsights({ countryCode }) {
             )}
             {resaleState === "done" && resaleSignal && !resaleSignal.has_data && (
               <p className="ni-coming-soon">No comparable listing data for {city} yet — this app currently covers a growing set of cities, not all of them.</p>
+            )}
+          </div>
+          )}
+
+          {sectionVisibility.extended_metrics && (
+          <div className="ni-card">
+            <h3>📊 More about this area</h3>
+            {extendedState === "loading" && <p>Checking additional area data...</p>}
+            {extendedState === "error" && <p className="ni-coming-soon">Couldn't load this right now — please try again.</p>}
+            {extendedState === "done" && extendedMetrics && (
+              <div className="ni-extended-metrics">
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Overall ranking</span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.overall_ranking.has_data
+                      ? <>{extendedMetrics.overall_ranking.score} / 100
+                          <span className="ni-comparison-resolved-note"> — from {extendedMetrics.overall_ranking.contributors.join(", ")}</span>
+                        </>
+                      : "Not enough data yet"}
+                  </span>
+                </div>
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Air pollution index</span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.air_quality.has_data
+                      ? `${extendedMetrics.air_quality.aqi_label} (${extendedMetrics.air_quality.aqi}/5) — PM2.5: ${extendedMetrics.air_quality.pm2_5}`
+                      : "Not available"}
+                  </span>
+                </div>
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Job prospects <span className="ni-comparison-metric-label">(country-level unemployment)</span></span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.world_bank.has_data && extendedMetrics.world_bank.unemployment_rate
+                      ? `${extendedMetrics.world_bank.unemployment_rate.value.toFixed(1)}% (${extendedMetrics.world_bank.unemployment_rate.year})`
+                      : "Not available"}
+                  </span>
+                </div>
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Business environment <span className="ni-comparison-metric-label">(country-level GDP growth)</span></span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.world_bank.has_data && extendedMetrics.world_bank.gdp_growth
+                      ? `${extendedMetrics.world_bank.gdp_growth.value.toFixed(1)}% (${extendedMetrics.world_bank.gdp_growth.year})`
+                      : "Not available"}
+                  </span>
+                </div>
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Tourism index <span className="ni-comparison-metric-label">(country-level annual arrivals)</span></span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.world_bank.has_data && extendedMetrics.world_bank.tourist_arrivals
+                      ? `${Math.round(extendedMetrics.world_bank.tourist_arrivals.value / 1000000)}M/yr (${extendedMetrics.world_bank.tourist_arrivals.year})`
+                      : "Not available"}
+                  </span>
+                </div>
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Diseases <span className="ni-comparison-metric-label">(country-level life expectancy proxy)</span></span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.world_bank.has_data && extendedMetrics.world_bank.life_expectancy
+                      ? `${extendedMetrics.world_bank.life_expectancy.value.toFixed(1)} yrs (${extendedMetrics.world_bank.life_expectancy.year})`
+                      : "Not available"}
+                  </span>
+                </div>
+                <div className="ni-extended-metric-row">
+                  <span className="ni-extended-metric-label">Municipality rankings <span className="ni-comparison-metric-label">(India: Swachh Survekshan)</span></span>
+                  <span className="ni-extended-metric-value">
+                    {extendedMetrics.municipality_ranking.has_data
+                      ? `Rank ${extendedMetrics.municipality_ranking.rank} of ${extendedMetrics.municipality_ranking.total_cities_ranked}`
+                      : extendedMetrics.municipality_ranking.reason === "india_only" ? "India only" : "Not available"}
+                  </span>
+                </div>
+                {["Traffic congestion", "Ease of living", "Food safety"].map((label) => (
+                  <div className="ni-extended-metric-row" key={label}>
+                    <span className="ni-extended-metric-label">{label}</span>
+                    <a
+                      className="ni-comparison-search-link"
+                      href={`https://www.google.com/search?q=${encodeURIComponent(`${label.toLowerCase()} ${selectedPlace?.label || city}`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                    >
+                      Search for this ↗
+                    </a>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           )}

@@ -2648,6 +2648,31 @@ def neighborhood_infrastructure(city: str, country: str = "India"):
     return get_infrastructure_summary(city, country)
 
 
+@app.get("/api/neighborhood-insights/extended-metrics")
+def neighborhood_extended_metrics(city: str, country: str = "India", lat: Optional[float] = None, lon: Optional[float] = None, locality: Optional[str] = None, property_type: str = "Apartment"):
+    """Public (no auth, same reasoning as every other neighborhood-
+    insights endpoint): the single-area equivalent of what the area
+    comparison feature already computes per area — air quality, the
+    transparent overall ranking, World Bank country-level indicators,
+    and municipality rankings (India only) — deliberately reusing
+    _fetch_area_comparison_data itself rather than a second, separate
+    implementation of the same real data pulls, so the single-area
+    page and the comparison page can never quietly drift apart on what
+    "air quality" or "overall ranking" actually mean.
+
+    Kept as its own endpoint rather than folded into resale-signal or
+    infrastructure above, since those two already have their own
+    established callers/response shapes this doesn't need to disturb."""
+    area = NeighborhoodComparisonArea(city=city, country=country, locality=locality, lat=lat, lon=lon, property_type=property_type)
+    result = _fetch_area_comparison_data(area)
+    return {
+        "air_quality": result["air_quality"],
+        "overall_ranking": result["overall_ranking"],
+        "world_bank": result["world_bank"],
+        "municipality_ranking": result["municipality_ranking"],
+    }
+
+
 class NeighborhoodComparisonArea(BaseModel):
     city: str
     country: str = "India"
@@ -3179,7 +3204,7 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     return record
 
 
-NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "comparison", "checklist", "authority_contacts", "cross_sell", "share"]
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "checklist", "authority_contacts", "cross_sell", "share"]
 NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
 
 
