@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { studioApi, getSession } from "./studioApi";
 import useTermsGate from "../hooks/useTermsGate";
 import RefundRequestForm from "./RefundRequestForm";
+import { TIER_TAGLINES } from "./tierTaglines";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
 
@@ -192,7 +193,7 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
 
           return (
             <div key={tierId} className={`studio-tier-card ${isFeatured ? "studio-tier-featured" : ""}`}>
-              <div className="studio-tier-name">{tier.label}</div>
+              <div className="studio-tier-name tier-name-tooltip" data-tooltip={TIER_TAGLINES[tierId] || ""} tabIndex={0}>{tier.label}</div>
               <div className="studio-tier-price">
                 {formatPrice(tier.price_usd, currency, fxRates)}
                 <span>{isInsight ? " one-time" : "/mo"}</span>

@@ -2791,3 +2791,70 @@
 .studio-design-card-delete-btn:hover {
   background: #fee2e2;
 }
+
+/* Modern, lightweight hover tooltip for tier names — pure CSS, no new
+   library. Applied to any tier-name element via className
+   "tier-name-tooltip" + a data-tooltip attribute holding the real
+   tagline text from tierTaglines.js. */
+.tier-name-tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  border-bottom: 1px dashed #94a3b8;
+}
+
+.tier-name-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 8px;
+  width: max-content;
+  max-width: 220px;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+
+.tier-name-tooltip::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #0f172a;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.tier-name-tooltip:hover::after,
+.tier-name-tooltip:focus::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tier-name-tooltip:hover::before,
+.tier-name-tooltip:focus::before {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .tier-name-tooltip::after {
+    max-width: 160px;
+    font-size: 11px;
+  }
+}

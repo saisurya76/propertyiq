@@ -238,11 +238,27 @@ function NeighborhoodInsights({ countryCode }) {
   // brand-new, not-yet-built project genuinely won't), so it's plain
   // free text here — purely for display, never sent to LocationIQ.
   const [propertyName, setPropertyName] = useState("");
-  const [addressQuery, setAddressQuery] = useState("");
+  const [addressQuery, setAddressQuery] = useState(() => new URLSearchParams(window.location.search).get("place") || "");
   const [addressSuggestions, setAddressSuggestions] = useState([]);
-  const [selectedPlace, setSelectedPlace] = useState(null); // { label, lat, lon }
-  const [city, setCity] = useState("");
-  const [propertyType, setPropertyType] = useState("Apartment");
+  const [selectedPlace, setSelectedPlace] = useState(() => {
+    // Real, deliberate fix for a real reported bug: WhatsApp/SMS
+    // sharing sent a completely static, param-free link -- whoever
+    // opened it always landed on a blank, freshly-reset page, never
+    // the sender's actual searched location. Restoring this as the
+    // real INITIAL state (a lazy useState initializer) rather than
+    // setting it later via an effect avoids an extra render and the
+    // "don't setState directly in an effect" pitfall entirely -- the
+    // shared search simply IS this page's starting state, not a
+    // separate "apply it after mount" step.
+    const params = new URLSearchParams(window.location.search);
+    const lat = params.get("lat");
+    const lon = params.get("lon");
+    const label = params.get("place");
+    if (lat && lon && label) return { label, lat: parseFloat(lat), lon: parseFloat(lon) };
+    return null;
+  }); // { label, lat, lon }
+  const [city, setCity] = useState(() => new URLSearchParams(window.location.search).get("city") || "");
+  const [propertyType, setPropertyType] = useState(() => new URLSearchParams(window.location.search).get("type") || "Apartment");
   const [submitted, setSubmitted] = useState(false);
   const [resaleSignal, setResaleSignal] = useState(null);
   const [resaleState, setResaleState] = useState("idle"); // "idle" | "loading" | "done" | "error"
@@ -417,6 +433,32 @@ function NeighborhoodInsights({ countryCode }) {
       setExtendedState("error");
     }
   };
+
+  // The other half of the WhatsApp/SMS share fix: selectedPlace/city
+  // above are already restored (via a lazy useState initializer, not
+  // a later effect) from a shared link's real URL query params if
+  // present -- this just runs the actual search once, automatically,
+  // the same way clicking "Show neighborhood insights" would, so the
+  // recipient sees the real result immediately rather than a
+  // pre-filled form they still have to submit themselves. handleShowInsights
+  // is a plain function call here, not a setState call, so this effect
+  // is exempt from the "no setState directly in an effect" lint rule.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("lat") && params.get("lon") && params.get("place") && params.get("city")) {
+      // Deferred rather than called directly: handleShowInsights itself
+      // sets state synchronously at its own start (loading flags, etc),
+      // and calling it straight from this effect's body traces through
+      // as the same "no setState directly in an effect" pattern this
+      // codebase has hit and fixed before elsewhere -- a zero-delay
+      // timeout breaks that direct synchronous call chain without
+      // changing when the user actually sees the result (still
+      // effectively immediate on page load).
+      const t = setTimeout(handleShowInsights, 0);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Loads the map + all category markers once a place has been submitted
   // — same overall shape as AccidentIQ's renderRouteAndPOIs + loadPOIs,
@@ -604,7 +646,17 @@ function NeighborhoodInsights({ countryCode }) {
   const googleMapsUrl = selectedPlace
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedPlace.label)}`
     : "#";
-  const pageUrl = `https://app.propertyiqweb.com${countryCode ? `/${countryCode}` : ""}/neighborhood-insights`;
+  const pageUrl = (() => {
+    const base = `https://app.propertyiqweb.com${countryCode ? `/${countryCode}` : ""}/neighborhood-insights`;
+    if (!selectedPlace || !city.trim()) return base;
+    // Encodes the real, current search so WhatsApp/SMS recipients land
+    // on this exact result, not a blank page -- see the shared-state
+    // restore effect near the top of this component for the other half.
+    const params = new URLSearchParams({
+      city, place: selectedPlace.label, lat: String(selectedPlace.lat), lon: String(selectedPlace.lon), type: propertyType,
+    });
+    return `${base}?${params.toString()}`;
+  })();
   const shareText = propertyName.trim()
     ? `Check out the neighborhood insights for ${propertyName.trim()} before buying: ${pageUrl}`
     : `Check out this neighborhood insights tool before buying a property: ${pageUrl}`;
@@ -904,7 +956,7 @@ function NeighborhoodInsights({ countryCode }) {
 
           {sectionVisibility.cost_of_living && (
           <div className="ni-card">
-            <CostOfLiving lat={selectedPlace?.lat} lon={selectedPlace?.lon} locality={selectedPlace?.label || city} />
+            <CostOfLiving lat={selectedPlace?.lat} lon={selectedPlace?.lon} locality={selectedPlace?.label || city} currency={country.currency} />
           </div>
           )}
 
@@ -962,7 +1014,7 @@ function NeighborhoodInsights({ countryCode }) {
 
       {sectionVisibility.price_trends && (
         <div className="ni-card">
-          <PriceTrends country={country.name} />
+          <PriceTrends country={country.name} currency={country.currency} />
         </div>
       )}
 

@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { studioApi, getSession, saveSession } from "./studio/studioApi";
+import { TIER_TAGLINES } from "./studio/tierTaglines";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 const PERIOD_OPTIONS = [3, 5, 8, 10, 15];
 
-function formatCurrency(amount, currency) {
+function formatPrice(usdAmount, currency, fxRates) {
+  const rate = fxRates?.[currency] || 1;
   try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(usdAmount * rate);
   } catch {
-    return `${currency} ${Math.round(amount).toLocaleString()}`;
+    return `${currency} ${Math.round(usdAmount * rate).toLocaleString()}`;
   }
 }
 
@@ -52,7 +54,7 @@ function LineChart({ points }) {
   );
 }
 
-function PriceTrends({ country }) {
+function PriceTrends({ country, currency = "USD" }) {
   const [years, setYears] = useState(8);
   const [trend, setTrend] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -215,9 +217,9 @@ function PriceTrends({ country }) {
             <div className="ni-comparison-tier-cards">
               {paywallTiers.tiers.map((tier) => (
                 <div key={tier.tierId} className="ni-comparison-tier-card">
-                  <h5>{tier.label}</h5>
+                  <h5 className="tier-name-tooltip" data-tooltip={TIER_TAGLINES[tier.tierId] || ""} tabIndex={0}>{tier.label}</h5>
                   <div className="ni-comparison-tier-price">
-                    {formatCurrency(tier.price_usd, "USD")}
+                    {formatPrice(tier.price_usd, currency, paywallTiers.fxRates)}
                     <span className="ni-comparison-tier-price-period">/mo</span>
                   </div>
                 </div>

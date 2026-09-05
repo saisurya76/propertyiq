@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { studioApi, getSession } from "../studio/studioApi";
+import { TIER_TAGLINES } from "../studio/tierTaglines";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 
@@ -366,7 +367,7 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
               <div className="agent-tier-cards">
                 {paywallTiers.tiers.map((tier) => (
                   <div key={tier.tierId} className="agent-tier-card">
-                    <h4>{tier.label}</h4>
+                    <h4 className="tier-name-tooltip" data-tooltip={TIER_TAGLINES[tier.tierId] || ""} tabIndex={0}>{tier.label}</h4>
                     <div className="agent-tier-price">{formatPrice(tier.price_usd, currency, paywallTiers.fxRates)}<span>/mo</span></div>
                     <div className="agent-tier-quota">
                       {tier.max_agent_clients == null ? "Unlimited" : tier.max_agent_clients} clients ·{" "}

@@ -583,3 +583,51 @@ def test_report_omits_checklist_gracefully_for_an_unmapped_country(monkeypatch):
     r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
     assert r.status_code == 200
     assert r.content[:4] == b"%PDF"
+
+
+def test_report_has_a_client_friendly_heading_not_the_internal_tool_name(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentheadingcheck@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Heading Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "PROPERTY ADVISORY REPORT" in text
+    assert "Monetize" not in text  # internal, agent-side framing shouldn't appear in a client-facing document
+
+
+def test_report_footer_has_real_clickable_link_annotations_on_every_page(monkeypatch):
+    """Direct proof the reportlab two-pass crash is genuinely fixed --
+    inspects the actual PDF's real link annotation objects (not just
+    the visible text) on a genuine multi-page report."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentlinkannotations@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Link Annotation Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    assert len(reader.pages) >= 2  # a real multi-page report -- the crash only ever showed up from page 2 onward
+    for page in reader.pages:
+        annots = page.get("/Annots")
+        assert annots is not None and len(annots) == 3
+        urls = {a.get_object()["/A"]["/URI"] for a in annots}
+        assert urls == {
+            "https://app.propertyiqweb.com/privacy-policy.html",
+            "https://app.propertyiqweb.com/terms-of-service.html",
+            "https://app.propertyiqweb.com/refund-policy.html",
+        }

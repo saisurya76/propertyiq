@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { studioApi, getSession, saveSession } from "./studio/studioApi";
+import { TIER_TAGLINES } from "./studio/tierTaglines";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 const MAX_AREAS = 5;
@@ -438,7 +439,7 @@ function NeighborhoodComparison({ currency = "USD" }) {
             <div className="ni-comparison-tier-cards">
               {paywallTiers.tiers.map((tier) => (
                 <div key={tier.tierId} className="ni-comparison-tier-card">
-                  <h5>{tier.label}</h5>
+                  <h5 className="tier-name-tooltip" data-tooltip={TIER_TAGLINES[tier.tierId] || ""} tabIndex={0}>{tier.label}</h5>
                   <div className="ni-comparison-tier-price">
                     {formatPrice(tier.price_usd, currency, paywallTiers.fxRates)}
                     <span className="ni-comparison-tier-price-period">/mo</span>

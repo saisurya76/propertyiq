@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { studioApi, getSession, saveSession } from "./studio/studioApi";
+import { TIER_TAGLINES } from "./studio/tierTaglines";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 
@@ -25,12 +26,16 @@ function searchLinkFor(label, locality) {
   return `https://www.google.com/search?q=${encodeURIComponent(`${label} cost ${locality}`)}`;
 }
 
-function formatPrice(usdAmount, fxRates) {
-  const rate = fxRates?.USD || 1;
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(usdAmount * rate);
+function formatPrice(usdAmount, currency, fxRates) {
+  const rate = fxRates?.[currency] || 1;
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(usdAmount * rate);
+  } catch {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(usdAmount);
+  }
 }
 
-function CostOfLiving({ lat, lon, locality }) {
+function CostOfLiving({ lat, lon, locality, currency = "USD" }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -178,9 +183,9 @@ function CostOfLiving({ lat, lon, locality }) {
             <div className="ni-comparison-tier-cards">
               {paywallTiers.tiers.map((tier) => (
                 <div key={tier.tierId} className="ni-comparison-tier-card">
-                  <h5>{tier.label}</h5>
+                  <h5 className="tier-name-tooltip" data-tooltip={TIER_TAGLINES[tier.tierId] || ""} tabIndex={0}>{tier.label}</h5>
                   <div className="ni-comparison-tier-price">
-                    {formatPrice(tier.price_usd, paywallTiers.fxRates)}
+                    {formatPrice(tier.price_usd, currency, paywallTiers.fxRates)}
                     <span className="ni-comparison-tier-price-period">/mo</span>
                   </div>
                 </div>

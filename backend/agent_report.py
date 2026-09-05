@@ -60,6 +60,11 @@ _BULLET_STYLE = ParagraphStyle("AgentBullet", parent=_STYLES["Normal"], fontSize
 # ---------------------------------------------------------------------------
 
 
+_PRIVACY_URL = "https://app.propertyiqweb.com/privacy-policy.html"
+_TERMS_URL = "https://app.propertyiqweb.com/terms-of-service.html"
+_REFUND_URL = "https://app.propertyiqweb.com/refund-policy.html"
+
+
 class _AgentReportCanvas(Canvas):
     """Standard reportlab two-pass pattern for a genuine 'Page X of Y' —
     the total page count isn't known until the whole document has been
@@ -76,8 +81,18 @@ class _AgentReportCanvas(Canvas):
 
     def save(self):
         total_pages = len(self._saved_page_states)
-        for state in self._saved_page_states:
+        for page_index, state in enumerate(self._saved_page_states):
             self.__dict__.update(state)
+            # _annotationCount is part of the restored __dict__ state
+            # above, and every page's saved state shares the same
+            # starting value (no footer/links were drawn during the
+            # original forward pass) -- replaying page after page would
+            # otherwise regenerate the exact same auto-generated
+            # annotation name ("NUMBER1", etc.) on every single page,
+            # crashing reportlab with "redefining named object" from
+            # the second page onward. A real, unique offset per page
+            # gives each page's link annotations their own namespace.
+            self._annotationCount = page_index * 1000
             self._draw_footer(total_pages)
             Canvas.showPage(self)
         Canvas.save(self)
@@ -92,18 +107,25 @@ class _AgentReportCanvas(Canvas):
         self.setFont("Helvetica", 7.5)
         self.drawRightString(width - 0.6 * inch, 0.6 * inch, f"Page {self._pageNumber} of {total_pages}")
 
-        # Plain, styled text rather than a real linkURL annotation --
-        # reportlab's two-pass numbered-canvas replay (this exact
-        # pattern, already proven in construction_report.py) re-plays
-        # each page's saved __dict__ state, which carries a stale
-        # annotation-name counter forward and crashes linkURL with
-        # "redefining named object" on the second page onward. Shown
-        # as the real, full URL instead so it's still genuinely usable
-        # by anyone reading a printed or non-interactive copy, which a
-        # clickable-only link would not be.
-        self.setFillColor(HexColor(_INDIGO))
-        self.setFont("Helvetica", 7)
-        self.drawString(0.6 * inch, 0.6 * inch, "Privacy Policy · Terms of Service · Refund Policy — app.propertyiqweb.com")
+        # Real, genuinely clickable links -- this PDF is meant to be
+        # handed to (or emailed to) the agent's own client, who should
+        # be able to actually reach these pages, not just read a URL.
+        # Each page now gets its own unique annotation-name namespace
+        # (see save() above), so linkURL no longer collides across
+        # pages during the two-pass replay.
+        link_y = 0.6 * inch
+        x = 0.6 * inch
+        for label, url in [("Privacy Policy", _PRIVACY_URL), ("Terms of Service", _TERMS_URL), ("Refund Policy", _REFUND_URL)]:
+            self.setFillColor(HexColor(_INDIGO))
+            self.setFont("Helvetica", 7.5)
+            text_width = self.stringWidth(label, "Helvetica", 7.5)
+            self.drawString(x, link_y, label)
+            self.linkURL(url, (x, link_y - 1, x + text_width, link_y + 8), relative=0)
+            x += text_width
+            if url != _REFUND_URL:
+                self.setFillColor(HexColor(_TEXT_MUTED))
+                self.drawString(x, link_y, "  ·  ")
+                x += self.stringWidth("  ·  ", "Helvetica", 7.5)
 
         self.setFillColor(HexColor(_TEXT_MUTED))
         self.setFont("Helvetica-Oblique", 7)
@@ -153,8 +175,8 @@ def build_agent_advisory_pdf(
     story = []
 
     header_table = Table(
-        [[Paragraph("PROPERTYIQ AGENT INTELLIGENCE", _TITLE_STYLE)],
-         [Paragraph("Consolidated Advisory Report — Analyze · Advise · Monetize", _SUBTITLE_STYLE)]],
+        [[Paragraph("PROPERTY ADVISORY REPORT", _TITLE_STYLE)],
+         [Paragraph("Independent, evidence-based analysis — prepared using PropertyIQ Agent Intelligence", _SUBTITLE_STYLE)]],
         colWidths=[6.3 * inch],
     )
     header_table.setStyle(TableStyle([
