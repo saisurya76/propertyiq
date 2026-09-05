@@ -1,0 +1,195 @@
+import os
+
+os.environ.setdefault("DODO_PAYMENTS_API_KEY", "test")
+os.environ.setdefault("DODO_REPORT_PRODUCT_ID", "test")
+os.environ.setdefault("ADMIN_DASHBOARD_PASSWORD", "test-admin-pw")
+
+from fastapi.testclient import TestClient  # noqa: E402
+from backend.api import app  # noqa: E402
+from backend.auth_store import create_otp  # noqa: E402
+from backend.subscription_store import upsert_subscription  # noqa: E402
+
+client = TestClient(app)
+
+
+def _authed_headers(email: str) -> dict:
+    code = create_otp(email)
+    r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    token = r.json()["session_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _entitled_headers(email: str, tier_id: str = "studio_pro") -> dict:
+    upsert_subscription(email=email, tier_id=tier_id, status="active", dodo_subscription_id=f"sub_{email}")
+    return _authed_headers(email)
+
+
+def _property_payload(lat=17.4, lon=78.4):
+    return {
+        "country": "India", "stateProvince": "Telangana", "city": "Hyderabad", "location": "Tellapur",
+        "propertyType": "Apartment", "propertyName": "Aparna Sarovar Zenith", "developerName": "Aparna",
+        "quotedPrice": 18000000, "governmentGuidance": 6500, "marketAverage": 10125, "unitArea": 1800,
+        "monthlyRent": 45000, "areaUnit": "sqft", "lat": lat, "lon": lon,
+    }
+
+
+def test_create_client_requires_authentication():
+    r = client.post("/api/agent/clients", json={"client_name": "Rahul Sharma"})
+    assert r.status_code == 401
+
+
+def test_create_client_rejects_a_signed_in_visitor_with_no_subscription():
+    headers = _authed_headers("noagentsub@example.com")
+    r = client.post("/api/agent/clients", json={"client_name": "Rahul Sharma"}, headers=headers)
+    assert r.status_code == 403
+    assert "Agent Intelligence" in r.json()["detail"]
+
+
+def test_create_client_succeeds_for_an_entitled_agent():
+    headers = _entitled_headers("agentworks@example.com")
+    r = client.post("/api/agent/clients", json={"client_name": "Rahul Sharma", "client_contact": "rahul@example.com"}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["client_name"] == "Rahul Sharma"
+    assert "client_id" in data
+
+
+def test_create_client_rejects_an_empty_name():
+    headers = _entitled_headers("agentemptyname@example.com")
+    r = client.post("/api/agent/clients", json={"client_name": "   "}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_list_clients_only_shows_the_calling_agents_own_clients():
+    headers_a = _entitled_headers("agenta@example.com")
+    headers_b = _entitled_headers("agentb@example.com")
+    client.post("/api/agent/clients", json={"client_name": "Client Of A"}, headers=headers_a)
+    client.post("/api/agent/clients", json={"client_name": "Client Of B"}, headers=headers_b)
+
+    r_a = client.get("/api/agent/clients", headers=headers_a)
+    names_a = [c["client_name"] for c in r_a.json()["clients"]]
+    assert "Client Of A" in names_a
+    assert "Client Of B" not in names_a
+
+
+def test_client_limit_is_enforced_and_reported_honestly():
+    headers = _entitled_headers("agentlimit@example.com", tier_id="studio_starter")  # limit is 5
+    for i in range(5):
+        r = client.post("/api/agent/clients", json={"client_name": f"Client {i}"}, headers=headers)
+        assert r.status_code == 200
+    r_over = client.post("/api/agent/clients", json={"client_name": "One Too Many"}, headers=headers)
+    assert r_over.status_code == 403
+
+
+def test_delete_client_removes_it_and_a_stranger_cannot_delete_it():
+    headers = _entitled_headers("agentdelete@example.com")
+    created = client.post("/api/agent/clients", json={"client_name": "To Be Deleted"}, headers=headers).json()
+
+    other_headers = _entitled_headers("agentstranger@example.com")
+    r_stranger = client.delete(f"/api/agent/clients/{created['client_id']}", headers=other_headers)
+    assert r_stranger.status_code == 404
+
+    r_owner = client.delete(f"/api/agent/clients/{created['client_id']}", headers=headers)
+    assert r_owner.status_code == 200
+    r_list = client.get("/api/agent/clients", headers=headers)
+    assert created["client_id"] not in [c["client_id"] for c in r_list.json()["clients"]]
+
+
+def test_create_client_property_requires_the_client_to_belong_to_the_caller():
+    headers = _entitled_headers("agentpropowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Owner's Client"}, headers=headers).json()
+
+    stranger_headers = _entitled_headers("agentpropstranger@example.com")
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=stranger_headers)
+    assert r.status_code == 404
+
+
+def test_create_and_list_client_property_round_trip():
+    headers = _entitled_headers("agentproproundtrip@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Property Owner"}, headers=headers).json()
+
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers)
+    assert r.status_code == 200
+    prop = r.json()
+    assert prop["property_payload"]["propertyName"] == "Aparna Sarovar Zenith"
+    assert prop["lat"] == 17.4
+
+    r_list = client.get(f"/api/agent/clients/{created_client['client_id']}/properties", headers=headers)
+    assert len(r_list.json()["properties"]) == 1
+
+
+def test_property_limit_per_client_is_enforced():
+    headers = _entitled_headers("agentproplimit@example.com", tier_id="studio_starter")  # limit is 3 per client
+    created_client = client.post("/api/agent/clients", json={"client_name": "Limited Client"}, headers=headers).json()
+    for i in range(3):
+        r = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers)
+        assert r.status_code == 200
+    r_over = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers)
+    assert r_over.status_code == 403
+
+
+def test_delete_client_property_and_ownership_check():
+    headers = _entitled_headers("agentdeleteprop@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Del Prop Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    stranger_headers = _entitled_headers("agentdeletepropstranger@example.com")
+    r_stranger = client.delete(f"/api/agent/properties/{prop['property_id']}", headers=stranger_headers)
+    assert r_stranger.status_code == 404
+
+    r_owner = client.delete(f"/api/agent/properties/{prop['property_id']}", headers=headers)
+    assert r_owner.status_code == 200
+
+
+def test_deleting_a_client_cascades_to_its_properties():
+    headers = _entitled_headers("agentcascade@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Cascade Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    client.delete(f"/api/agent/clients/{created_client['client_id']}", headers=headers)
+
+    r = client.delete(f"/api/agent/properties/{prop['property_id']}", headers=headers)
+    assert r.status_code == 404  # already gone via cascade
+
+
+def test_generate_report_produces_a_real_pdf(monkeypatch):
+    """The real, direct proof of the actual feature: generating a
+    report calls the exact same real functions the rest of the app
+    uses (build_assessment, etc.) and returns a genuine PDF."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentreport@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Report Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert "attachment" in r.headers["content-disposition"]
+    assert r.content[:4] == b"%PDF"  # a genuine PDF file signature, not a stub
+
+
+def test_generate_report_works_without_coordinates_too(monkeypatch):
+    """A real resilience requirement: a property with no lat/lon
+    (e.g. never geocoded) must still produce a report, with the
+    coordinate-dependent sections honestly marked unavailable rather
+    than crashing."""
+    headers = _entitled_headers("agentreportnocoords@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Coords Client"}, headers=headers).json()
+    payload = _property_payload(lat=None, lon=None)
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=payload, headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
+
+
+def test_generate_report_requires_ownership():
+    headers = _entitled_headers("agentreportowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Report Owner Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    stranger_headers = _entitled_headers("agentreportstranger@example.com")
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=stranger_headers)
+    assert r.status_code == 404

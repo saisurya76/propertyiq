@@ -1,0 +1,377 @@
+/* Agent Intelligence — a distinct, modern "professional business tool"
+   identity, separate from Studio's violet and Neighborhood Insights'
+   green: slate (structure/analysis), indigo (advisory/trust), emerald
+   (growth/monetize) — reflecting Analyze -> Advise -> Monetize. */
+
+.agent-workspace {
+  min-height: 100vh;
+  background: #F1F5F9;
+}
+
+.agent-hero {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 55%, #312E81 100%);
+  padding: 32px 20px 40px;
+}
+
+.agent-hero-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.agent-back-link {
+  background: none;
+  border: none;
+  color: #C7D2FE;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 16px;
+}
+
+.agent-hero h1 {
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.agent-hero-tagline {
+  color: #A5B4FC;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.agent-arrow {
+  color: #34D399;
+  margin: 0 4px;
+}
+
+.agent-content {
+  max-width: 900px;
+  margin: -20px auto 60px;
+  padding: 0 20px;
+}
+
+.agent-error-banner {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.agent-primary-btn {
+  background: linear-gradient(135deg, #4F46E5, #4338CA);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.agent-primary-btn:hover {
+  background: linear-gradient(135deg, #4338CA, #3730A3);
+}
+
+.agent-primary-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.agent-text-btn {
+  background: none;
+  border: none;
+  color: #4F46E5;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.agent-delete-btn {
+  color: #DC2626;
+}
+
+/* Dashboard */
+.agent-dashboard {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  padding: 28px;
+}
+
+.agent-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.agent-stat-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.agent-stat-card-accent {
+  background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
+  border-color: #A7F3D0;
+}
+
+.agent-stat-number {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1E293B;
+  margin-bottom: 6px;
+}
+
+.agent-stat-card-accent .agent-stat-number {
+  font-size: 26px;
+}
+
+.agent-stat-label {
+  font-size: 12.5px;
+  color: #64748B;
+  font-weight: 600;
+}
+
+.agent-enter-workspace-btn {
+  width: 100%;
+  text-align: center;
+  font-size: 15px;
+  padding: 14px;
+}
+
+/* Workspace */
+.agent-workspace-body {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  padding: 24px;
+}
+
+.agent-workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.agent-add-client-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.agent-add-client-form input {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.agent-empty-note {
+  color: #94A3B8;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.agent-client-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-client-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.agent-client-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  cursor: pointer;
+  background: #FAFBFF;
+}
+
+.agent-client-card-header:hover {
+  background: #F1F5F9;
+}
+
+.agent-client-contact {
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.agent-client-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.agent-expand-caret {
+  color: #94A3B8;
+  font-size: 11px;
+}
+
+.agent-client-properties {
+  padding: 14px 18px 18px;
+  border-top: 1px solid #E2E8F0;
+}
+
+.agent-property-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #F1F5F9;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.agent-property-meta {
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.agent-property-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.agent-small-btn {
+  padding: 8px 14px;
+  font-size: 12.5px;
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.agent-small-btn:hover {
+  background: linear-gradient(135deg, #047857, #065F46);
+}
+
+.agent-add-property-link {
+  margin-top: 8px;
+}
+
+.agent-add-property-form {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.agent-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.agent-form-grid input {
+  padding: 9px 11px;
+  border: 1px solid #CBD5E1;
+  border-radius: 7px;
+  font-size: 13.5px;
+}
+
+.agent-form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* Paywall */
+.agent-paywall {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  padding: 28px;
+  text-align: center;
+}
+
+.agent-paywall h3 {
+  color: #1E293B;
+  font-size: 20px;
+}
+
+.agent-tier-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.agent-tier-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.agent-tier-card h4 {
+  color: #1E293B;
+  margin: 0 0 8px;
+}
+
+.agent-tier-price {
+  font-size: 22px;
+  font-weight: 800;
+  color: #059669;
+}
+
+.agent-tier-price span {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94A3B8;
+}
+
+.agent-tier-quota {
+  font-size: 12px;
+  color: #64748B;
+  margin-top: 8px;
+}
+
+/* Homepage entry-point strip: same shape as Construction Studio's,
+   with the agent palette instead of violet. */
+.agent-feature-strip {
+  background: linear-gradient(135deg, #EEF2FF, #ECFDF5) !important;
+  border-color: #C7D2FE !important;
+}
+
+@media (max-width: 640px) {
+  .agent-hero h1 {
+    font-size: 24px;
+  }
+  .agent-workspace-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .agent-client-card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

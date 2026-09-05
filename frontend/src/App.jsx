@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import "./studio/studio.css";
+import "./agent/agent.css";
 
 import PropertyForm from "./components/PropertyForm";
 import HottestPropertiesTicker from "./HottestPropertiesTicker";
+import AgentWorkspace from "./agent/AgentWorkspace";
 import CollapsiblePanel from "./components/CollapsiblePanel";
 import InstantScorePanel from "./components/InstantScorePanel";
 import HiddenDealPanel from "./components/HiddenDealPanel";
@@ -241,7 +243,7 @@ function App() {
   // landing on Pricing regardless of what triggered it — that generic
   // fallback is still correct for the "manage my plan" entry point,
   // just not for a paid action that got interrupted by a 401.
-  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment"
+  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent"
   // Shown on the Pricing screen specifically when a paid action (not
   // the generic "manage my plan" entry point) is what actually sent
   // the visitor there — without this, landing on Pricing right after
@@ -761,6 +763,24 @@ function App() {
     }
   };
 
+  // Deliberately simpler than launchStudio: just requires a session
+  // (sending a signed-out visitor to auth first, with pendingAuthAction
+  // set so a fresh sign-in lands them straight in the workspace rather
+  // than requiring a second click) — entitlement itself (does this
+  // agent's tier actually include agent_intelligence) is checked by
+  // AgentWorkspace's own first API call, the same inline-paywall
+  // pattern NeighborhoodComparison.jsx already uses, rather than
+  // duplicating that check here too.
+  const launchAgentWorkspace = () => {
+    const session = getSession();
+    if (!session) {
+      setPendingAuthAction("agent");
+      setStudioView("auth");
+      return;
+    }
+    setStudioView("agent");
+  };
+
   // A real, previously-missing gap this fixes: SessionBar's "Plan:
   // Studio Pro" badge is meant to always open Pricing (its own title
   // attribute literally says "Manage your subscription") but was
@@ -801,6 +821,11 @@ function App() {
       setPendingAuthAction(null);
       setStudioView("main");
       generateAssessment();
+      return;
+    }
+    if (pendingAuthAction === "agent") {
+      setPendingAuthAction(null);
+      setStudioView("agent");
       return;
     }
     setPricingContextMessage(""); // reached auth via the generic "manage my plan" path, not a feature gate
@@ -926,6 +951,17 @@ function App() {
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <AdminPanel onBack={backToReport} />
+        <LegalFooter />
+        <ScrollToTopBottom />
+      </div>
+    );
+  }
+
+  if (studioView === "agent") {
+    return (
+      <div className="app">
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
+        <AgentWorkspace onBack={backToReport} currency={currency} />
         <LegalFooter />
         <ScrollToTopBottom />
       </div>
@@ -1112,6 +1148,14 @@ function App() {
         <span className="feature-strip-icon">🏗</span>
         <span className="feature-strip-text">
           <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
+        </span>
+        <span className="feature-strip-arrow">→</span>
+      </div>
+
+      <div className="feature-strip agent-feature-strip" onClick={launchAgentWorkspace} role="button" tabIndex={0}>
+        <span className="feature-strip-icon">🤝</span>
+        <span className="feature-strip-text">
+          <strong>Agent Intelligence</strong> — analyze, advise, and monetize: manage clients and properties, then generate one consolidated advisory report for each.
         </span>
         <span className="feature-strip-arrow">→</span>
       </div>

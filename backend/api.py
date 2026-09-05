@@ -82,6 +82,20 @@ from backend.neighborhood_infrastructure import get_infrastructure_summary
 
 from backend.loan_calculator import build_amortization_schedule, summarize_loan
 
+from backend.agent_store import (
+    initialize_agent_store,
+    create_client_if_under_limit,
+    get_client,
+    list_clients_for_agent,
+    delete_client,
+    count_properties_for_client,
+    create_client_property_if_under_limit,
+    get_client_property,
+    list_properties_for_client,
+    delete_client_property,
+)
+from backend.agent_report import build_agent_advisory_pdf
+
 from backend.neighborhood_comparison_store import (
     initialize_neighborhood_comparison_store,
     create_comparison,
@@ -264,6 +278,7 @@ initialize_refund_store()
 initialize_profile_store()
 initialize_webhook_store()
 initialize_neighborhood_comparison_store()
+initialize_agent_store()
 initialize_insight_store()
 initialize_challenge_store()
 initialize_price_watch_store()
@@ -503,6 +518,17 @@ class PropertyRequest(BaseModel):
     regulatoryViolations: Optional[int] = None
 
     areaUnit: str = "sqft"
+
+
+class AgentClientPropertyRequest(PropertyRequest):
+    """The exact same fields PropertyRequest already defines, plus
+    optional real coordinates — needed so an agent's client property
+    can actually get real neighborhood/cost-of-living data in its
+    advisory report, which PropertyRequest alone has no way to
+    provide (the homepage assessment form never needed coordinates,
+    since it doesn't call those functions)."""
+    lat: Optional[float] = None
+    lon: Optional[float] = None
 
 
 class ReportCheckoutRequest(PropertyRequest):
@@ -4729,6 +4755,152 @@ def api_export_property(property_id: str, user_email: str = Depends(get_current_
         # was and when, without needing to re-import it first to find out.
         "_exported_from": {"original_name": prop["name"], "originally_created_at": prop["created_at"]},
     }
+
+
+# ============================================================
+# Agent Intelligence: a workspace layer on top of everything else in
+# this app. Every endpoint below requires an active subscription whose
+# tier includes "agent_intelligence" (same has_feature() pattern as
+# every other paid feature) -- checked once per endpoint via
+# _require_agent_entitlement, not duplicated inline each time.
+# ============================================================
+
+def _require_agent_entitlement(user_email: str) -> str:
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "agent_intelligence"):
+        raise HTTPException(
+            status_code=403,
+            detail="Agent Intelligence requires an active Studio subscription that includes this feature.",
+        )
+    return tier_id
+
+
+class AgentCreateClientRequest(BaseModel):
+    client_name: str
+    client_contact: Optional[str] = None
+
+
+@app.post("/api/agent/clients")
+def api_agent_create_client(request: AgentCreateClientRequest, user_email: str = Depends(get_current_user_email)):
+    tier_id = _require_agent_entitlement(user_email)
+    tier = get_tier(tier_id)
+    limit = tier.get("max_agent_clients") if tier else 0
+    try:
+        client = create_client_if_under_limit(limit=limit, agent_email=user_email, client_name=request.client_name, client_contact=request.client_contact)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if client is None:
+        raise HTTPException(status_code=403, detail=f"Client limit reached for the {tier['label']} tier. Remove an existing client or upgrade your plan.")
+    return client
+
+
+@app.get("/api/agent/clients")
+def api_agent_list_clients(user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    return {"clients": list_clients_for_agent(user_email)}
+
+
+@app.delete("/api/agent/clients/{client_id}")
+def api_agent_delete_client(client_id: str, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+    delete_client(client_id)
+    return {"deleted": True}
+
+
+@app.post("/api/agent/clients/{client_id}/properties")
+def api_agent_create_client_property(client_id: str, request: AgentClientPropertyRequest, user_email: str = Depends(get_current_user_email)):
+    tier_id = _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    tier = get_tier(tier_id)
+    limit = tier.get("max_properties_per_client") if tier else 0
+
+    payload = request.model_dump(exclude={"lat", "lon"})
+    prop = create_client_property_if_under_limit(
+        limit=limit, client_id=client_id, agent_email=user_email,
+        property_payload=payload, lat=request.lat, lon=request.lon,
+    )
+    if prop is None:
+        used = count_properties_for_client(client_id)
+        raise HTTPException(status_code=403, detail=f"Property limit reached ({used}/{limit}) for this client's tier. Remove a property or upgrade your plan.")
+    return prop
+
+
+@app.get("/api/agent/clients/{client_id}/properties")
+def api_agent_list_client_properties(client_id: str, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+    return {"properties": list_properties_for_client(client_id)}
+
+
+@app.delete("/api/agent/properties/{property_id}")
+def api_agent_delete_client_property(property_id: str, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    prop = get_client_property(property_id)
+    if prop is None or prop["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Property not found.")
+    delete_client_property(property_id)
+    return {"deleted": True}
+
+
+@app.post("/api/agent/properties/{property_id}/generate-report")
+def api_agent_generate_report(property_id: str, user_email: str = Depends(get_current_user_email)):
+    """The actual "Advise > Monetize" output: one consolidated PDF,
+    built entirely from the exact same functions the rest of this app
+    already uses for a real property assessment (build_assessment),
+    neighborhood data (_fetch_area_comparison_data), and an EMI
+    estimate (summarize_loan) -- this endpoint's only real job is
+    orchestrating those existing calls and handing the results to
+    agent_report.py for layout. No new analysis is invented for this
+    report."""
+    _require_agent_entitlement(user_email)
+    prop = get_client_property(property_id)
+    if prop is None or prop["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Property not found.")
+    client = get_client(prop["client_id"])
+
+    payload = prop["property_payload"]
+    property_request = PropertyRequest(**payload)
+    assessment = build_assessment(property_request)
+
+    neighborhood = None
+    if prop["lat"] is not None and prop["lon"] is not None:
+        area = NeighborhoodComparisonArea(city=payload["city"], country=payload["country"], lat=prop["lat"], lon=prop["lon"], property_type=payload["propertyType"])
+        neighborhood = _fetch_area_comparison_data(area)
+
+    emi_summary = None
+    if payload.get("quotedPrice"):
+        try:
+            emi_summary = summarize_loan(payload["quotedPrice"], 8.5, 20)  # a reasonable, clearly-labeled illustrative default -- not the client's own real loan terms, which this feature has no way to know
+        except ValueError:
+            emi_summary = None
+
+    cost_of_living = None
+    if prop["lat"] is not None and prop["lon"] is not None:
+        cost_of_living = _fetch_cost_of_living(prop["lat"], prop["lon"])
+
+    pdf_bytes = build_agent_advisory_pdf(
+        client_name=client["client_name"] if client else "Unknown Client",
+        property_name=payload.get("propertyName", "Unnamed Property"),
+        property_address=f"{payload.get('location', '')}, {payload.get('city', '')}",
+        assessment=assessment,
+        neighborhood=neighborhood,
+        emi_summary=emi_summary,
+        cost_of_living=cost_of_living,
+        agent_email=user_email,
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=advisory_report_{property_id}.pdf"},
+    )
 
 
 @app.put("/api/properties/{property_id}")

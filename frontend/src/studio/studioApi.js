@@ -105,6 +105,18 @@ export const studioApi = {
   adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility) =>
     apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility }) }),
 
+  agentListClients: () => apiFetch("/api/agent/clients"),
+  agentCreateClient: (clientName, clientContact) =>
+    apiFetch("/api/agent/clients", { method: "POST", body: JSON.stringify({ client_name: clientName, client_contact: clientContact }) }),
+  agentDeleteClient: (clientId) =>
+    apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}`, { method: "DELETE" }),
+  agentListClientProperties: (clientId) =>
+    apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/properties`),
+  agentCreateClientProperty: (clientId, payload) =>
+    apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/properties`, { method: "POST", body: JSON.stringify(payload) }),
+  agentDeleteClientProperty: (propertyId) =>
+    apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
+
   adminLookupPayments: (password, email) =>
     apiFetch("/api/admin/payments", { method: "POST", body: JSON.stringify({ password, email }) }),
 

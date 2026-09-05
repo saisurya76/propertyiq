@@ -40,9 +40,12 @@ DEFAULT_TIER_CONFIG = {
             "price_trends",
             "emi_calculator",
             "amortization_projector",
+            "agent_intelligence",
         ],
         "design_quota_per_month": 3,
         "saved_designs_limit": 2,
+        "max_agent_clients": 5,
+        "max_properties_per_client": 3,
         "max_price_watches": 2,
     },
     "studio_pro": {
@@ -61,9 +64,12 @@ DEFAULT_TIER_CONFIG = {
             "price_trends",
             "emi_calculator",
             "amortization_projector",
+            "agent_intelligence",
         ],
         "design_quota_per_month": 15,
         "saved_designs_limit": 10,
+        "max_agent_clients": 20,
+        "max_properties_per_client": 10,
         "max_price_watches": 10,
     },
     "studio_unlimited": {
@@ -84,9 +90,12 @@ DEFAULT_TIER_CONFIG = {
             "price_trends",
             "emi_calculator",
             "amortization_projector",
+            "agent_intelligence",
         ],
         "design_quota_per_month": None,  # None = unlimited
         "saved_designs_limit": None,  # None = unlimited
+        "max_agent_clients": None,  # None = unlimited
+        "max_properties_per_client": None,  # None = unlimited
         "max_price_watches": None,  # None = unlimited
     },
 }
@@ -247,6 +256,7 @@ ALL_FEATURES = [
     "price_trends",
     "emi_calculator",
     "amortization_projector",
+    "agent_intelligence",
 ]
 
 

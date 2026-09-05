@@ -42,7 +42,9 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
     endpoints, gated independently of each other), price_trends (real
     FRED/BIS historical price data, also gated independently),
     cost_of_living (real school/hospital access data, also gated
-    independently)."""
+    independently), agent_intelligence (the full Agent Workspace —
+    client/property CRUD + consolidated advisory report generation,
+    all gated behind _require_agent_entitlement)."""
     assert set(ALL_FEATURES) == {
         "similar_property_suggestions",
         "vastu_compliance",
@@ -58,6 +60,7 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
         "amortization_projector",
         "price_trends",
         "cost_of_living",
+        "agent_intelligence",
     }
 
 
