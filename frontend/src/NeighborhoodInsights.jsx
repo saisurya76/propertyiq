@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import "./App.css";
 import NeighborhoodComparison from "./NeighborhoodComparison";
 import PriceTrends from "./PriceTrends";
+import CostOfLiving from "./CostOfLiving";
 import EmiCalculator from "./EmiCalculator";
 import AmortizationProjector from "./AmortizationProjector";
 
@@ -898,6 +899,12 @@ function NeighborhoodInsights({ countryCode }) {
                 ))}
               </div>
             )}
+          </div>
+          )}
+
+          {sectionVisibility.cost_of_living && (
+          <div className="ni-card">
+            <CostOfLiving lat={selectedPlace?.lat} lon={selectedPlace?.lon} locality={selectedPlace?.label || city} />
           </div>
           )}
 

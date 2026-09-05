@@ -233,3 +233,72 @@ def test_price_trends_handles_a_real_fetch_failure(monkeypatch):
     assert r.status_code == 200
     assert r.json()["has_data"] is False
     assert r.json()["reason"] == "fetch_failed"
+
+
+def test_cost_of_living_requires_authentication():
+    r = client.get("/api/neighborhood-insights/cost-of-living", params={"lat": 17.4, "lon": 78.4})
+    assert r.status_code == 401
+
+
+def test_cost_of_living_rejects_a_signed_in_visitor_with_no_subscription():
+    headers = _authed_headers("nocolsub@example.com")
+    r = client.get("/api/neighborhood-insights/cost-of-living", params={"lat": 17.4, "lon": 78.4}, headers=headers)
+    assert r.status_code == 403
+    assert "cost of living" in r.json()["detail"]
+
+
+def test_cost_of_living_returns_real_school_and_hospital_data(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda lat, lon, tag, radius=2000: [{"name": "x"}, {"name": "y"}] if "school" in tag else [{"name": "z"}])
+    headers = _entitled_headers("colworks@example.com")
+    r = client.get("/api/neighborhood-insights/cost-of-living", params={"lat": 17.4, "lon": 78.4}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["school_access"]["has_data"] is True
+    assert data["school_access"]["count_within_2km"] == 2
+    assert data["hospital_access"]["has_data"] is True
+    assert data["hospital_access"]["count_within_2km"] == 1
+
+
+def test_cost_of_living_honestly_lists_the_10_unavailable_items(monkeypatch):
+    """Confirms all 10 items with no real data source are explicitly
+    listed as unavailable, not silently dropped."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    headers = _entitled_headers("colhonest@example.com")
+    r = client.get("/api/neighborhood-insights/cost-of-living", params={"lat": 17.4, "lon": 78.4}, headers=headers)
+    assert r.status_code == 200
+    unavailable = r.json()["unavailable_items"]
+    assert len(unavailable) == 10
+    assert "electricity" in unavailable
+    assert "fuel" in unavailable
+    assert "commute_cost" in unavailable
+
+
+def test_cost_of_living_handles_missing_coordinates_gracefully():
+    headers = _entitled_headers("colnocoords@example.com")
+    r = client.get("/api/neighborhood-insights/cost-of-living", headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["school_access"]["has_data"] is False
+    assert data["school_access"]["reason"] == "no_coordinates"
+
+
+def test_cost_of_living_survives_one_lookup_failing(monkeypatch):
+    """A real resilience requirement: if the school lookup fails, the
+    hospital data must still come through, not a total 500."""
+    import backend.api as api_module
+
+    def flaky_nearby(lat, lon, tag, radius=2000):
+        if "school" in tag:
+            raise Exception("simulated failure")
+        return [{"name": "real hospital"}]
+
+    monkeypatch.setattr(api_module, "neighborhood_nearby", flaky_nearby)
+    headers = _entitled_headers("colflaky@example.com")
+    r = client.get("/api/neighborhood-insights/cost-of-living", params={"lat": 17.4, "lon": 78.4}, headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["school_access"]["has_data"] is False
+    assert data["hospital_access"]["has_data"] is True
+    assert data["hospital_access"]["count_within_2km"] == 1

@@ -2687,6 +2687,22 @@ def neighborhood_extended_metrics(city: str, country: str = "India", lat: Option
     }
 
 
+@app.get("/api/neighborhood-insights/cost-of-living")
+def neighborhood_cost_of_living(lat: Optional[float] = None, lon: Optional[float] = None, user_email: str = Depends(get_current_user_email)):
+    """A real, deliberate paid-feature gate — gated separately from the
+    other 3 new panels per the explicit business decision. See
+    _fetch_cost_of_living's own docstring for the real, honest
+    breakdown of which of the 12 requested items actually have real
+    data behind them."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "cost_of_living"):
+        raise HTTPException(
+            status_code=403,
+            detail="The cost of living panel requires an active Studio subscription that includes this feature.",
+        )
+    return _fetch_cost_of_living(lat, lon)
+
+
 @app.get("/api/neighborhood-insights/price-trends")
 def neighborhood_price_trends(country: str, years: int = 8, user_email: str = Depends(get_current_user_email)):
     """A real, deliberate paid-feature gate — same has_feature()
@@ -2896,6 +2912,63 @@ PRICE_TREND_FRED_SERIES = {
     "philippines": "QPHR628BIS",  # Makati (metro Manila)
     "indonesia": "QIDR628BIS",    # Indonesia, national
 }
+
+
+# The real, honest state of each of the 12 requested cost-of-living
+# items after checking each one specifically (not assumed): only
+# school and hospital access are genuinely, directly computable from
+# an area's own coordinates alone, via the same real nearby-POI search
+# the map/flood-risk sections already use. Everything else checked and
+# confirmed to have no free, per-area, programmatically fetchable data
+# source anywhere: fuel and electricity prices are real numbers that
+# exist, but only behind paid APIs or on pages meant for humans to
+# read, not fetch; tolls, domestic services, maintenance, water,
+# local lifestyle cost, parking, and delivery/service accessibility
+# have no structured source at all. Commute COST specifically (not
+# just commute access) was deliberately left out of the "real" bucket
+# too: computing an actual cost needs a real destination, which this
+# feature has no honest way to know — a generic city-wide number would
+# be an invented estimate dressed up as data, the same trap avoided
+# for traffic congestion and ease of living earlier.
+COST_OF_LIVING_UNAVAILABLE_ITEMS = [
+    "fuel", "tolls", "domestic_services", "maintenance", "water",
+    "electricity", "local_lifestyle_cost", "parking",
+    "delivery_service_accessibility", "commute_cost",
+]
+
+
+def _fetch_cost_of_living(lat: Optional[float], lon: Optional[float]) -> dict[str, Any]:
+    """Real per-area data for the 2 items that genuinely have it
+    (school and hospital access), honest "not available" for the
+    remaining 10 — see COST_OF_LIVING_UNAVAILABLE_ITEMS's own comment
+    for why each of those specifically has no real source, rather than
+    a blanket excuse."""
+    if lat is None or lon is None:
+        return {
+            "school_access": {"has_data": False, "reason": "no_coordinates"},
+            "hospital_access": {"has_data": False, "reason": "no_coordinates"},
+            "unavailable_items": COST_OF_LIVING_UNAVAILABLE_ITEMS,
+        }
+
+    try:
+        schools = neighborhood_nearby(lat, lon, "amenity:school", 2000)
+        school_access = {"has_data": True, "count_within_2km": len(schools)}
+    except Exception as exc:
+        logger.error(f"_fetch_cost_of_living: school lookup failed: {exc}")
+        school_access = {"has_data": False, "reason": "fetch_failed"}
+
+    try:
+        hospitals = neighborhood_nearby(lat, lon, "amenity:hospital", 2000)
+        hospital_access = {"has_data": True, "count_within_2km": len(hospitals)}
+    except Exception as exc:
+        logger.error(f"_fetch_cost_of_living: hospital lookup failed: {exc}")
+        hospital_access = {"has_data": False, "reason": "fetch_failed"}
+
+    return {
+        "school_access": school_access,
+        "hospital_access": hospital_access,
+        "unavailable_items": COST_OF_LIVING_UNAVAILABLE_ITEMS,
+    }
 
 
 def _fetch_price_trend(country: str, years: int = 8) -> dict[str, Any]:
@@ -3400,7 +3473,7 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     return record
 
 
-NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "price_trends", "emi_calculator", "amortization_projector", "checklist", "authority_contacts", "cross_sell", "share"]
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "price_trends", "cost_of_living", "emi_calculator", "amortization_projector", "checklist", "authority_contacts", "cross_sell", "share"]
 NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
 
 

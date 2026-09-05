@@ -758,6 +758,7 @@ function AdminPanel({ onBack }) {
                   { key: "extended_metrics", label: "More about this area (air quality, rankings, etc.)" },
                   { key: "comparison", label: "Compare areas (paid feature)" },
                   { key: "price_trends", label: "Price trends (paid feature)" },
+                  { key: "cost_of_living", label: "Cost of living (paid feature)" },
                   { key: "emi_calculator", label: "EMI calculator (paid feature)" },
                   { key: "amortization_projector", label: "Amortization projector (paid feature)" },
                   { key: "checklist", label: "Buyer's due-diligence checklist" },
