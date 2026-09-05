@@ -61,6 +61,7 @@ def build_agent_advisory_pdf(
     property_address: str,
     assessment: Any,  # the real PropertyAssessment object build_assessment() returns, not a dict
     neighborhood: Optional[dict[str, Any]],
+    price_trend: Optional[dict[str, Any]],
     emi_summary: Optional[dict[str, Any]],
     cost_of_living: Optional[dict[str, Any]],
     agent_email: str,
@@ -111,14 +112,56 @@ def build_agent_advisory_pdf(
         resale = neighborhood.get("resale_signal", {})
         infra = neighborhood.get("infrastructure", {})
         overall = neighborhood.get("overall_ranking", {})
+        flood = neighborhood.get("flood_risk", {})
+        air = neighborhood.get("air_quality", {})
+        wb = neighborhood.get("world_bank", {})
+        muni = neighborhood.get("municipality_ranking", {})
+
         story.append(_kv_table([
             ("Overall Ranking", f"{overall.get('score')} / 100" if overall.get("has_data") else "Not enough data"),
             ("Avg. Price/Sqft (resale signal)", f"{resale.get('currency', '')} {resale.get('average_price_per_sqft', 0):,.0f}" if resale.get("has_data") else "No data"),
             ("Comparable Listings", str(resale.get("comparable_count", "—")) if resale.get("has_data") else "—"),
             ("Infrastructure News", infra.get("summary", "No recent news found") if infra.get("has_data") else "No recent news found"),
+            ("Flood-Risk Proximity", f"{flood.get('nearby_water_count')} nearby water body(ies) within 2km" if flood.get("has_data") else "Not available"),
+            ("Air Pollution Index", f"{air.get('aqi_label')} ({air.get('aqi')}/5) — PM2.5: {air.get('pm2_5')}" if air.get("has_data") else "Not available"),
         ]))
+
+        wb_rows = []
+        if wb.get("has_data"):
+            if wb.get("unemployment_rate"):
+                wb_rows.append(("Job Prospects (unemployment rate)", f"{wb['unemployment_rate']['value']:.1f}% ({wb['unemployment_rate']['year']})"))
+            if wb.get("gdp_growth"):
+                wb_rows.append(("Business Environment (GDP growth)", f"{wb['gdp_growth']['value']:.1f}% ({wb['gdp_growth']['year']})"))
+            if wb.get("tourist_arrivals"):
+                wb_rows.append(("Tourism Index (annual arrivals)", f"{wb['tourist_arrivals']['value'] / 1_000_000:.1f}M/yr ({wb['tourist_arrivals']['year']})"))
+            if wb.get("life_expectancy"):
+                wb_rows.append(("Diseases (life expectancy proxy)", f"{wb['life_expectancy']['value']:.1f} yrs ({wb['life_expectancy']['year']})"))
+        if muni.get("has_data"):
+            wb_rows.append(("Municipality Ranking (Swachh Survekshan)", f"Rank {muni.get('rank')} of {muni.get('total_cities_ranked')}"))
+        if wb_rows:
+            story.append(Spacer(1, 4))
+            story.append(_kv_table(wb_rows))
+        else:
+            story.append(Paragraph("Country-level indicators (job market, tourism, municipality ranking) not available for this country.", _MUTED_STYLE))
     else:
         story.append(Paragraph("Not available for this property — no coordinates were captured for it.", _MUTED_STYLE))
+
+    story.append(Paragraph("Price Trends", _SECTION_STYLE))
+    if price_trend and price_trend.get("has_data"):
+        first_point = price_trend["points"][0]
+        last_point = price_trend["points"][-1]
+        change_pct = ((last_point["value"] - first_point["value"]) / first_point["value"]) * 100 if first_point["value"] else 0
+        story.append(_kv_table([
+            ("Index (real, country-level)", price_trend.get("unit", "")),
+            ("Earliest on Record", f"{first_point['date']}: {first_point['value']:.1f}"),
+            ("Latest on Record", f"{last_point['date']}: {last_point['value']:.1f}"),
+            ("Change Over Period", f"{change_pct:+.1f}%"),
+        ]))
+        story.append(Paragraph(f"Source: {price_trend.get('source', 'Bank for International Settlements, via FRED')}. Country-level, not neighborhood-specific.", _MUTED_STYLE))
+    else:
+        reason = price_trend.get("reason") if price_trend else "no_coordinates"
+        message = "No real historical price index exists for this country." if reason == "country_not_covered" else "Not available for this property right now."
+        story.append(Paragraph(message, _MUTED_STYLE))
 
     story.append(Paragraph("Financing Snapshot (EMI Estimate)", _SECTION_STYLE))
     if emi_summary:

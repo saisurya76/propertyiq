@@ -375,3 +375,57 @@
     gap: 8px;
   }
 }
+
+.agent-address-autocomplete {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.agent-address-autocomplete > input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.agent-address-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  z-index: 10;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.agent-address-suggestion-item {
+  padding: 10px 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.agent-address-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.agent-address-suggestion-item:hover {
+  background: #F8FAFC;
+}
+
+.agent-coords-confirm {
+  color: #059669;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin: 6px 0 0;
+}
+
+.agent-no-coords-note {
+  color: #D97706;
+}

@@ -588,7 +588,7 @@ function AdminPanel({ onBack }) {
           <div className="admin-section admin-section-purple">
             <h3>Tier Configuration</h3>
             <div className="admin-tier-row admin-tier-row-header">
-              <span>Tier</span><span>Price (from Dodo)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Max price watches (blank = unlimited)</span><span>Label</span>
+              <span>Tier</span><span>Price (from Dodo)</span><span>Generate/mo (blank = unlimited, 0 = one-time)</span><span>Saved designs (blank = unlimited)</span><span>Max price watches (blank = unlimited)</span><span>Agent clients (blank = unlimited)</span><span>Properties per client (blank = unlimited)</span><span>Label</span>
             </div>
             <p className="admin-section-note" style={{ marginTop: -8 }}>
               Price is read directly from Dodo Payments — the real, actual amount a customer is
@@ -637,6 +637,28 @@ function AdminPanel({ onBack }) {
                       title="Max active Price Drop Alert watches this tier can have at once — leave blank for unlimited"
                       onChange={(e) =>
                         updateTierField(tierId, "max_price_watches", e.target.value === "" ? null : Number(e.target.value))
+                      }
+                    />
+                    </span>
+                    <span data-label="Agent clients">
+                    <input
+                      type="number"
+                      value={tier.max_agent_clients ?? ""}
+                      placeholder="unlimited clients"
+                      title="Max clients an Agent Intelligence user on this tier can add at once — leave blank for unlimited"
+                      onChange={(e) =>
+                        updateTierField(tierId, "max_agent_clients", e.target.value === "" ? null : Number(e.target.value))
+                      }
+                    />
+                    </span>
+                    <span data-label="Properties per client">
+                    <input
+                      type="number"
+                      value={tier.max_properties_per_client ?? ""}
+                      placeholder="unlimited properties"
+                      title="Max properties per client this tier's Agent Intelligence users can add — leave blank for unlimited"
+                      onChange={(e) =>
+                        updateTierField(tierId, "max_properties_per_client", e.target.value === "" ? null : Number(e.target.value))
                       }
                     />
                     </span>

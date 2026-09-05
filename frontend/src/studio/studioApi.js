@@ -108,12 +108,16 @@ export const studioApi = {
   agentListClients: () => apiFetch("/api/agent/clients"),
   agentCreateClient: (clientName, clientContact) =>
     apiFetch("/api/agent/clients", { method: "POST", body: JSON.stringify({ client_name: clientName, client_contact: clientContact }) }),
+  agentUpdateClient: (clientId, clientName, clientContact) =>
+    apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}`, { method: "PUT", body: JSON.stringify({ client_name: clientName, client_contact: clientContact }) }),
   agentDeleteClient: (clientId) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}`, { method: "DELETE" }),
   agentListClientProperties: (clientId) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/properties`),
   agentCreateClientProperty: (clientId, payload) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/properties`, { method: "POST", body: JSON.stringify(payload) }),
+  agentUpdateClientProperty: (propertyId, payload) =>
+    apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}`, { method: "PUT", body: JSON.stringify(payload) }),
   agentDeleteClientProperty: (propertyId) =>
     apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
 

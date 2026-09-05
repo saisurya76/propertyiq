@@ -87,11 +87,13 @@ from backend.agent_store import (
     create_client_if_under_limit,
     get_client,
     list_clients_for_agent,
+    update_client,
     delete_client,
     count_properties_for_client,
     create_client_property_if_under_limit,
     get_client_property,
     list_properties_for_client,
+    update_client_property,
     delete_client_property,
 )
 from backend.agent_report import build_agent_advisory_pdf
@@ -4800,6 +4802,18 @@ def api_agent_list_clients(user_email: str = Depends(get_current_user_email)):
     return {"clients": list_clients_for_agent(user_email)}
 
 
+@app.put("/api/agent/clients/{client_id}")
+def api_agent_update_client(client_id: str, request: AgentCreateClientRequest, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+    try:
+        return update_client(client_id=client_id, client_name=request.client_name, client_contact=request.client_contact)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.delete("/api/agent/clients/{client_id}")
 def api_agent_delete_client(client_id: str, user_email: str = Depends(get_current_user_email)):
     _require_agent_entitlement(user_email)
@@ -4838,6 +4852,16 @@ def api_agent_list_client_properties(client_id: str, user_email: str = Depends(g
     if client is None or client["agent_email"] != user_email.strip().lower():
         raise HTTPException(status_code=404, detail="Client not found.")
     return {"properties": list_properties_for_client(client_id)}
+
+
+@app.put("/api/agent/properties/{property_id}")
+def api_agent_update_client_property(property_id: str, request: AgentClientPropertyRequest, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    prop = get_client_property(property_id)
+    if prop is None or prop["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Property not found.")
+    payload = request.model_dump(exclude={"lat", "lon"})
+    return update_client_property(property_id=property_id, property_payload=payload, lat=request.lat, lon=request.lon)
 
 
 @app.delete("/api/agent/properties/{property_id}")
@@ -4886,12 +4910,15 @@ def api_agent_generate_report(property_id: str, user_email: str = Depends(get_cu
     if prop["lat"] is not None and prop["lon"] is not None:
         cost_of_living = _fetch_cost_of_living(prop["lat"], prop["lon"])
 
+    price_trend = _fetch_price_trend(payload["country"], years=8)
+
     pdf_bytes = build_agent_advisory_pdf(
         client_name=client["client_name"] if client else "Unknown Client",
         property_name=payload.get("propertyName", "Unnamed Property"),
         property_address=f"{payload.get('location', '')}, {payload.get('city', '')}",
         assessment=assessment,
         neighborhood=neighborhood,
+        price_trend=price_trend,
         emi_summary=emi_summary,
         cost_of_living=cost_of_living,
         agent_email=user_email,

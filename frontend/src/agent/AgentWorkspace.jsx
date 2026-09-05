@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { studioApi, getSession } from "../studio/studioApi";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
@@ -8,7 +8,22 @@ function emptyPropertyForm() {
     country: "India", stateProvince: "Telangana", city: "", location: "",
     propertyType: "Apartment", propertyName: "", developerName: "",
     quotedPrice: "", governmentGuidance: "", marketAverage: "", unitArea: "",
-    monthlyRent: "0", areaUnit: "sqft", lat: "", lon: "",
+    monthlyRent: "0", areaUnit: "sqft", lat: null, lon: null,
+    addressQuery: "",
+  };
+}
+
+function propertyPayloadToForm(payload, lat, lon) {
+  return {
+    ...emptyPropertyForm(),
+    ...payload,
+    quotedPrice: String(payload.quotedPrice ?? ""),
+    governmentGuidance: String(payload.governmentGuidance ?? ""),
+    marketAverage: String(payload.marketAverage ?? ""),
+    unitArea: String(payload.unitArea ?? ""),
+    monthlyRent: String(payload.monthlyRent ?? "0"),
+    lat, lon,
+    addressQuery: `${payload.location || ""}, ${payload.city || ""}`.trim(),
   };
 }
 
@@ -33,11 +48,14 @@ function AgentWorkspace({ onBack, currency }) {
   const [paywallTiers, setPaywallTiers] = useState(null);
 
   const [showAddClient, setShowAddClient] = useState(false);
-  const [newClientName, setNewClientName] = useState("");
-  const [newClientContact, setNewClientContact] = useState("");
+  const [editingClientId, setEditingClientId] = useState(null); // client_id being edited, or null for "add new"
+  const [clientNameInput, setClientNameInput] = useState("");
+  const [clientContactInput, setClientContactInput] = useState("");
 
-  const [addingPropertyForClient, setAddingPropertyForClient] = useState(null);
+  const [propertyFormFor, setPropertyFormFor] = useState(null); // { clientId, propertyId | null } — propertyId set means "editing", null means "adding new"
   const [propertyForm, setPropertyForm] = useState(emptyPropertyForm());
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const debounceRef = useRef(null);
 
   const [generatingReportFor, setGeneratingReportFor] = useState(null);
 
@@ -83,18 +101,35 @@ function AgentWorkspace({ onBack, currency }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAddClient = async (e) => {
+  const openAddClient = () => {
+    setEditingClientId(null);
+    setClientNameInput("");
+    setClientContactInput("");
+    setShowAddClient(true);
+  };
+
+  const openEditClient = (client) => {
+    setEditingClientId(client.client_id);
+    setClientNameInput(client.client_name);
+    setClientContactInput(client.client_contact || "");
+    setShowAddClient(true);
+  };
+
+  const handleSaveClient = async (e) => {
     e.preventDefault();
-    if (!newClientName.trim()) return;
+    if (!clientNameInput.trim()) return;
     setError("");
     try {
-      await studioApi.agentCreateClient(newClientName.trim(), newClientContact.trim() || null);
-      setNewClientName("");
-      setNewClientContact("");
+      if (editingClientId) {
+        await studioApi.agentUpdateClient(editingClientId, clientNameInput.trim(), clientContactInput.trim() || null);
+      } else {
+        await studioApi.agentCreateClient(clientNameInput.trim(), clientContactInput.trim() || null);
+      }
       setShowAddClient(false);
+      setEditingClientId(null);
       await loadClients();
     } catch (err) {
-      setError(err.message || "Couldn't add this client.");
+      setError(err.message || "Couldn't save this client.");
     }
   };
 
@@ -125,27 +160,78 @@ function AgentWorkspace({ onBack, currency }) {
     }
   };
 
-  const handleAddProperty = async (e, clientId) => {
+  // Same real autocomplete this app's Neighborhood Insights page
+  // already uses (LocationIQ, via the same backend proxy endpoint) —
+  // needed so a client property actually gets real coordinates, which
+  // its neighborhood/cost-of-living/report sections all depend on.
+  const handleAddressInput = (value) => {
+    setPropertyForm((prev) => ({ ...prev, addressQuery: value, lat: null, lon: null }));
+    clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      const isoCode = { India: "in", Thailand: "th", Philippines: "ph", Vietnam: "vn", Indonesia: "id" }[propertyForm.country] || "in";
+      fetch(`${API_BASE}/api/neighborhood-insights/autocomplete?q=${encodeURIComponent(value)}&country=${isoCode}`)
+        .then((res) => res.json())
+        .then((data) => setAddressSuggestions(Array.isArray(data) ? data : []))
+        .catch(() => setAddressSuggestions([]));
+    }, 300);
+  };
+
+  const selectAddressSuggestion = (item) => {
+    const label = item.display_name || item.display_place || propertyForm.addressQuery;
+    setPropertyForm((prev) => ({
+      ...prev,
+      addressQuery: label,
+      location: label,
+      city: item.address?.city || item.address?.town || item.address?.village || prev.city,
+      lat: parseFloat(item.lat),
+      lon: parseFloat(item.lon),
+    }));
+    setAddressSuggestions([]);
+  };
+
+  const openAddProperty = (clientId) => {
+    setPropertyFormFor({ clientId, propertyId: null });
+    setPropertyForm(emptyPropertyForm());
+    setAddressSuggestions([]);
+  };
+
+  const openEditProperty = (clientId, prop) => {
+    setPropertyFormFor({ clientId, propertyId: prop.property_id });
+    setPropertyForm(propertyPayloadToForm(prop.property_payload, prop.lat, prop.lon));
+    setAddressSuggestions([]);
+  };
+
+  const handleSaveProperty = async (e) => {
     e.preventDefault();
     setError("");
+    const { addressQuery, ...rest } = propertyForm;
+    void addressQuery;
     const payload = {
-      ...propertyForm,
+      ...rest,
       quotedPrice: parseFloat(propertyForm.quotedPrice) || 0,
       governmentGuidance: parseFloat(propertyForm.governmentGuidance) || 0,
       marketAverage: parseFloat(propertyForm.marketAverage) || 0,
       unitArea: parseFloat(propertyForm.unitArea) || 0,
       monthlyRent: parseFloat(propertyForm.monthlyRent) || 0,
-      lat: propertyForm.lat ? parseFloat(propertyForm.lat) : null,
-      lon: propertyForm.lon ? parseFloat(propertyForm.lon) : null,
+      lat: propertyForm.lat,
+      lon: propertyForm.lon,
     };
     try {
-      await studioApi.agentCreateClientProperty(clientId, payload);
-      setPropertyForm(emptyPropertyForm());
-      setAddingPropertyForClient(null);
+      if (propertyFormFor.propertyId) {
+        await studioApi.agentUpdateClientProperty(propertyFormFor.propertyId, payload);
+      } else {
+        await studioApi.agentCreateClientProperty(propertyFormFor.clientId, payload);
+      }
+      const clientId = propertyFormFor.clientId;
+      setPropertyFormFor(null);
       const res = await studioApi.agentListClientProperties(clientId);
       setPropertiesByClient((prev) => ({ ...prev, [clientId]: res.properties }));
     } catch (err) {
-      setError(err.message || "Couldn't add this property.");
+      setError(err.message || "Couldn't save this property.");
     }
   };
 
@@ -256,16 +342,17 @@ function AgentWorkspace({ onBack, currency }) {
               <div className="agent-workspace-body">
                 <div className="agent-workspace-header">
                   <button type="button" className="agent-back-link" onClick={() => setView("dashboard")}>← Dashboard</button>
-                  <button type="button" className="agent-primary-btn" onClick={() => setShowAddClient((v) => !v)}>
+                  <button type="button" className="agent-primary-btn" onClick={openAddClient}>
                     + Add Client
                   </button>
                 </div>
 
                 {showAddClient && (
-                  <form className="agent-add-client-form" onSubmit={handleAddClient}>
-                    <input type="text" placeholder="Client name" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required autoFocus />
-                    <input type="text" placeholder="Contact (email or phone, optional)" value={newClientContact} onChange={(e) => setNewClientContact(e.target.value)} />
-                    <button type="submit" className="agent-primary-btn">Save Client</button>
+                  <form className="agent-add-client-form" onSubmit={handleSaveClient}>
+                    <input type="text" placeholder="Client name" value={clientNameInput} onChange={(e) => setClientNameInput(e.target.value)} required autoFocus />
+                    <input type="text" placeholder="Contact (email or phone, optional)" value={clientContactInput} onChange={(e) => setClientContactInput(e.target.value)} />
+                    <button type="submit" className="agent-primary-btn">{editingClientId ? "Save Changes" : "Save Client"}</button>
+                    <button type="button" className="agent-text-btn" onClick={() => { setShowAddClient(false); setEditingClientId(null); }}>Cancel</button>
                   </form>
                 )}
 
@@ -284,6 +371,9 @@ function AgentWorkspace({ onBack, currency }) {
                           {c.client_contact && <span className="agent-client-contact"> · {c.client_contact}</span>}
                         </div>
                         <div className="agent-client-card-actions">
+                          <button type="button" className="agent-text-btn" onClick={(e) => { e.stopPropagation(); openEditClient(c); }}>
+                            Edit
+                          </button>
                           <button type="button" className="agent-text-btn agent-delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteClient(c.client_id); }}>
                             Delete
                           </button>
@@ -297,7 +387,7 @@ function AgentWorkspace({ onBack, currency }) {
                             <div key={p.property_id} className="agent-property-row">
                               <div>
                                 <strong>{p.property_payload.propertyName}</strong>
-                                <div className="agent-property-meta">{p.property_payload.location}, {p.property_payload.city}</div>
+                                <div className="agent-property-meta">{p.property_payload.location}, {p.property_payload.city}{p.lat == null && <span className="agent-no-coords-note"> · no coordinates yet</span>}</div>
                               </div>
                               <div className="agent-property-actions">
                                 <button
@@ -308,6 +398,7 @@ function AgentWorkspace({ onBack, currency }) {
                                 >
                                   {generatingReportFor === p.property_id ? "Generating..." : "📄 Generate Report"}
                                 </button>
+                                <button type="button" className="agent-text-btn" onClick={() => openEditProperty(c.client_id, p)}>Edit</button>
                                 <button type="button" className="agent-text-btn agent-delete-btn" onClick={() => handleDeleteProperty(c.client_id, p.property_id)}>
                                   Delete
                                 </button>
@@ -315,27 +406,44 @@ function AgentWorkspace({ onBack, currency }) {
                             </div>
                           ))}
 
-                          {addingPropertyForClient === c.client_id ? (
-                            <form className="agent-add-property-form" onSubmit={(e) => handleAddProperty(e, c.client_id)}>
+                          {propertyFormFor && propertyFormFor.clientId === c.client_id ? (
+                            <form className="agent-add-property-form" onSubmit={handleSaveProperty}>
+                              <div className="agent-address-autocomplete">
+                                <input
+                                  type="text"
+                                  placeholder="Search address — locality, city (enables neighborhood data automatically)"
+                                  value={propertyForm.addressQuery}
+                                  onChange={(e) => handleAddressInput(e.target.value)}
+                                />
+                                {addressSuggestions.length > 0 && (
+                                  <div className="agent-address-suggestions">
+                                    {addressSuggestions.map((item, i) => (
+                                      <div key={i} className="agent-address-suggestion-item" onClick={() => selectAddressSuggestion(item)}>
+                                        {item.display_name || item.display_place}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {propertyForm.lat != null && (
+                                  <p className="agent-coords-confirm">✓ Location captured — neighborhood data will be included in the report.</p>
+                                )}
+                              </div>
                               <div className="agent-form-grid">
                                 <input type="text" placeholder="Property name" value={propertyForm.propertyName} onChange={(e) => setPropertyForm({ ...propertyForm, propertyName: e.target.value })} required />
                                 <input type="text" placeholder="Developer" value={propertyForm.developerName} onChange={(e) => setPropertyForm({ ...propertyForm, developerName: e.target.value })} required />
                                 <input type="text" placeholder="City" value={propertyForm.city} onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })} required />
-                                <input type="text" placeholder="Location / locality" value={propertyForm.location} onChange={(e) => setPropertyForm({ ...propertyForm, location: e.target.value })} required />
                                 <input type="number" placeholder="Quoted price" value={propertyForm.quotedPrice} onChange={(e) => setPropertyForm({ ...propertyForm, quotedPrice: e.target.value })} required />
                                 <input type="number" placeholder="Government guidance value/sqft" value={propertyForm.governmentGuidance} onChange={(e) => setPropertyForm({ ...propertyForm, governmentGuidance: e.target.value })} required />
                                 <input type="number" placeholder="Market average/sqft" value={propertyForm.marketAverage} onChange={(e) => setPropertyForm({ ...propertyForm, marketAverage: e.target.value })} required />
                                 <input type="number" placeholder="Unit area (sqft)" value={propertyForm.unitArea} onChange={(e) => setPropertyForm({ ...propertyForm, unitArea: e.target.value })} required />
-                                <input type="number" step="any" placeholder="Latitude (optional, enables neighborhood data)" value={propertyForm.lat} onChange={(e) => setPropertyForm({ ...propertyForm, lat: e.target.value })} />
-                                <input type="number" step="any" placeholder="Longitude (optional)" value={propertyForm.lon} onChange={(e) => setPropertyForm({ ...propertyForm, lon: e.target.value })} />
                               </div>
                               <div className="agent-form-actions">
-                                <button type="submit" className="agent-primary-btn">Save Property</button>
-                                <button type="button" className="agent-text-btn" onClick={() => setAddingPropertyForClient(null)}>Cancel</button>
+                                <button type="submit" className="agent-primary-btn">{propertyFormFor.propertyId ? "Save Changes" : "Save Property"}</button>
+                                <button type="button" className="agent-text-btn" onClick={() => setPropertyFormFor(null)}>Cancel</button>
                               </div>
                             </form>
                           ) : (
-                            <button type="button" className="agent-text-btn agent-add-property-link" onClick={() => { setAddingPropertyForClient(c.client_id); setPropertyForm(emptyPropertyForm()); }}>
+                            <button type="button" className="agent-text-btn agent-add-property-link" onClick={() => openAddProperty(c.client_id)}>
                               + Add a property for {c.client_name}
                             </button>
                           )}

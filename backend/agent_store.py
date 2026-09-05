@@ -114,6 +114,22 @@ def list_clients_for_agent(agent_email: str) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def update_client(*, client_id: str, client_name: str, client_contact: Optional[str] = None) -> Optional[dict[str, Any]]:
+    """Editing never touches the client-count quota — it's the same
+    row, not a new one — so no limit check is needed here, unlike
+    create_client_if_under_limit."""
+    if not client_name or not client_name.strip():
+        raise ValueError("Client name is required.")
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE agent_clients SET client_name = %s, client_contact = %s WHERE client_id = %s",
+                (client_name.strip(), client_contact, client_id),
+            )
+        connection.commit()
+    return get_client(client_id)
+
+
 def delete_client(client_id: str) -> None:
     """Cascades to the client's own properties too -- a deleted client
     has no real, ongoing reason to keep an orphaned property list
@@ -171,6 +187,20 @@ def list_properties_for_client(client_id: str) -> list[dict[str, Any]]:
         result["property_payload"] = json.loads(result["property_payload"])
         results.append(result)
     return results
+
+
+def update_client_property(*, property_id: str, property_payload: dict[str, Any], lat: Optional[float] = None, lon: Optional[float] = None) -> Optional[dict[str, Any]]:
+    """Same real reasoning as update_client — editing an existing
+    property doesn't touch the per-client property-count quota, since
+    it's the same row, not a new one."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE agent_client_properties SET property_payload = %s, lat = %s, lon = %s WHERE property_id = %s",
+                (json.dumps(property_payload), lat, lon, property_id),
+            )
+        connection.commit()
+    return get_client_property(property_id)
 
 
 def delete_client_property(property_id: str) -> None:

@@ -193,3 +193,102 @@ def test_generate_report_requires_ownership():
     stranger_headers = _entitled_headers("agentreportstranger@example.com")
     r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=stranger_headers)
     assert r.status_code == 404
+
+
+def test_update_client_changes_name_and_contact():
+    headers = _entitled_headers("agentupdateclient@example.com")
+    created = client.post("/api/agent/clients", json={"client_name": "Old Name", "client_contact": "old@example.com"}, headers=headers).json()
+
+    r = client.put(f"/api/agent/clients/{created['client_id']}", json={"client_name": "New Name", "client_contact": "new@example.com"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["client_name"] == "New Name"
+    assert r.json()["client_contact"] == "new@example.com"
+
+
+def test_update_client_requires_ownership():
+    headers = _entitled_headers("agentupdateowner@example.com")
+    created = client.post("/api/agent/clients", json={"client_name": "Owner Client"}, headers=headers).json()
+
+    stranger_headers = _entitled_headers("agentupdatestranger@example.com")
+    r = client.put(f"/api/agent/clients/{created['client_id']}", json={"client_name": "Hijacked"}, headers=stranger_headers)
+    assert r.status_code == 404
+
+
+def test_update_client_rejects_empty_name():
+    headers = _entitled_headers("agentupdateempty@example.com")
+    created = client.post("/api/agent/clients", json={"client_name": "Real Name"}, headers=headers).json()
+    r = client.put(f"/api/agent/clients/{created['client_id']}", json={"client_name": "   "}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_update_client_does_not_consume_the_client_quota():
+    """A real, important edge case: editing an existing client must
+    never be blocked by (or count against) the client-count limit,
+    since it's the same row, not a new one."""
+    headers = _entitled_headers("agentupdatequota@example.com", tier_id="studio_starter")  # limit is 5
+    created_clients = []
+    for i in range(5):
+        created_clients.append(client.post("/api/agent/clients", json={"client_name": f"Client {i}"}, headers=headers).json())
+    # At the limit -- editing any of them must still work
+    r = client.put(f"/api/agent/clients/{created_clients[0]['client_id']}", json={"client_name": "Edited At Limit"}, headers=headers)
+    assert r.status_code == 200
+
+
+def test_update_client_property_changes_the_payload():
+    headers = _entitled_headers("agentupdateprop@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Prop Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    updated_payload = _property_payload(lat=18.0, lon=79.0)
+    updated_payload["propertyName"] = "Updated Property Name"
+    r = client.put(f"/api/agent/properties/{prop['property_id']}", json=updated_payload, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["property_payload"]["propertyName"] == "Updated Property Name"
+    assert r.json()["lat"] == 18.0
+
+
+def test_update_client_property_requires_ownership():
+    headers = _entitled_headers("agentupdatepropowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Owner Prop Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    stranger_headers = _entitled_headers("agentupdatepropstranger@example.com")
+    r = client.put(f"/api/agent/properties/{prop['property_id']}", json=_property_payload(), headers=stranger_headers)
+    assert r.status_code == 404
+
+
+def test_update_client_property_does_not_consume_the_property_quota():
+    headers = _entitled_headers("agentupdatepropquota@example.com", tier_id="studio_starter")  # limit is 3 per client
+    created_client = client.post("/api/agent/clients", json={"client_name": "Quota Prop Client"}, headers=headers).json()
+    props = []
+    for i in range(3):
+        props.append(client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json())
+    r = client.put(f"/api/agent/properties/{props[0]['property_id']}", json=_property_payload(lat=1, lon=1), headers=headers)
+    assert r.status_code == 200
+
+
+def test_report_includes_flood_risk_air_quality_and_price_trend(monkeypatch):
+    """Direct proof the report now includes the previously-missing
+    Neighborhood Insights data points, plus the new Price Trends
+    section -- checked by extracting the real generated PDF's text."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [{"name": "x"}])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")  # honestly unavailable, still must not crash
+
+    headers = _entitled_headers("agentreportfull@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Full Report Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
+
+    # Extract real text from the real generated PDF to confirm the
+    # new sections actually rendered, not just that a PDF came back.
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Flood-Risk Proximity" in text
+    assert "Air Pollution Index" in text
+    assert "Price Trends" in text
