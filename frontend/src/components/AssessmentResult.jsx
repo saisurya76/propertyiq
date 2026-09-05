@@ -3,6 +3,7 @@ import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
+import { getSession } from "../studio/studioApi";
 
 function AssessmentResult({
   result,
@@ -32,6 +33,7 @@ function AssessmentResult({
     try {
 
       setReportLoading(true);
+      const session = getSession();
 
       const response = await fetch(
         "https://propertyiq-api-q21y.onrender.com/generate-report",
@@ -39,7 +41,8 @@ function AssessmentResult({
           method: "POST",
 
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
 
           body: JSON.stringify({
@@ -1083,7 +1086,6 @@ function AssessmentResult({
         <button
           className="download-report-btn"
           onClick={downloadReport}
-          disabled={true}
         >
           {reportLoading && (
             <span className="spinner"></span>

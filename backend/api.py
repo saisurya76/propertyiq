@@ -97,6 +97,7 @@ from backend.agent_store import (
     delete_client_property,
 )
 from backend.agent_report import build_agent_advisory_pdf
+from backend.main_report import build_main_property_report_pdf
 
 from backend.neighborhood_comparison_store import (
     initialize_neighborhood_comparison_store,
@@ -1118,48 +1119,35 @@ def get_order_status(order_id: str):
 
 
 @app.post("/generate-report")
-def generate_report(data: PropertyRequest):
-    
+def generate_report(data: PropertyRequest, user_email: str = Depends(get_current_user_email)):
+    """Real, deliberate fix alongside the report-content rewrite below:
+    this endpoint previously required NO authentication or subscription
+    check at all -- since it independently builds its own assessment
+    from the raw PropertyRequest input (rather than looking up an
+    already-generated one), anyone could have called it directly to
+    get the full assessment via PDF, completely bypassing /assess's
+    own property_assessment paywall. Gated the same way /assess already
+    is, so re-enabling this button doesn't reintroduce that gap."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "property_assessment"):
+        raise HTTPException(
+            status_code=403,
+            detail="Downloading a property report requires an active Studio subscription that includes this feature.",
+        )
+
     assessment = build_assessment(data)
-
-    summary = generate_executive_summary(
-        property_name=assessment.property_name,
-        quoted_price=assessment.quoted_price,
-        fair_value=assessment.fair_value,
-        buyer_protection_score=assessment.buyer_protection_score,
-        buyer_protection_rating=assessment.buyer_protection_rating,
-        recommendation=assessment.recommendation,
+    recommendation_reasons = get_recommendation_reasons(
+        overpricing_percent=assessment.overpricing_percent,
         inventory_risk=assessment.inventory_risk,
-        developer_rating=assessment.developer_rating
+        developer_rating=assessment.developer_rating,
+        buyer_protection_score=assessment.buyer_protection_score,
     )
-
-    risks = identify_risks(
-        assessment.overpricing_percent,
-        assessment.inventory_risk,
-        assessment.developer_rating
-    )
-
-    guidance = negotiation_guidance(
-        assessment.quoted_price,
-        assessment.fair_value
-    )
-
-    output_file = (
-        "outputs/pdfs/propertyiq_report.pdf"
-    )
-
-    generate_pdf(
-        assessment=assessment,
-        risks=risks,
-        negotiation_text=guidance,
-        executive_summary=summary,
-        output_file=output_file
-    )
-
-    return FileResponse(
-        path=output_file,
+    currency = COMPARISON_COUNTRY_CURRENCY.get(data.country.strip().lower(), "INR")
+    pdf_bytes = build_main_property_report_pdf(assessment, recommendation_reasons, currency)
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
-        filename="PropertyIQ_Report.pdf"
+        headers={"Content-Disposition": "attachment; filename=PropertyIQ_Report.pdf"},
     )
 
 class RequestOtpRequest(BaseModel):
