@@ -59,12 +59,14 @@ def build_agent_advisory_pdf(
     client_name: str,
     property_name: str,
     property_address: str,
+    property_currency: str,  # the property's own real local currency (e.g. "THB" for a Thailand property) -- never assumed to be INR
     assessment: Any,  # the real PropertyAssessment object build_assessment() returns, not a dict
     neighborhood: Optional[dict[str, Any]],
     price_trend: Optional[dict[str, Any]],
+    comparison_results: Optional[list[dict[str, Any]]],
     emi_summary: Optional[dict[str, Any]],
     cost_of_living: Optional[dict[str, Any]],
-    agent_email: str,
+    prepared_by: str,  # the agent's real display name if they've set one, else their email — computed by the caller
 ) -> bytes:
     """Builds the actual PDF bytes. Every section is honest about its
     own source, same standard as the rest of this app — a section with
@@ -93,7 +95,7 @@ def build_agent_advisory_pdf(
     story.append(_kv_table([
         ("Client", client_name),
         ("Property", f"{property_name} — {property_address}"),
-        ("Prepared by", agent_email),
+        ("Prepared by", prepared_by),
         ("Generated", datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")),
     ]))
 
@@ -103,8 +105,8 @@ def build_agent_advisory_pdf(
         ("Recommendation", assessment.recommendation),
         ("Deal Quality", assessment.deal_quality),
         ("Negotiation Position", assessment.negotiation_position),
-        ("Target Price", f"{assessment.target_price:,.0f}"),
-        ("Potential Savings", f"{assessment.potential_savings:,.0f}"),
+        ("Target Price", f"{property_currency} {assessment.target_price:,.0f}"),
+        ("Potential Savings", f"{property_currency} {assessment.potential_savings:,.0f}"),
     ]))
 
     story.append(Paragraph("Neighborhood Insights", _SECTION_STYLE))
@@ -163,12 +165,45 @@ def build_agent_advisory_pdf(
         message = "No real historical price index exists for this country." if reason == "country_not_covered" else "Not available for this property right now."
         story.append(Paragraph(message, _MUTED_STYLE))
 
+    if comparison_results:
+        story.append(Paragraph("Comparison Against This Client's Other Properties", _SECTION_STYLE))
+        header_row = ["Metric"] + [Paragraph(r["property_name"], _LABEL_STYLE) for r in comparison_results]
+        rows = [header_row]
+
+        def _resale_cell(r):
+            resale = r.get("resale_signal", {})
+            return f"{resale.get('currency', '')} {resale.get('average_price_per_sqft', 0):,.0f}/sqft" if resale.get("has_data") else "No data"
+
+        def _ranking_cell(r):
+            ranking = r.get("overall_ranking", {})
+            return f"{ranking.get('score')} / 100" if ranking.get("has_data") else "Not enough data"
+
+        def _flood_cell(r):
+            flood = r.get("flood_risk", {})
+            return f"{flood.get('nearby_water_count')} nearby" if flood.get("has_data") else "Not available"
+
+        rows.append(["Avg. Price/Sqft"] + [_resale_cell(r) for r in comparison_results])
+        rows.append(["Overall Ranking"] + [_ranking_cell(r) for r in comparison_results])
+        rows.append(["Flood-Risk Proximity"] + [_flood_cell(r) for r in comparison_results])
+
+        col_width = min(1.5 * inch, 6.3 * inch / len(header_row))
+        comp_table = Table(rows, colWidths=[1.5 * inch] + [col_width] * len(comparison_results))
+        comp_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, HexColor(_BORDER)),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#F1F5F9")),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ]))
+        story.append(comp_table)
+        story.append(Spacer(1, 8))
+
     story.append(Paragraph("Financing Snapshot (EMI Estimate)", _SECTION_STYLE))
     if emi_summary:
         story.append(_kv_table([
-            ("Estimated Monthly EMI", f"{emi_summary.get('emi', 0):,.2f}"),
-            ("Total Interest (full tenure)", f"{emi_summary.get('total_interest', 0):,.2f}"),
-            ("Total Amount Payable", f"{emi_summary.get('total_paid', 0):,.2f}"),
+            ("Estimated Monthly EMI", f"{property_currency} {emi_summary.get('emi', 0):,.2f}"),
+            ("Total Interest (full tenure)", f"{property_currency} {emi_summary.get('total_interest', 0):,.2f}"),
+            ("Total Amount Payable", f"{property_currency} {emi_summary.get('total_paid', 0):,.2f}"),
         ]))
         story.append(Paragraph("Illustrative only, based on the property's quoted price at a default rate/tenure — not a loan offer.", _MUTED_STYLE))
     else:

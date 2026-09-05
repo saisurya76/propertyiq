@@ -106,6 +106,7 @@ export const studioApi = {
     apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility }) }),
 
   agentListClients: () => apiFetch("/api/agent/clients"),
+  agentGetQuotaSummary: () => apiFetch("/api/agent/quota-summary"),
   agentCreateClient: (clientName, clientContact) =>
     apiFetch("/api/agent/clients", { method: "POST", body: JSON.stringify({ client_name: clientName, client_contact: clientContact }) }),
   agentUpdateClient: (clientId, clientName, clientContact) =>
@@ -120,6 +121,8 @@ export const studioApi = {
     apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}`, { method: "PUT", body: JSON.stringify(payload) }),
   agentDeleteClientProperty: (propertyId) =>
     apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
+  agentCompareProperties: (clientId, propertyIds) =>
+    apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/compare-properties`, { method: "POST", body: JSON.stringify({ property_ids: propertyIds }) }),
 
   adminLookupPayments: (password, email) =>
     apiFetch("/api/admin/payments", { method: "POST", body: JSON.stringify({ password, email }) }),
@@ -305,6 +308,8 @@ export const studioApi = {
   },
 
   getProfile: () => apiFetch("/api/profile"),
+  updateDisplayName: (displayName) =>
+    apiFetch("/api/profile/display-name", { method: "POST", body: JSON.stringify({ display_name: displayName }) }),
 
   cancelSubscription: (reason) =>
     apiFetch("/api/profile/cancel-subscription", { method: "POST", body: JSON.stringify({ reason }) }),

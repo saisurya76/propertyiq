@@ -11,10 +11,14 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [displayNameInput, setDisplayNameInput] = useState("");
 
   useEffect(() => {
     studioApi.getProfile()
-      .then(setProfile)
+      .then((res) => {
+        setProfile(res);
+        setDisplayNameInput(res.display_name || "");
+      })
       .catch((err) => setError(err.message || "Couldn't load your profile."))
       .finally(() => setLoading(false));
   }, []);
@@ -65,6 +69,34 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
         {profile && (
           <>
             <p className="refund-request-intro"><strong>{profile.email}</strong></p>
+
+            {/* Display name -- used in place of the bare email on things
+                like an Agent Intelligence advisory report. Optional; a
+                blank value falls back to showing the email everywhere. */}
+            <h4 style={{ marginBottom: 4 }}>Your Name</h4>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setActionMessage("");
+                setError("");
+                studioApi.updateDisplayName(displayNameInput.trim() || null)
+                  .then((res) => {
+                    setProfile((prev) => ({ ...prev, display_name: res.display_name }));
+                    setActionMessage("Name saved.");
+                  })
+                  .catch((err) => setError(err.message || "Couldn't save your name."));
+              }}
+              style={{ display: "flex", gap: 8, marginBottom: 12 }}
+            >
+              <input
+                type="text"
+                placeholder="Your name (shown on reports, optional)"
+                value={displayNameInput}
+                onChange={(e) => setDisplayNameInput(e.target.value)}
+                style={{ flex: 1, padding: "8px 10px", border: "1px solid #d6dbe3", borderRadius: 8 }}
+              />
+              <button type="submit" className="cs-nav-btn cs-nav-primary">Save</button>
+            </form>
 
             {/* 1. Tier details */}
             <h4 style={{ marginBottom: 4 }}>Plan</h4>

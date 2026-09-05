@@ -46,6 +46,46 @@ def initialize_profile_store() -> None:
                 )
                 """
             )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    email TEXT PRIMARY KEY,
+                    display_name TEXT
+                )
+                """
+            )
+        connection.commit()
+
+
+def get_display_name(email: str) -> Optional[str]:
+    """The real, human name a customer set for themselves (e.g. for
+    use on an Agent Intelligence advisory report) — or None if they
+    never set one, which every existing account starts as, since this
+    app has only ever collected an email via OTP sign-in until now.
+    Callers should fall back to the email itself when this is None,
+    not treat it as an error."""
+    email = email.strip().lower()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT display_name FROM user_profiles WHERE email = %s", (email,))
+            row = cursor.fetchone()
+    return row["display_name"] if row and row["display_name"] else None
+
+
+def set_display_name(email: str, display_name: Optional[str]) -> None:
+    """A blank/None display_name is a real, valid choice (clearing a
+    previously-set name back to "just use my email"), not an error."""
+    email = email.strip().lower()
+    cleaned = display_name.strip() if display_name and display_name.strip() else None
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO user_profiles (email, display_name) VALUES (%s, %s)
+                ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name
+                """,
+                (email, cleaned),
+            )
         connection.commit()
 
 

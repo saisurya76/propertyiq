@@ -292,3 +292,215 @@ def test_report_includes_flood_risk_air_quality_and_price_trend(monkeypatch):
     assert "Flood-Risk Proximity" in text
     assert "Air Pollution Index" in text
     assert "Price Trends" in text
+
+
+def test_quota_summary_requires_authentication():
+    r = client.get("/api/agent/quota-summary")
+    assert r.status_code == 401
+
+
+def test_quota_summary_reflects_real_current_usage():
+    headers = _entitled_headers("agentquotasummary@example.com", tier_id="studio_starter")  # limit is 5 clients, 3 properties each
+    c1 = client.post("/api/agent/clients", json={"client_name": "Client A"}, headers=headers).json()
+    client.post("/api/agent/clients", json={"client_name": "Client B"}, headers=headers)
+    client.post(f"/api/agent/clients/{c1['client_id']}/properties", json=_property_payload(), headers=headers)
+    client.post(f"/api/agent/clients/{c1['client_id']}/properties", json=_property_payload(), headers=headers)
+
+    r = client.get("/api/agent/quota-summary", headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["client_count"] == 2
+    assert data["client_limit"] == 5
+    assert data["property_limit_per_client"] == 3
+    assert data["per_client_property_counts"][c1["client_id"]] == 2
+
+
+def test_quota_summary_reflects_deletion_freeing_a_slot():
+    """Direct proof deleting a client genuinely frees the counted slot
+    -- not a stale cached number."""
+    headers = _entitled_headers("agentquotadelete@example.com", tier_id="studio_starter")
+    c1 = client.post("/api/agent/clients", json={"client_name": "Temp Client"}, headers=headers).json()
+    before = client.get("/api/agent/quota-summary", headers=headers).json()
+    client.delete(f"/api/agent/clients/{c1['client_id']}", headers=headers)
+    after = client.get("/api/agent/quota-summary", headers=headers).json()
+    assert after["client_count"] == before["client_count"] - 1
+
+
+def test_report_shows_real_property_currency_not_bare_numbers(monkeypatch):
+    """Direct proof of the multi-country fix: a Thailand property's
+    report shows THB, not a bare number or an assumed INR."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentthaicurrency@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Thai Client"}, headers=headers).json()
+    thai_payload = _property_payload()
+    thai_payload.update({"country": "Thailand", "stateProvince": "", "city": "Bangkok", "location": "Sukhumvit"})
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=thai_payload, headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "THB" in text
+    assert "INR" not in text
+
+
+def test_display_name_defaults_to_none_and_falls_back_to_email_in_report(monkeypatch):
+    """A real account that never set a display name must still get a
+    working report, with the email shown as "Prepared by" instead."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentnodisplayname@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Name Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "agentnodisplayname@example.com" in text
+
+
+def test_setting_display_name_shows_it_on_the_report_instead_of_email(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentwithdisplayname@example.com")
+    client.post("/api/profile/display-name", json={"display_name": "Priya Sharma"}, headers=headers)
+
+    created_client = client.post("/api/agent/clients", json={"client_name": "Named Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Priya Sharma" in text
+
+
+def test_display_name_can_be_cleared_back_to_none():
+    headers = _entitled_headers("agentclearname@example.com")
+    client.post("/api/profile/display-name", json={"display_name": "Temp Name"}, headers=headers)
+    r = client.post("/api/profile/display-name", json={"display_name": ""}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["display_name"] is None
+
+
+def test_get_profile_includes_display_name():
+    headers = _entitled_headers("agentprofilename@example.com")
+    client.post("/api/profile/display-name", json={"display_name": "Real Name Here"}, headers=headers)
+    r = client.get("/api/profile", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["display_name"] == "Real Name Here"
+
+
+def test_compare_properties_requires_at_least_two():
+    headers = _entitled_headers("agentcompareone@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Compare Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/compare-properties", json={"property_ids": [prop["property_id"]]}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_compare_properties_returns_real_data_for_each(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentcomparereal@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Compare Real Client"}, headers=headers).json()
+    p1 = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(lat=17.4, lon=78.4), headers=headers).json()
+    p2 = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(lat=17.5, lon=78.5), headers=headers).json()
+
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/compare-properties", json={"property_ids": [p1["property_id"], p2["property_id"]]}, headers=headers)
+    assert r.status_code == 200
+    results = r.json()["results"]
+    assert len(results) == 2
+    assert all(res["has_data"] for res in results)
+
+
+def test_compare_properties_honest_when_missing_coordinates():
+    headers = _entitled_headers("agentcomparenocoords@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Coords Compare Client"}, headers=headers).json()
+    p1 = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(lat=None, lon=None), headers=headers).json()
+    p2 = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(lat=17.5, lon=78.5), headers=headers).json()
+
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/compare-properties", json={"property_ids": [p1["property_id"], p2["property_id"]]}, headers=headers)
+    assert r.status_code == 200
+    results = r.json()["results"]
+    no_coords_result = next(res for res in results if res["property_id"] == p1["property_id"])
+    assert no_coords_result["has_data"] is False
+    assert no_coords_result["reason"] == "no_coordinates"
+
+
+def test_compare_properties_rejects_a_property_from_a_different_client():
+    headers = _entitled_headers("agentcomparecross@example.com")
+    client_a = client.post("/api/agent/clients", json={"client_name": "Client A"}, headers=headers).json()
+    client_b = client.post("/api/agent/clients", json={"client_name": "Client B"}, headers=headers).json()
+    p_a = client.post(f"/api/agent/clients/{client_a['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    p_b = client.post(f"/api/agent/clients/{client_b['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/clients/{client_a['client_id']}/compare-properties", json={"property_ids": [p_a["property_id"], p_b["property_id"]]}, headers=headers)
+    assert r.status_code == 404
+
+
+def test_report_includes_comparison_against_client_other_properties(monkeypatch):
+    """Direct proof, via real extracted PDF text, that generating a
+    report for one property with a sibling property (same client, both
+    with coordinates) includes the comparison section."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentreportcompare@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Compare Report Client"}, headers=headers).json()
+    p1_payload = _property_payload(lat=17.4, lon=78.4)
+    p1_payload["propertyName"] = "First Property"
+    p1 = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=p1_payload, headers=headers).json()
+    p2_payload = _property_payload(lat=17.5, lon=78.5)
+    p2_payload["propertyName"] = "Second Property"
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=p2_payload, headers=headers)
+
+    r = client.post(f"/api/agent/properties/{p1['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Comparison Against This Client" in text
+    assert "Second Property" in text
+
+
+def test_report_omits_comparison_section_for_a_clients_only_property(monkeypatch):
+    """The opposite, equally real case: a client with just one
+    property must not show a comparison section at all."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentreportnocompare@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Solo Property Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(lat=17.4, lon=78.4), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Comparison Against This Client" not in text

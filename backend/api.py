@@ -137,6 +137,8 @@ from backend.profile_store import (
     delete_account,
     get_deletion_record,
     COOLING_OFF_DAYS,
+    get_display_name,
+    set_display_name,
 )
 
 from backend.webhook_store import (
@@ -2389,6 +2391,7 @@ def get_profile(user_email: str = Depends(get_current_user_email)):
 
     return {
         "email": user_email,
+        "display_name": get_display_name(user_email),
         "tier": {
             "tier_id": tier_id,
             "label": tier.get("label") if tier else None,
@@ -2406,6 +2409,21 @@ def get_profile(user_email: str = Depends(get_current_user_email)):
         "payments_note": payments_note,
         "notifications": notifications,
     }
+
+
+class UpdateDisplayNameRequest(BaseModel):
+    display_name: Optional[str] = None
+
+
+@app.post("/api/profile/display-name")
+def update_display_name(request: UpdateDisplayNameRequest, user_email: str = Depends(get_current_user_email)):
+    """Sets the real, human name shown on things like an Agent
+    Intelligence advisory report (in place of the bare email) —
+    previously nowhere in this app, since sign-in has only ever
+    collected an email via OTP. A blank/None value is a valid,
+    deliberate choice (revert to showing the email), not an error."""
+    set_display_name(user_email, request.display_name)
+    return {"display_name": get_display_name(user_email)}
 
 
 class ProfileCancelSubscriptionRequest(BaseModel):
@@ -4777,6 +4795,30 @@ def _require_agent_entitlement(user_email: str) -> str:
     return tier_id
 
 
+@app.get("/api/agent/quota-summary")
+def api_agent_quota_summary(user_email: str = Depends(get_current_user_email)):
+    """Real, current usage against the agent's real tier limits — lets
+    the workspace show a genuine "X of Y used" / nearing-limit warning,
+    rather than the agent only discovering the limit when a create
+    attempt is rejected. per_client_property_counts lets the frontend
+    show a per-client warning too, not just a single global number,
+    since max_properties_per_client is a per-client limit."""
+    tier_id = _require_agent_entitlement(user_email)
+    tier = get_tier(tier_id)
+    client_limit = tier.get("max_agent_clients") if tier else None
+    property_limit = tier.get("max_properties_per_client") if tier else None
+
+    clients = list_clients_for_agent(user_email)
+    per_client_property_counts = {c["client_id"]: count_properties_for_client(c["client_id"]) for c in clients}
+
+    return {
+        "client_count": len(clients),
+        "client_limit": client_limit,
+        "property_limit_per_client": property_limit,
+        "per_client_property_counts": per_client_property_counts,
+    }
+
+
 class AgentCreateClientRequest(BaseModel):
     client_name: str
     client_contact: Optional[str] = None
@@ -4854,6 +4896,50 @@ def api_agent_list_client_properties(client_id: str, user_email: str = Depends(g
     return {"properties": list_properties_for_client(client_id)}
 
 
+class AgentComparePropertiesRequest(BaseModel):
+    property_ids: list[str]
+
+
+@app.post("/api/agent/clients/{client_id}/compare-properties")
+def api_agent_compare_properties(client_id: str, request: AgentComparePropertiesRequest, user_email: str = Depends(get_current_user_email)):
+    """Reuses the exact same comparison module the (separately paid,
+    subscriber-facing) area_comparison feature already uses on the
+    Neighborhood Insights page — not a second, parallel implementation
+    — so an agent comparing a client's properties sees the identical
+    real metrics in the identical shape. Gated only behind
+    agent_intelligence itself (not also area_comparison), since this
+    is a tool inside the agent's own workspace, not the public-facing
+    comparison feature."""
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+    if len(request.property_ids) < 2:
+        raise HTTPException(status_code=400, detail="Select at least 2 properties to compare.")
+    if len(request.property_ids) > 5:
+        raise HTTPException(status_code=400, detail="You can compare up to 5 properties at once.")
+
+    results = []
+    for property_id in request.property_ids:
+        prop = get_client_property(property_id)
+        if prop is None or prop["client_id"] != client_id:
+            raise HTTPException(status_code=404, detail=f"Property {property_id} not found for this client.")
+        if prop["lat"] is None or prop["lon"] is None:
+            results.append({
+                "property_id": property_id, "property_name": prop["property_payload"].get("propertyName", "Unnamed"),
+                "has_data": False, "reason": "no_coordinates",
+            })
+            continue
+        payload = prop["property_payload"]
+        area = NeighborhoodComparisonArea(city=payload["city"], country=payload["country"], lat=prop["lat"], lon=prop["lon"], property_type=payload.get("propertyType", "Apartment"))
+        data = _fetch_area_comparison_data(area)
+        data["property_id"] = property_id
+        data["property_name"] = payload.get("propertyName", "Unnamed")
+        data["has_data"] = True
+        results.append(data)
+    return {"results": results}
+
+
 @app.put("/api/agent/properties/{property_id}")
 def api_agent_update_client_property(property_id: str, request: AgentClientPropertyRequest, user_email: str = Depends(get_current_user_email)):
     _require_agent_entitlement(user_email)
@@ -4912,16 +4998,39 @@ def api_agent_generate_report(property_id: str, user_email: str = Depends(get_cu
 
     price_trend = _fetch_price_trend(payload["country"], years=8)
 
+    # Real, direct reuse of the same comparison module used elsewhere
+    # in this app — if this client has other properties with real
+    # coordinates, the report shows how this one compares, not just
+    # its own isolated numbers. Capped at 4 others (5 total) to match
+    # area_comparison's own real limit.
+    comparison_results = None
+    if prop["lat"] is not None and prop["lon"] is not None:
+        sibling_properties = [
+            p for p in list_properties_for_client(prop["client_id"])
+            if p["property_id"] != property_id and p["lat"] is not None and p["lon"] is not None
+        ][:4]
+        if sibling_properties:
+            comparison_results = [{"property_name": payload.get("propertyName", "Unnamed Property"), **neighborhood}] if neighborhood else []
+            for sibling in sibling_properties:
+                sibling_payload = sibling["property_payload"]
+                sibling_area = NeighborhoodComparisonArea(city=sibling_payload["city"], country=sibling_payload["country"], lat=sibling["lat"], lon=sibling["lon"], property_type=sibling_payload.get("propertyType", "Apartment"))
+                sibling_data = _fetch_area_comparison_data(sibling_area)
+                comparison_results.append({"property_name": sibling_payload.get("propertyName", "Unnamed"), **sibling_data})
+
+    property_currency = COMPARISON_COUNTRY_CURRENCY.get((payload.get("country") or "").strip().lower(), "INR")
+
     pdf_bytes = build_agent_advisory_pdf(
         client_name=client["client_name"] if client else "Unknown Client",
         property_name=payload.get("propertyName", "Unnamed Property"),
         property_address=f"{payload.get('location', '')}, {payload.get('city', '')}",
+        property_currency=property_currency,
         assessment=assessment,
         neighborhood=neighborhood,
         price_trend=price_trend,
+        comparison_results=comparison_results,
         emi_summary=emi_summary,
         cost_of_living=cost_of_living,
-        agent_email=user_email,
+        prepared_by=get_display_name(user_email) or user_email,
     )
     return Response(
         content=pdf_bytes,

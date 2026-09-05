@@ -961,7 +961,7 @@ function App() {
     return (
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
-        <AgentWorkspace onBack={backToReport} currency={currency} />
+        <AgentWorkspace onBack={backToReport} currency={currency} urlCountryContext={urlCountryContext} />
         <LegalFooter />
         <ScrollToTopBottom />
       </div>

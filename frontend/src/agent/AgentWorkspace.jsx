@@ -3,12 +3,15 @@ import { studioApi, getSession } from "../studio/studioApi";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
 
-function emptyPropertyForm() {
+function emptyPropertyForm(urlCountryContext) {
   return {
-    country: "India", stateProvince: "Telangana", city: "", location: "",
+    country: urlCountryContext ? urlCountryContext.name : "India",
+    stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
+    city: urlCountryContext ? urlCountryContext.city : "", location: "",
     propertyType: "Apartment", propertyName: "", developerName: "",
     quotedPrice: "", governmentGuidance: "", marketAverage: "", unitArea: "",
-    monthlyRent: "0", areaUnit: "sqft", lat: null, lon: null,
+    monthlyRent: "0", areaUnit: urlCountryContext?.unit_system === "metric" ? "sq meter" : "sqft",
+    lat: null, lon: null,
     addressQuery: "",
   };
 }
@@ -36,7 +39,7 @@ function formatPrice(usdAmount, currency, fxRates) {
   }
 }
 
-function AgentWorkspace({ onBack, currency }) {
+function AgentWorkspace({ onBack, currency, urlCountryContext }) {
   const [view, setView] = useState("dashboard"); // "dashboard" | "workspace"
   const [clients, setClients] = useState(null);
   const [propertiesByClient, setPropertiesByClient] = useState({});
@@ -46,6 +49,8 @@ function AgentWorkspace({ onBack, currency }) {
 
   const [authStep, setAuthStep] = useState(null); // null | "paywall"
   const [paywallTiers, setPaywallTiers] = useState(null);
+  const [quota, setQuota] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [showAddClient, setShowAddClient] = useState(false);
   const [editingClientId, setEditingClientId] = useState(null); // client_id being edited, or null for "add new"
@@ -53,11 +58,16 @@ function AgentWorkspace({ onBack, currency }) {
   const [clientContactInput, setClientContactInput] = useState("");
 
   const [propertyFormFor, setPropertyFormFor] = useState(null); // { clientId, propertyId | null } — propertyId set means "editing", null means "adding new"
-  const [propertyForm, setPropertyForm] = useState(emptyPropertyForm());
+  const [propertyForm, setPropertyForm] = useState(emptyPropertyForm(urlCountryContext));
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const debounceRef = useRef(null);
 
   const [generatingReportFor, setGeneratingReportFor] = useState(null);
+
+  const [compareModeForClient, setCompareModeForClient] = useState(null); // client_id currently in "select properties to compare" mode
+  const [selectedForCompare, setSelectedForCompare] = useState([]); // property_ids checked
+  const [comparing, setComparing] = useState(false);
+  const [compareResults, setCompareResults] = useState(null); // { clientId, results }
 
   const loadPaywallTiers = () => {
     if (paywallTiers !== null) return;
@@ -90,6 +100,11 @@ function AgentWorkspace({ onBack, currency }) {
         }
       });
 
+  const refreshQuota = () =>
+    studioApi.agentGetQuotaSummary()
+      .then((res) => setQuota(res))
+      .catch(() => {}); // a quota-display failure shouldn't block the rest of the page
+
   const loadClients = () => {
     setError("");
     setLoading(true);
@@ -98,8 +113,16 @@ function AgentWorkspace({ onBack, currency }) {
 
   useEffect(() => {
     fetchClients();
+    refreshQuota();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const t = setTimeout(() => setSuccessMessage(""), 5000);
+    return () => clearTimeout(t);
+  }, [successMessage]);
+
 
   const openAddClient = () => {
     setEditingClientId(null);
@@ -122,12 +145,15 @@ function AgentWorkspace({ onBack, currency }) {
     try {
       if (editingClientId) {
         await studioApi.agentUpdateClient(editingClientId, clientNameInput.trim(), clientContactInput.trim() || null);
+        setSuccessMessage("Client updated.");
       } else {
         await studioApi.agentCreateClient(clientNameInput.trim(), clientContactInput.trim() || null);
+        setSuccessMessage("Client added.");
       }
       setShowAddClient(false);
       setEditingClientId(null);
       await loadClients();
+      await refreshQuota();
     } catch (err) {
       setError(err.message || "Couldn't save this client.");
     }
@@ -139,6 +165,10 @@ function AgentWorkspace({ onBack, currency }) {
     try {
       await studioApi.agentDeleteClient(clientId);
       await loadClients();
+      const updated = await studioApi.agentGetQuotaSummary().catch(() => null);
+      setQuota(updated);
+      const remaining = updated && updated.client_limit != null ? updated.client_limit - updated.client_count : null;
+      setSuccessMessage(remaining != null ? `Client deleted. You now have ${remaining} of ${updated.client_limit} client slot(s) free.` : "Client deleted.");
     } catch (err) {
       setError(err.message || "Couldn't delete this client.");
     }
@@ -172,7 +202,7 @@ function AgentWorkspace({ onBack, currency }) {
       return;
     }
     debounceRef.current = setTimeout(() => {
-      const isoCode = { India: "in", Thailand: "th", Philippines: "ph", Vietnam: "vn", Indonesia: "id" }[propertyForm.country] || "in";
+      const isoCode = urlCountryContext ? urlCountryContext.code : "in";
       fetch(`${API_BASE}/api/neighborhood-insights/autocomplete?q=${encodeURIComponent(value)}&country=${isoCode}`)
         .then((res) => res.json())
         .then((data) => setAddressSuggestions(Array.isArray(data) ? data : []))
@@ -195,7 +225,7 @@ function AgentWorkspace({ onBack, currency }) {
 
   const openAddProperty = (clientId) => {
     setPropertyFormFor({ clientId, propertyId: null });
-    setPropertyForm(emptyPropertyForm());
+    setPropertyForm(emptyPropertyForm(urlCountryContext));
     setAddressSuggestions([]);
   };
 
@@ -223,13 +253,16 @@ function AgentWorkspace({ onBack, currency }) {
     try {
       if (propertyFormFor.propertyId) {
         await studioApi.agentUpdateClientProperty(propertyFormFor.propertyId, payload);
+        setSuccessMessage("Property updated.");
       } else {
         await studioApi.agentCreateClientProperty(propertyFormFor.clientId, payload);
+        setSuccessMessage("Property added.");
       }
       const clientId = propertyFormFor.clientId;
       setPropertyFormFor(null);
       const res = await studioApi.agentListClientProperties(clientId);
       setPropertiesByClient((prev) => ({ ...prev, [clientId]: res.properties }));
+      await refreshQuota();
     } catch (err) {
       setError(err.message || "Couldn't save this property.");
     }
@@ -242,6 +275,11 @@ function AgentWorkspace({ onBack, currency }) {
       await studioApi.agentDeleteClientProperty(propertyId);
       const res = await studioApi.agentListClientProperties(clientId);
       setPropertiesByClient((prev) => ({ ...prev, [clientId]: res.properties }));
+      const updated = await studioApi.agentGetQuotaSummary().catch(() => null);
+      setQuota(updated);
+      const limit = updated?.property_limit_per_client;
+      const used = updated?.per_client_property_counts?.[clientId] ?? res.properties.length;
+      setSuccessMessage(limit != null ? `Property deleted. This client now has ${limit - used} of ${limit} property slot(s) free.` : "Property deleted.");
     } catch (err) {
       setError(err.message || "Couldn't delete this property.");
     }
@@ -271,6 +309,35 @@ function AgentWorkspace({ onBack, currency }) {
     }
   };
 
+  const startCompareMode = (clientId) => {
+    setCompareModeForClient(clientId);
+    setSelectedForCompare([]);
+    setCompareResults(null);
+  };
+
+  const toggleSelectedForCompare = (propertyId) => {
+    setSelectedForCompare((prev) =>
+      prev.includes(propertyId) ? prev.filter((id) => id !== propertyId) : prev.length >= 5 ? prev : [...prev, propertyId]
+    );
+  };
+
+  const handleRunCompare = async (clientId) => {
+    if (selectedForCompare.length < 2) {
+      setError("Select at least 2 properties to compare.");
+      return;
+    }
+    setError("");
+    setComparing(true);
+    try {
+      const res = await studioApi.agentCompareProperties(clientId, selectedForCompare);
+      setCompareResults({ clientId, results: res.results });
+    } catch (err) {
+      setError(err.message || "Couldn't compare these properties right now.");
+    } finally {
+      setComparing(false);
+    }
+  };
+
   const totalProperties = Object.values(propertiesByClient).reduce((sum, list) => sum + list.length, 0);
 
   return (
@@ -285,6 +352,7 @@ function AgentWorkspace({ onBack, currency }) {
 
       <div className="agent-content">
         {error && <div className="agent-error-banner">{error}</div>}
+        {successMessage && <div className="agent-success-banner">{successMessage}</div>}
 
         {authStep === "paywall" && (
           <div className="agent-paywall">
@@ -347,6 +415,14 @@ function AgentWorkspace({ onBack, currency }) {
                   </button>
                 </div>
 
+                {quota && quota.client_limit != null && (
+                  <div className={`agent-quota-banner ${quota.client_count >= quota.client_limit ? "agent-quota-banner-danger" : quota.client_count >= quota.client_limit * 0.8 ? "agent-quota-banner-warning" : ""}`}>
+                    {quota.client_count} of {quota.client_limit} client slots used
+                    {quota.client_count >= quota.client_limit && " — limit reached, delete a client to add another"}
+                    {quota.client_count < quota.client_limit && quota.client_count >= quota.client_limit * 0.8 && " — nearing your plan's limit"}
+                  </div>
+                )}
+
                 {showAddClient && (
                   <form className="agent-add-client-form" onSubmit={handleSaveClient}>
                     <input type="text" placeholder="Client name" value={clientNameInput} onChange={(e) => setClientNameInput(e.target.value)} required autoFocus />
@@ -383,11 +459,39 @@ function AgentWorkspace({ onBack, currency }) {
 
                       {expandedClientId === c.client_id && (
                         <div className="agent-client-properties">
+                          {(propertiesByClient[c.client_id] || []).length >= 2 && (
+                            <div className="agent-compare-toggle-row">
+                              {compareModeForClient === c.client_id ? (
+                                <>
+                                  <button type="button" className="agent-primary-btn agent-small-btn" onClick={() => handleRunCompare(c.client_id)} disabled={comparing}>
+                                    {comparing ? "Comparing..." : `Compare Selected (${selectedForCompare.length})`}
+                                  </button>
+                                  <button type="button" className="agent-text-btn" onClick={() => { setCompareModeForClient(null); setCompareResults(null); }}>Cancel</button>
+                                </>
+                              ) : (
+                                <button type="button" className="agent-text-btn" onClick={() => startCompareMode(c.client_id)}>
+                                  ⚖ Compare properties
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           {(propertiesByClient[c.client_id] || []).map((p) => (
                             <div key={p.property_id} className="agent-property-row">
-                              <div>
-                                <strong>{p.property_payload.propertyName}</strong>
-                                <div className="agent-property-meta">{p.property_payload.location}, {p.property_payload.city}{p.lat == null && <span className="agent-no-coords-note"> · no coordinates yet</span>}</div>
+                              <div className="agent-property-row-main">
+                                {compareModeForClient === c.client_id && (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedForCompare.includes(p.property_id)}
+                                    disabled={p.lat == null}
+                                    title={p.lat == null ? "No coordinates yet — can't be compared" : undefined}
+                                    onChange={() => toggleSelectedForCompare(p.property_id)}
+                                  />
+                                )}
+                                <div>
+                                  <strong>{p.property_payload.propertyName}</strong>
+                                  <div className="agent-property-meta">{p.property_payload.location}, {p.property_payload.city}{p.lat == null && <span className="agent-no-coords-note"> · no coordinates yet</span>}</div>
+                                </div>
                               </div>
                               <div className="agent-property-actions">
                                 <button
@@ -405,6 +509,43 @@ function AgentWorkspace({ onBack, currency }) {
                               </div>
                             </div>
                           ))}
+
+                          {compareResults && compareResults.clientId === c.client_id && (
+                            <div className="agent-compare-results">
+                              <table className="agent-compare-table">
+                                <thead>
+                                  <tr>
+                                    <th>Metric</th>
+                                    {compareResults.results.map((r) => <th key={r.property_id}>{r.property_name}</th>)}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    <td>Avg. Price/Sqft</td>
+                                    {compareResults.results.map((r) => (
+                                      <td key={r.property_id}>
+                                        {r.has_data && r.resale_signal?.has_data
+                                          ? `${r.resale_signal.currency} ${r.resale_signal.average_price_per_sqft.toLocaleString()}`
+                                          : r.has_data ? "No data" : "No coordinates"}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                  <tr>
+                                    <td>Overall Ranking</td>
+                                    {compareResults.results.map((r) => (
+                                      <td key={r.property_id}>{r.has_data && r.overall_ranking?.has_data ? `${r.overall_ranking.score} / 100` : "—"}</td>
+                                    ))}
+                                  </tr>
+                                  <tr>
+                                    <td>Flood-Risk Proximity</td>
+                                    {compareResults.results.map((r) => (
+                                      <td key={r.property_id}>{r.has_data && r.flood_risk?.has_data ? `${r.flood_risk.nearby_water_count} nearby` : "—"}</td>
+                                    ))}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
 
                           {propertyFormFor && propertyFormFor.clientId === c.client_id ? (
                             <form className="agent-add-property-form" onSubmit={handleSaveProperty}>
@@ -443,9 +584,22 @@ function AgentWorkspace({ onBack, currency }) {
                               </div>
                             </form>
                           ) : (
-                            <button type="button" className="agent-text-btn agent-add-property-link" onClick={() => openAddProperty(c.client_id)}>
-                              + Add a property for {c.client_name}
-                            </button>
+                            <>
+                              {quota && quota.property_limit_per_client != null && (() => {
+                                const usedForClient = quota.per_client_property_counts?.[c.client_id] ?? (propertiesByClient[c.client_id] || []).length;
+                                const limit = quota.property_limit_per_client;
+                                if (usedForClient < limit * 0.8) return null;
+                                return (
+                                  <div className={`agent-quota-banner agent-quota-banner-inline ${usedForClient >= limit ? "agent-quota-banner-danger" : "agent-quota-banner-warning"}`}>
+                                    {usedForClient} of {limit} property slots used for this client
+                                    {usedForClient >= limit && " — limit reached"}
+                                  </div>
+                                );
+                              })()}
+                              <button type="button" className="agent-text-btn agent-add-property-link" onClick={() => openAddProperty(c.client_id)}>
+                                + Add a property for {c.client_name}
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
