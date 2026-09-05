@@ -3503,7 +3503,7 @@ def neighborhood_section_visibility():
     return get_ni_section_visibility()
 
 
-HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert"]
+HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker"]
 HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
 
 
@@ -3532,6 +3532,48 @@ def homepage_panel_visibility():
     no-redeploy-needed operational control as Neighborhood Insights'
     own section visibility."""
     return get_homepage_panel_visibility()
+
+
+# Every city ALL_COMPARABLES actually covers, mapped to its real
+# country — needed since that dataset only records a city, not a
+# country, and the ticker below needs to filter by country.
+COMPARABLES_CITY_TO_COUNTRY = {
+    "Ahmedabad": "India", "Bangalore": "India", "Chennai": "India", "Delhi": "India",
+    "Hyderabad": "India", "Kolkata": "India", "Lucknow": "India", "Mumbai": "India",
+    "Nagpur": "India", "Pune": "India",
+    "Bangkok": "Thailand", "Chiang Mai": "Thailand", "Pattaya": "Thailand", "Phuket": "Thailand",
+    "Cebu City": "Philippines", "Makati": "Philippines", "Manila": "Philippines", "Quezon City": "Philippines",
+    "Da Nang": "Vietnam", "Hanoi": "Vietnam", "Ho Chi Minh City": "Vietnam",
+    "Bandung": "Indonesia", "Jakarta": "Indonesia",
+}
+
+
+@app.get("/api/homepage/hottest-properties")
+def homepage_hottest_properties(country: str = "India", limit: int = 8):
+    """Public (no auth) — real data for the homepage ticker, not
+    invented listings: the exact same static comparables dataset the
+    resale-signal card elsewhere in this app already uses, filtered to
+    the requested country and ranked by real price/sqft (the one real,
+    transparent number this dataset actually has — not a fabricated
+    "demand" or "hotness" score this app has no way to genuinely
+    measure). Labeled honestly to the visitor as "featured listings by
+    price/sqft," not an unqualified claim of real-time market
+    activity."""
+    matching = [
+        c for c in ALL_COMPARABLES
+        if COMPARABLES_CITY_TO_COUNTRY.get(c.city, "").lower() == country.strip().lower()
+    ]
+    matching.sort(key=lambda c: c.price_per_sqft, reverse=True)
+    return {
+        "country": country,
+        "properties": [
+            {
+                "project_name": c.project_name, "developer": c.developer, "city": c.city,
+                "property_type": c.property_type, "price_per_sqft": c.price_per_sqft,
+            }
+            for c in matching[:limit]
+        ],
+    }
 
 
 @app.get("/api/neighborhood-insights/resale-signal")

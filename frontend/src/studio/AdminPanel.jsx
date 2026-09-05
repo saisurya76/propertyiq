@@ -809,6 +809,7 @@ function AdminPanel({ onBack }) {
                   { key: "red_flag_hunt", label: "Red Flag Hunt — Can You Spot the Red Flags? (Free)" },
                   { key: "challenge_a_friend", label: "Should I Buy This? — Challenge a Friend (Free)" },
                   { key: "price_drop_alert", label: "Price Drop Alert — Let PropertyIQ Watch For You (Free)" },
+                  { key: "hottest_properties_ticker", label: "Hottest Properties ticker (below the logo)" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`homepage-toggle-${key}`}>{label}</label>

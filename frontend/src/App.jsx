@@ -3,6 +3,7 @@ import "./App.css";
 import "./studio/studio.css";
 
 import PropertyForm from "./components/PropertyForm";
+import HottestPropertiesTicker from "./HottestPropertiesTicker";
 import CollapsiblePanel from "./components/CollapsiblePanel";
 import InstantScorePanel from "./components/InstantScorePanel";
 import HiddenDealPanel from "./components/HiddenDealPanel";
@@ -168,8 +169,14 @@ function App() {
   // controls this operationally, without a redeploy).
   const [homepagePanelVisibility, setHomepagePanelVisibility] = useState({
     instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
-    challenge_a_friend: true, price_drop_alert: true,
+    challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
   });
+  // Captured from the same real ipapi.co lookup the language-detection
+  // effect below already makes (not a second, duplicate call) — the
+  // one real signal the hottest-properties ticker needs for "if it's
+  // global, use the country the visitor is actually accessing the
+  // site from," per the explicit requirement this was built for.
+  const [detectedCountryName, setDetectedCountryName] = useState(null);
   useEffect(() => {
     fetch("https://propertyiq-api-q21y.onrender.com/api/homepage-panels/visibility")
       .then((res) => res.json())
@@ -332,6 +339,15 @@ function App() {
           // signal — it should win over IP-based geolocation, not get
           // silently overridden by wherever the visitor actually is.
           if (data.currency && !cancelled && !urlCountryContext) setCurrency(data.currency);
+          // Real IP-geolocation result, mapped to one of the 5
+          // countries this app actually has hottest-properties data
+          // for — anything else (a visitor from a country PropertyIQ
+          // doesn't cover) honestly falls back to India below, in the
+          // ticker's own resolution logic, rather than showing empty
+          // results silently.
+          const TICKER_COUNTRY_BY_ISO2 = { in: "India", th: "Thailand", ph: "Philippines", vn: "Vietnam", id: "Indonesia" };
+          const detectedTickerCountry = TICKER_COUNTRY_BY_ISO2[(data.country_code || "").toLowerCase()];
+          if (detectedTickerCountry && !cancelled) setDetectedCountryName(detectedTickerCountry);
           const mapped = COUNTRY_LANGUAGE_MAP[data.country_code];
           const geoLanguage = (data.languages || "").split(",")[0]?.trim();
           if (mapped) {
@@ -1087,6 +1103,10 @@ function App() {
       </p>
 
       </div>
+
+      {homepagePanelVisibility.hottest_properties_ticker && (
+        <HottestPropertiesTicker country={urlCountryContext ? urlCountryContext.name : (detectedCountryName || "India")} />
+      )}
 
       <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
         <span className="feature-strip-icon">🏗</span>

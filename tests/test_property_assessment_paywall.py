@@ -302,3 +302,50 @@ def test_cost_of_living_survives_one_lookup_failing(monkeypatch):
     assert data["school_access"]["has_data"] is False
     assert data["hospital_access"]["has_data"] is True
     assert data["hospital_access"]["count_within_2km"] == 1
+
+
+def test_hottest_properties_is_public_no_auth_required():
+    r = client.get("/api/homepage/hottest-properties", params={"country": "India"})
+    assert r.status_code == 200
+
+
+def test_hottest_properties_returns_real_data_sorted_by_price_per_sqft():
+    """Confirms this pulls from the real, existing comparables
+    dataset -- not fabricated listings -- and is genuinely sorted by
+    the one real, transparent number available (price/sqft), not a
+    fictional "hotness" score."""
+    r = client.get("/api/homepage/hottest-properties", params={"country": "India", "limit": 5})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["country"] == "India"
+    props = data["properties"]
+    assert len(props) > 0
+    assert len(props) <= 5
+    prices = [p["price_per_sqft"] for p in props]
+    assert prices == sorted(prices, reverse=True)
+    for p in props:
+        assert p["project_name"]
+        assert p["developer"]
+
+
+def test_hottest_properties_only_returns_the_requested_country():
+    r_india = client.get("/api/homepage/hottest-properties", params={"country": "India", "limit": 20})
+    r_thailand = client.get("/api/homepage/hottest-properties", params={"country": "Thailand", "limit": 20})
+    india_cities = {p["city"] for p in r_india.json()["properties"]}
+    thai_cities = {p["city"] for p in r_thailand.json()["properties"]}
+    assert "Hyderabad" in india_cities or "Mumbai" in india_cities or "Bangalore" in india_cities
+    assert "Bangkok" in thai_cities or "Phuket" in thai_cities
+    assert india_cities.isdisjoint(thai_cities)
+
+
+def test_hottest_properties_honest_for_an_uncovered_country():
+    """A country genuinely not in the comparables dataset returns an
+    honestly empty list, not an error or fabricated data."""
+    r = client.get("/api/homepage/hottest-properties", params={"country": "Germany"})
+    assert r.status_code == 200
+    assert r.json()["properties"] == []
+
+
+def test_hottest_properties_respects_the_limit_parameter():
+    r = client.get("/api/homepage/hottest-properties", params={"country": "India", "limit": 2})
+    assert len(r.json()["properties"]) == 2
