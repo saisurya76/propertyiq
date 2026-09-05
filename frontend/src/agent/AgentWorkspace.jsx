@@ -459,7 +459,7 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
 
                       {expandedClientId === c.client_id && (
                         <div className="agent-client-properties">
-                          {(propertiesByClient[c.client_id] || []).length >= 2 && (
+                          {(propertiesByClient[c.client_id] || []).length >= 2 ? (
                             <div className="agent-compare-toggle-row">
                               {compareModeForClient === c.client_id ? (
                                 <>
@@ -474,6 +474,10 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                                 </button>
                               )}
                             </div>
+                          ) : (
+                            <p className="agent-compare-hint">
+                              ⚖ Add {2 - (propertiesByClient[c.client_id] || []).length} more propert{(propertiesByClient[c.client_id] || []).length === 1 ? "y" : "ies"} for this client to unlock comparison.
+                            </p>
                           )}
 
                           {(propertiesByClient[c.client_id] || []).map((p) => (

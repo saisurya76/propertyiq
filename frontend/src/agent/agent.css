@@ -511,3 +511,12 @@
   color: #475569;
   font-weight: 700;
 }
+
+.agent-compare-hint {
+  color: #94A3B8;
+  font-size: 13px;
+  font-style: italic;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #F1F5F9;
+}
