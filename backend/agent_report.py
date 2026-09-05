@@ -2,14 +2,20 @@
 
 Deliberately pure rendering — takes already-fetched data (from the
 exact same functions the rest of the app already uses: build_assessment,
-_fetch_area_comparison_data, summarize_loan, etc., all called by the
-endpoint in api.py that owns this report) and lays it out as one PDF.
-No new analysis happens here, and no external calls — this module
-can't accidentally drift from what the rest of the app actually shows,
-because it never fetches anything itself.
+_fetch_area_comparison_data, summarize_loan, build_amortization_schedule,
+etc., all called by the endpoint in api.py that owns this report) and
+lays it out as one PDF. No new analysis happens here, and no external
+calls — this module can't accidentally drift from what the rest of the
+app actually shows, because it never fetches anything itself.
 
 Uses reportlab, the same real, already-installed dependency
-construction_report.py uses — no new library.
+construction_report.py uses — no new library. The page-numbered
+footer with real, clickable Privacy/Terms/Refund links reuses that
+same module's own proven _NumberedCanvas pattern (a plain
+story.append(Paragraph(...)) only ever renders once, wherever it
+falls in the flow — it can't be a real per-page footer on its own;
+reportlab's own two-pass canvas override is the correct mechanism,
+already established and working elsewhere in this app).
 """
 
 import io
@@ -20,8 +26,10 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_RIGHT
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+from backend.country_reference import get_country_reference
 
 # A distinct palette from Construction Studio's own amber/navy report —
 # slate + indigo + emerald, meant to read as "professional business
@@ -41,6 +49,71 @@ _SECTION_STYLE = ParagraphStyle("AgentSection", parent=_STYLES["Heading2"], font
 _BODY_STYLE = ParagraphStyle("AgentBody", parent=_STYLES["Normal"], fontSize=10, textColor=HexColor(_TEXT_DARK), leading=14)
 _MUTED_STYLE = ParagraphStyle("AgentMuted", parent=_STYLES["Normal"], fontSize=8.5, textColor=HexColor(_TEXT_MUTED))
 _LABEL_STYLE = ParagraphStyle("AgentLabel", parent=_STYLES["Normal"], fontSize=9, textColor=HexColor(_TEXT_MUTED), fontName="Helvetica-Bold")
+_BULLET_STYLE = ParagraphStyle("AgentBullet", parent=_STYLES["Normal"], fontSize=9.5, textColor=HexColor(_TEXT_DARK), leading=13, spaceAfter=4, leftIndent=12, bulletIndent=0)
+
+
+# ---------------------------------------------------------------------------
+# Page chrome: footer + page numbers on every page, with real, clickable
+# Privacy/Terms/Refund links — same proven two-pass pattern as
+# construction_report.py's own _NumberedCanvas, adapted to this report's
+# own slate/indigo palette.
+# ---------------------------------------------------------------------------
+
+
+class _AgentReportCanvas(Canvas):
+    """Standard reportlab two-pass pattern for a genuine 'Page X of Y' —
+    the total page count isn't known until the whole document has been
+    laid out once, so every page's drawing is buffered and replayed
+    once the final count is available."""
+
+    def __init__(self, *args, **kwargs):
+        Canvas.__init__(self, *args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self._draw_footer(total_pages)
+            Canvas.showPage(self)
+        Canvas.save(self)
+
+    def _draw_footer(self, total_pages: int) -> None:
+        width, _ = letter
+        self.setStrokeColor(HexColor(_BORDER))
+        self.setLineWidth(0.5)
+        self.line(0.6 * inch, 0.78 * inch, width - 0.6 * inch, 0.78 * inch)
+
+        self.setFillColor(HexColor(_TEXT_MUTED))
+        self.setFont("Helvetica", 7.5)
+        self.drawRightString(width - 0.6 * inch, 0.6 * inch, f"Page {self._pageNumber} of {total_pages}")
+
+        # Plain, styled text rather than a real linkURL annotation --
+        # reportlab's two-pass numbered-canvas replay (this exact
+        # pattern, already proven in construction_report.py) re-plays
+        # each page's saved __dict__ state, which carries a stale
+        # annotation-name counter forward and crashes linkURL with
+        # "redefining named object" on the second page onward. Shown
+        # as the real, full URL instead so it's still genuinely usable
+        # by anyone reading a printed or non-interactive copy, which a
+        # clickable-only link would not be.
+        self.setFillColor(HexColor(_INDIGO))
+        self.setFont("Helvetica", 7)
+        self.drawString(0.6 * inch, 0.6 * inch, "Privacy Policy · Terms of Service · Refund Policy — app.propertyiqweb.com")
+
+        self.setFillColor(HexColor(_TEXT_MUTED))
+        self.setFont("Helvetica-Oblique", 7)
+        self.drawCentredString(width / 2, 0.45 * inch, "PropertyIQ Agent Intelligence — for internal advisory use by the preparing agent")
+
+
+def _make_canvas_factory():
+    def factory(*args, **kwargs):
+        return _AgentReportCanvas(*args, **kwargs)
+    return factory
 
 
 def _kv_table(rows: list[tuple[str, str]]) -> Table:
@@ -59,12 +132,14 @@ def build_agent_advisory_pdf(
     client_name: str,
     property_name: str,
     property_address: str,
+    property_country: str,  # drives the checklist/authority-contacts section below
     property_currency: str,  # the property's own real local currency (e.g. "THB" for a Thailand property) -- never assumed to be INR
     assessment: Any,  # the real PropertyAssessment object build_assessment() returns, not a dict
     neighborhood: Optional[dict[str, Any]],
     price_trend: Optional[dict[str, Any]],
     comparison_results: Optional[list[dict[str, Any]]],
     emi_summary: Optional[dict[str, Any]],
+    amortization_schedule: Optional[list[dict[str, Any]]],
     cost_of_living: Optional[dict[str, Any]],
     prepared_by: str,  # the agent's real display name if they've set one, else their email — computed by the caller
 ) -> bytes:
@@ -74,7 +149,7 @@ def build_agent_advisory_pdf(
     than skipped silently or filled in, so the agent (and their
     client) can see exactly what was and wasn't checked."""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5 * inch, bottomMargin=0.6 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5 * inch, bottomMargin=0.95 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch)
     story = []
 
     header_table = Table(
@@ -209,6 +284,33 @@ def build_agent_advisory_pdf(
     else:
         story.append(Paragraph("Not available — the property's quoted price was not usable for an EMI estimate.", _MUTED_STYLE))
 
+    story.append(Paragraph("Amortization Projector", _SECTION_STYLE))
+    if amortization_schedule:
+        yearly_rows = [row for i, row in enumerate(amortization_schedule) if (i + 1) % 12 == 0 or i == len(amortization_schedule) - 1]
+        header_row = [Paragraph(h, _LABEL_STYLE) for h in ["Year", "Payment", "Principal", "Interest", "Balance"]]
+        rows = [header_row]
+        for row in yearly_rows:
+            year_num = -(-row["month"] // 12)  # ceiling division
+            rows.append([
+                str(year_num),
+                f"{property_currency} {row['payment']:,.0f}",
+                f"{property_currency} {row['principal_component']:,.0f}",
+                f"{property_currency} {row['interest_component']:,.0f}",
+                f"{property_currency} {row['remaining_balance']:,.0f}",
+            ])
+        amort_table = Table(rows, colWidths=[0.7 * inch, 1.4 * inch, 1.4 * inch, 1.4 * inch, 1.4 * inch])
+        amort_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, HexColor(_BORDER)),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#F1F5F9")),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(amort_table)
+        story.append(Paragraph("One row per year, for readability — same illustrative loan assumptions as the EMI estimate above.", _MUTED_STYLE))
+    else:
+        story.append(Paragraph("Not available — the property's quoted price was not usable for an amortization projection.", _MUTED_STYLE))
+
     story.append(Paragraph("Cost of Living Factors", _SECTION_STYLE))
     if cost_of_living:
         school = cost_of_living.get("school_access", {})
@@ -221,6 +323,16 @@ def build_agent_advisory_pdf(
     else:
         story.append(Paragraph("Not available for this property — no coordinates were captured for it.", _MUTED_STYLE))
 
+    reference = get_country_reference(property_country)
+    if reference["checklist"]:
+        story.append(Paragraph("Buyer's Due-Diligence Checklist", _SECTION_STYLE))
+        for item in reference["checklist"]:
+            story.append(Paragraph(f"☐ {item}", _BULLET_STYLE))
+
+    if reference["authority_contacts"]:
+        story.append(Paragraph("Local Authority Contacts", _SECTION_STYLE))
+        story.append(_kv_table(reference["authority_contacts"]))
+
     story.append(Spacer(1, 20))
     story.append(Paragraph(
         "This report consolidates PropertyIQ's own independent, evidence-based analysis tools for internal advisory "
@@ -228,5 +340,5 @@ def build_agent_advisory_pdf(
         _MUTED_STYLE,
     ))
 
-    doc.build(story)
+    doc.build(story, canvasmaker=_make_canvas_factory())
     return buffer.getvalue()

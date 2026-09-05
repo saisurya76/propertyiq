@@ -4986,11 +4986,14 @@ def api_agent_generate_report(property_id: str, user_email: str = Depends(get_cu
         neighborhood = _fetch_area_comparison_data(area)
 
     emi_summary = None
+    amortization_schedule = None
     if payload.get("quotedPrice"):
         try:
             emi_summary = summarize_loan(payload["quotedPrice"], 8.5, 20)  # a reasonable, clearly-labeled illustrative default -- not the client's own real loan terms, which this feature has no way to know
+            amortization_schedule = build_amortization_schedule(payload["quotedPrice"], 8.5, 20)
         except ValueError:
             emi_summary = None
+            amortization_schedule = None
 
     cost_of_living = None
     if prop["lat"] is not None and prop["lon"] is not None:
@@ -5023,12 +5026,14 @@ def api_agent_generate_report(property_id: str, user_email: str = Depends(get_cu
         client_name=client["client_name"] if client else "Unknown Client",
         property_name=payload.get("propertyName", "Unnamed Property"),
         property_address=f"{payload.get('location', '')}, {payload.get('city', '')}",
+        property_country=payload.get("country", "India"),
         property_currency=property_currency,
         assessment=assessment,
         neighborhood=neighborhood,
         price_trend=price_trend,
         comparison_results=comparison_results,
         emi_summary=emi_summary,
+        amortization_schedule=amortization_schedule,
         cost_of_living=cost_of_living,
         prepared_by=get_display_name(user_email) or user_email,
     )

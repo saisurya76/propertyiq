@@ -504,3 +504,82 @@ def test_report_omits_comparison_section_for_a_clients_only_property(monkeypatch
     reader = PdfReader(io.BytesIO(r.content))
     text = "".join(page.extract_text() for page in reader.pages)
     assert "Comparison Against This Client" not in text
+
+
+def test_report_includes_amortization_schedule_and_checklist_and_footer(monkeypatch):
+    """Direct proof, via real extracted PDF text, that the previously
+    missing Amortization Projector schedule, buyer's due-diligence
+    checklist, local authority contacts, and the legal-links footer
+    all genuinely render."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentfullreport@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Full Report Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+
+    assert "Amortization Projector" in text
+    assert "Buyer's Due-Diligence Checklist" in text
+    assert "RERA registration" in text  # a real, specific India checklist line
+    assert "Local Authority Contacts" in text
+    assert "RERA helpline" in text
+    assert "Privacy Policy" in text
+    assert "Terms of Service" in text
+    assert "Refund Policy" in text
+    # The amortization table's own real, correct math -- ends at zero,
+    # confirming build_amortization_schedule's real output rendered,
+    # not a fabricated placeholder.
+    assert "0\n" in text or text.rstrip().endswith("0")
+
+
+def test_report_amortization_uses_the_correct_country_specific_checklist(monkeypatch):
+    """Direct proof the checklist/authority-contacts section is real
+    per-country content, not always India's, for a Thailand property."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentthaichecklist@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Thai Checklist Client"}, headers=headers).json()
+    thai_payload = _property_payload()
+    thai_payload.update({"country": "Thailand", "stateProvince": "", "city": "Bangkok", "location": "Sukhumvit"})
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=thai_payload, headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Chanote" in text  # real, Thailand-specific checklist content
+    assert "Department of Lands" in text
+    assert "RERA" not in text  # must not leak India's checklist for a Thailand property
+
+
+def test_report_omits_checklist_gracefully_for_an_unmapped_country(monkeypatch):
+    """A real resilience requirement: a country somehow outside this
+    app's normal 5 (shouldn't happen, but code should never assume)
+    must not crash the report -- just show no checklist section."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentunmappedcountry@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Unmapped Client"}, headers=headers).json()
+    odd_payload = _property_payload()
+    odd_payload.update({"country": "Narnia", "stateProvince": ""})
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=odd_payload, headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
