@@ -36,6 +36,7 @@ def initialize_agent_store() -> None:
                 )
                 """
             )
+            cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS requirements TEXT")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS agent_client_properties (
@@ -128,6 +129,23 @@ def update_client(*, client_id: str, client_name: str, client_contact: Optional[
             cursor.execute(
                 "UPDATE agent_clients SET client_name = %s, client_contact = %s WHERE client_id = %s",
                 (client_name.strip(), client_contact, client_id),
+            )
+        connection.commit()
+    return get_client(client_id)
+
+
+def update_client_requirements(*, client_id: str, requirements: Optional[str]) -> Optional[dict[str, Any]]:
+    """A separate, focused update — same reasoning as
+    update_property_stage — rather than folding this into
+    update_client, since requirements is edited independently
+    (typically from the requirements-search box itself, not the
+    client-details edit form)."""
+    cleaned = requirements.strip() if requirements and requirements.strip() else None
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE agent_clients SET requirements = %s WHERE client_id = %s",
+                (cleaned, client_id),
             )
         connection.commit()
     return get_client(client_id)

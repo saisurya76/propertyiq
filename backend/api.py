@@ -78,7 +78,8 @@ from backend.compliance_rules import get_vastu_rules, get_thai_rules
 from backend.design_disciplines import group_by_discipline
 from backend.discipline_overlays import compute_structural_overlay, compute_plumbing_overlay, compute_electrical_overlay
 from backend.comparables import get_comparables, average_price_per_sqft, ALL_COMPARABLES
-from backend.neighborhood_infrastructure import get_infrastructure_summary
+from backend.neighborhood_infrastructure import get_infrastructure_summary, TAVILY_API_KEY
+from tavily import TavilyClient
 
 from backend.loan_calculator import build_amortization_schedule, summarize_loan
 
@@ -88,6 +89,7 @@ from backend.agent_store import (
     get_client,
     list_clients_for_agent,
     update_client,
+    update_client_requirements,
     delete_client,
     count_properties_for_client,
     create_client_property_if_under_limit,
@@ -4881,6 +4883,71 @@ def api_agent_update_client(client_id: str, request: AgentCreateClientRequest, u
         return update_client(client_id=client_id, client_name=request.client_name, client_contact=request.client_contact)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class AgentUpdateRequirementsRequest(BaseModel):
+    requirements: Optional[str] = None
+
+
+@app.put("/api/agent/clients/{client_id}/requirements")
+def api_agent_update_client_requirements(client_id: str, request: AgentUpdateRequirementsRequest, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+    return update_client_requirements(client_id=client_id, requirements=request.requirements)
+
+
+class AgentSearchPropertiesRequest(BaseModel):
+    requirements: Optional[str] = None  # override; falls back to the client's own saved requirements if omitted
+    country: str = "India"
+
+
+@app.post("/api/agent/clients/{client_id}/search-properties")
+def api_agent_search_properties(client_id: str, request: AgentSearchPropertiesRequest, user_email: str = Depends(get_current_user_email)):
+    """Real web search for property listings that plausibly match a
+    client's stated requirements — reuses the exact same Tavily search
+    client and API key this app already uses for neighborhood
+    infrastructure news, not a new integration. Returns real result
+    titles and URLs directly from Tavily; never invents property names
+    or listings itself. Honestly reports when no requirements text is
+    available, or when the search itself fails (missing API key,
+    quota, or a genuine API error), the same way infrastructure search
+    already does."""
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    requirements = (request.requirements or client.get("requirements") or "").strip()
+    if not requirements:
+        return {"has_results": False, "reason": "no_requirements", "results": []}
+
+    if not TAVILY_API_KEY:
+        return {"has_results": False, "reason": "no_api_key", "results": []}
+
+    query = f"{requirements} property for sale {request.country.strip()} 2026"
+    try:
+        tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
+        response = tavily_client.search(
+            query=query,
+            search_depth="basic",
+            max_results=8,
+            include_answer=False,
+            country=request.country.strip().lower(),
+        )
+    except Exception as exc:
+        exc_text = str(exc)
+        is_quota_error = "quota" in exc_text.lower() or "429" in exc_text or "usage" in exc_text.lower()
+        logger.error(f"api_agent_search_properties: Tavily API call failed for client={client_id!r}: {exc}")
+        return {"has_results": False, "reason": "quota_exceeded" if is_quota_error else "api_error", "results": []}
+
+    results = [
+        {"title": r.get("title") or r.get("url", ""), "url": r["url"], "snippet": (r.get("content") or "")[:220]}
+        for r in response.get("results", [])
+        if r.get("url")
+    ]
+    return {"has_results": len(results) > 0, "results": results, "query_used": query}
 
 
 @app.delete("/api/agent/clients/{client_id}")

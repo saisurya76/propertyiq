@@ -933,3 +933,125 @@ def test_named_report_requires_entitlement_and_ownership():
     headers = _authed_headers("agentnamedreportnosub@example.com")
     r = client.post("/api/agent/properties/fake-id/generate-report/location", headers=headers)
     assert r.status_code == 403
+
+
+def test_update_client_requirements_saves_and_clears():
+    headers = _entitled_headers("agentreqsave@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Req Client"}, headers=headers).json()
+    r = client.put(f"/api/agent/clients/{created_client['client_id']}/requirements", json={"requirements": "3BHK apartment under 1.5 crore near good schools"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["requirements"] == "3BHK apartment under 1.5 crore near good schools"
+
+    r2 = client.put(f"/api/agent/clients/{created_client['client_id']}/requirements", json={"requirements": ""}, headers=headers)
+    assert r2.json()["requirements"] is None
+
+
+def test_update_client_requirements_requires_ownership():
+    headers = _entitled_headers("agentreqowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Req Owner Client"}, headers=headers).json()
+    stranger_headers = _entitled_headers("agentreqstranger@example.com")
+    r = client.put(f"/api/agent/clients/{created_client['client_id']}/requirements", json={"requirements": "hijacked"}, headers=stranger_headers)
+    assert r.status_code == 404
+
+
+def test_search_properties_honest_when_no_requirements_at_all():
+    headers = _entitled_headers("agentsearchnoreq@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Req Client"}, headers=headers).json()
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_results"] is False
+    assert r.json()["reason"] == "no_requirements"
+
+
+def test_search_properties_honest_when_api_key_missing():
+    import backend.api as api_module
+    from unittest import mock
+    headers = _entitled_headers("agentsearchnokey@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Key Client"}, headers=headers).json()
+    with mock.patch.object(api_module, "TAVILY_API_KEY", ""):
+        r = client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={"requirements": "3BHK in Hyderabad"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_results"] is False
+    assert r.json()["reason"] == "no_api_key"
+
+
+def test_search_properties_uses_the_clients_saved_requirements_when_no_override_given(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "TAVILY_API_KEY", "fake_key")
+
+    captured_queries = []
+
+    class FakeTavilyClient:
+        def __init__(self, api_key):
+            pass
+
+        def search(self, query, **kwargs):
+            captured_queries.append(query)
+            return {"results": [{"title": "Prestige Skyline", "url": "https://example.com/listing1", "content": "A real 3BHK apartment listing in Hyderabad."}]}
+
+    monkeypatch.setattr(api_module, "TavilyClient", FakeTavilyClient)
+
+    headers = _entitled_headers("agentsearchsaved@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Saved Req Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/requirements", json={"requirements": "3BHK apartment in Hyderabad"}, headers=headers)
+
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_results"] is True
+    assert r.json()["results"][0]["title"] == "Prestige Skyline"
+    assert r.json()["results"][0]["url"] == "https://example.com/listing1"
+    assert "3BHK apartment in Hyderabad" in captured_queries[0]
+
+
+def test_search_properties_override_takes_priority_over_saved_requirements(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "TAVILY_API_KEY", "fake_key")
+
+    captured_queries = []
+
+    class FakeTavilyClient:
+        def __init__(self, api_key):
+            pass
+
+        def search(self, query, **kwargs):
+            captured_queries.append(query)
+            return {"results": []}
+
+    monkeypatch.setattr(api_module, "TavilyClient", FakeTavilyClient)
+
+    headers = _entitled_headers("agentsearchoverride@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Override Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/requirements", json={"requirements": "saved requirement text"}, headers=headers)
+
+    client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={"requirements": "override requirement text"}, headers=headers)
+    assert "override requirement text" in captured_queries[0]
+    assert "saved requirement text" not in captured_queries[0]
+
+
+def test_search_properties_honest_on_a_real_api_error(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "TAVILY_API_KEY", "fake_key")
+
+    class FailingTavilyClient:
+        def __init__(self, api_key):
+            pass
+
+        def search(self, query, **kwargs):
+            raise Exception("network unreachable")
+
+    monkeypatch.setattr(api_module, "TavilyClient", FailingTavilyClient)
+
+    headers = _entitled_headers("agentsearcherror@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Error Client"}, headers=headers).json()
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={"requirements": "anything"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_results"] is False
+    assert r.json()["reason"] == "api_error"
+
+
+def test_search_properties_requires_ownership():
+    headers = _entitled_headers("agentsearchownercheck@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Search Owner Client"}, headers=headers).json()
+    stranger_headers = _entitled_headers("agentsearchstranger@example.com")
+    r = client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={"requirements": "test"}, headers=stranger_headers)
+    assert r.status_code == 404

@@ -59,6 +59,10 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
   const [reportTypes, setReportTypes] = useState([]);
   const [reportsPanelFor, setReportsPanelFor] = useState(null); // property_id currently showing its Reports panel
   const [generatingNamedReportFor, setGeneratingNamedReportFor] = useState(null); // `${propertyId}:${reportType}` currently downloading
+  const [requirementsInput, setRequirementsInput] = useState("");
+  const [savingRequirementsFor, setSavingRequirementsFor] = useState(null);
+  const [searchResultsByClient, setSearchResultsByClient] = useState({});
+  const [searchingFor, setSearchingFor] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
 
   const [showAddClient, setShowAddClient] = useState(false);
@@ -191,6 +195,8 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
       return;
     }
     setExpandedClientId(clientId);
+    const currentClient = clients?.find((c) => c.client_id === clientId);
+    setRequirementsInput(currentClient?.requirements || "");
     if (!propertiesByClient[clientId]) {
       try {
         const res = await studioApi.agentListClientProperties(clientId);
@@ -379,6 +385,33 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
       setError(err.message || "Couldn't generate this report right now.");
     } finally {
       setGeneratingNamedReportFor(null);
+    }
+  };
+
+  const handleSaveRequirements = async (clientId) => {
+    setSavingRequirementsFor(clientId);
+    setError("");
+    try {
+      await studioApi.agentUpdateClientRequirements(clientId, requirementsInput);
+      setClients((prev) => prev.map((c) => (c.client_id === clientId ? { ...c, requirements: requirementsInput.trim() || null } : c)));
+      setSuccessMessage("Requirements saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save requirements.");
+    } finally {
+      setSavingRequirementsFor(null);
+    }
+  };
+
+  const handleSearchProperties = async (clientId) => {
+    setSearchingFor(clientId);
+    setError("");
+    try {
+      const res = await studioApi.agentSearchProperties(clientId, requirementsInput);
+      setSearchResultsByClient((prev) => ({ ...prev, [clientId]: res }));
+    } catch (err) {
+      setError(err.message || "Couldn't search for matching properties right now.");
+    } finally {
+      setSearchingFor(null);
     }
   };
 
@@ -572,6 +605,49 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
 
                       {expandedClientId === c.client_id && (
                         <div className="agent-client-properties">
+                          <div className="agent-requirements-box">
+                            <p className="agent-requirements-label">Client Requirements</p>
+                            <textarea
+                              placeholder="e.g. 3BHK apartment under 1.5 crore near good schools in Kompally"
+                              value={requirementsInput}
+                              onChange={(e) => setRequirementsInput(e.target.value)}
+                              rows={2}
+                              className="agent-requirements-input"
+                            />
+                            <div className="agent-requirements-actions">
+                              <button type="button" className="agent-text-btn" onClick={() => handleSaveRequirements(c.client_id)} disabled={savingRequirementsFor === c.client_id}>
+                                {savingRequirementsFor === c.client_id ? "Saving..." : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                className="agent-primary-btn agent-small-btn"
+                                onClick={() => handleSearchProperties(c.client_id)}
+                                disabled={searchingFor === c.client_id || !requirementsInput.trim()}
+                              >
+                                {searchingFor === c.client_id ? "Searching..." : "🔍 Search for Most Likely Matches"}
+                              </button>
+                            </div>
+                            {searchResultsByClient[c.client_id] && (
+                              <div className="agent-search-results">
+                                {searchResultsByClient[c.client_id].has_results ? (
+                                  searchResultsByClient[c.client_id].results.map((r, i) => (
+                                    <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="agent-search-result-item">
+                                      <strong>{r.title}</strong>
+                                      <span className="agent-search-result-snippet">{r.snippet}</span>
+                                    </a>
+                                  ))
+                                ) : (
+                                  <p className="agent-empty-note" style={{ padding: "8px 0" }}>
+                                    {searchResultsByClient[c.client_id].reason === "no_requirements" && "Enter requirements above and search again."}
+                                    {searchResultsByClient[c.client_id].reason === "no_api_key" && "Property search isn't configured right now."}
+                                    {(searchResultsByClient[c.client_id].reason === "api_error" || searchResultsByClient[c.client_id].reason === "quota_exceeded") && "Couldn't search right now — please try again shortly."}
+                                    {!["no_requirements", "no_api_key", "api_error", "quota_exceeded"].includes(searchResultsByClient[c.client_id].reason) && "No likely matches found."}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
                           {(propertiesByClient[c.client_id] || []).length >= 2 ? (
                             <div className="agent-compare-toggle-row">
                               {compareModeForClient === c.client_id ? (
