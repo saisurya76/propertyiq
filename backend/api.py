@@ -94,9 +94,11 @@ from backend.agent_store import (
     get_client_property,
     list_properties_for_client,
     update_client_property,
+    update_property_stage,
+    PIPELINE_STAGES,
     delete_client_property,
 )
-from backend.agent_report import build_agent_advisory_pdf
+from backend.agent_report import build_agent_advisory_pdf, build_agent_report_pdf, REPORT_TYPES
 from backend.main_report import build_main_property_report_pdf
 
 from backend.neighborhood_comparison_store import (
@@ -140,6 +142,9 @@ from backend.profile_store import (
     COOLING_OFF_DAYS,
     get_display_name,
     set_display_name,
+    get_agent_branding,
+    set_agent_branding,
+    get_email_for_share_slug,
 )
 
 from backend.webhook_store import (
@@ -4807,6 +4812,40 @@ def api_agent_quota_summary(user_email: str = Depends(get_current_user_email)):
     }
 
 
+class AgentBrandingRequest(BaseModel):
+    photo_url: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    brokerage_name: Optional[str] = None
+    custom_footer_text: Optional[str] = None
+    share_slug: Optional[str] = None
+
+
+@app.get("/api/agent/branding")
+def api_agent_get_branding(user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    return get_agent_branding(user_email)
+
+
+@app.post("/api/agent/branding")
+def api_agent_update_branding(request: AgentBrandingRequest, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    fields = request.model_dump(exclude_unset=True)
+    if fields.get("share_slug"):
+        slug = fields["share_slug"].strip().lower()
+        if not slug.replace("-", "").isalnum():
+            raise HTTPException(status_code=400, detail="Share link can only contain letters, numbers, and hyphens.")
+        existing_owner = get_email_for_share_slug(slug)
+        if existing_owner and existing_owner != user_email.strip().lower():
+            raise HTTPException(status_code=409, detail="That share link is already taken — please choose another.")
+        fields["share_slug"] = slug
+    try:
+        return set_agent_branding(user_email, **fields)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+
 class AgentCreateClientRequest(BaseModel):
     client_name: str
     client_contact: Optional[str] = None
@@ -4938,6 +4977,30 @@ def api_agent_update_client_property(property_id: str, request: AgentClientPrope
     return update_client_property(property_id=property_id, property_payload=payload, lat=request.lat, lon=request.lon)
 
 
+class AgentUpdateStageRequest(BaseModel):
+    stage: str
+
+
+@app.get("/api/agent/pipeline-stages")
+def api_agent_pipeline_stages():
+    """Public (no auth needed — this is just the fixed, real list of
+    valid stage names, not any agent's own data), so the frontend
+    dropdown always matches exactly what the backend will accept."""
+    return {"stages": PIPELINE_STAGES}
+
+
+@app.put("/api/agent/properties/{property_id}/stage")
+def api_agent_update_property_stage(property_id: str, request: AgentUpdateStageRequest, user_email: str = Depends(get_current_user_email)):
+    _require_agent_entitlement(user_email)
+    prop = get_client_property(property_id)
+    if prop is None or prop["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Property not found.")
+    try:
+        return update_property_stage(property_id=property_id, stage=request.stage)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.delete("/api/agent/properties/{property_id}")
 def api_agent_delete_client_property(property_id: str, user_email: str = Depends(get_current_user_email)):
     _require_agent_entitlement(user_email)
@@ -4948,17 +5011,13 @@ def api_agent_delete_client_property(property_id: str, user_email: str = Depends
     return {"deleted": True}
 
 
-@app.post("/api/agent/properties/{property_id}/generate-report")
-def api_agent_generate_report(property_id: str, user_email: str = Depends(get_current_user_email)):
-    """The actual "Advise > Monetize" output: one consolidated PDF,
-    built entirely from the exact same functions the rest of this app
-    already uses for a real property assessment (build_assessment),
-    neighborhood data (_fetch_area_comparison_data), and an EMI
-    estimate (summarize_loan) -- this endpoint's only real job is
-    orchestrating those existing calls and handing the results to
-    agent_report.py for layout. No new analysis is invented for this
-    report."""
-    _require_agent_entitlement(user_email)
+def _build_agent_report_context(property_id: str, user_email: str) -> tuple[dict, dict]:
+    """Builds the shared ctx dict every report type renders from —
+    orchestrates the exact same real functions the rest of this app
+    already uses (build_assessment, _fetch_area_comparison_data,
+    summarize_loan, etc.) exactly once, regardless of which report
+    type was actually requested. Returns (ctx, prop) so callers can
+    still use the raw prop record (e.g. for the download filename)."""
     prop = get_client_property(property_id)
     if prop is None or prop["agent_email"] != user_email.strip().lower():
         raise HTTPException(status_code=404, detail="Property not found.")
@@ -4967,6 +5026,12 @@ def api_agent_generate_report(property_id: str, user_email: str = Depends(get_cu
     payload = prop["property_payload"]
     property_request = PropertyRequest(**payload)
     assessment = build_assessment(property_request)
+    recommendation_reasons = get_recommendation_reasons(
+        overpricing_percent=assessment.overpricing_percent,
+        inventory_risk=assessment.inventory_risk,
+        developer_rating=assessment.developer_rating,
+        buyer_protection_score=assessment.buyer_protection_score,
+    )
 
     neighborhood = None
     if prop["lat"] is not None and prop["lon"] is not None:
@@ -5010,25 +5075,67 @@ def api_agent_generate_report(property_id: str, user_email: str = Depends(get_cu
 
     property_currency = COMPARISON_COUNTRY_CURRENCY.get((payload.get("country") or "").strip().lower(), "INR")
 
-    pdf_bytes = build_agent_advisory_pdf(
-        client_name=client["client_name"] if client else "Unknown Client",
-        property_name=payload.get("propertyName", "Unnamed Property"),
-        property_address=f"{payload.get('location', '')}, {payload.get('city', '')}",
-        property_country=payload.get("country", "India"),
-        property_currency=property_currency,
-        assessment=assessment,
-        neighborhood=neighborhood,
-        price_trend=price_trend,
-        comparison_results=comparison_results,
-        emi_summary=emi_summary,
-        amortization_schedule=amortization_schedule,
-        cost_of_living=cost_of_living,
-        prepared_by=get_display_name(user_email) or user_email,
-    )
+    ctx = {
+        "client_name": client["client_name"] if client else "Unknown Client",
+        "property_name": payload.get("propertyName", "Unnamed Property"),
+        "property_address": f"{payload.get('location', '')}, {payload.get('city', '')}",
+        "property_country": payload.get("country", "India"),
+        "property_currency": property_currency,
+        "assessment": assessment,
+        "recommendation_reasons": recommendation_reasons,
+        "neighborhood": neighborhood,
+        "price_trend": price_trend,
+        "comparison_results": comparison_results,
+        "emi_summary": emi_summary,
+        "amortization_schedule": amortization_schedule,
+        "cost_of_living": cost_of_living,
+        "prepared_by": get_display_name(user_email) or user_email,
+        "branding": get_agent_branding(user_email),
+    }
+    return ctx, prop
+
+
+@app.get("/api/agent/report-types")
+def api_agent_report_types():
+    """Public (no auth needed — this is just the fixed, real catalog
+    of report types, not any agent's own data), so the frontend's
+    Reports panel always matches exactly what the backend can build."""
+    return {"report_types": [{"id": k, "label": v["label"]} for k, v in REPORT_TYPES.items() if k != "quick"]}
+
+
+@app.post("/api/agent/properties/{property_id}/generate-report")
+def api_agent_generate_report(property_id: str, user_email: str = Depends(get_current_user_email)):
+    """The original "Generate Quick Report" — one consolidated PDF
+    covering every section. Kept as its own endpoint/URL for backwards
+    compatibility with the existing button; routes through the same
+    shared context builder and report catalog as the named report
+    types below, not a separate implementation."""
+    _require_agent_entitlement(user_email)
+    ctx, prop = _build_agent_report_context(property_id, user_email)
+    pdf_bytes = build_agent_report_pdf("quick", ctx)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=advisory_report_{property_id}.pdf"},
+    )
+
+
+@app.post("/api/agent/properties/{property_id}/generate-report/{report_type}")
+def api_agent_generate_named_report(property_id: str, report_type: str, user_email: str = Depends(get_current_user_email)):
+    """The Reports panel's own 9 named report types — each one a
+    different, real combination of the same section builders
+    agent_report.py already has, sharing the identical context this
+    endpoint builds once. An unknown report_type honestly 404s rather
+    than silently falling back to the quick report."""
+    _require_agent_entitlement(user_email)
+    if report_type not in REPORT_TYPES or report_type == "quick":
+        raise HTTPException(status_code=404, detail=f"Unknown report type: {report_type}")
+    ctx, prop = _build_agent_report_context(property_id, user_email)
+    pdf_bytes = build_agent_report_pdf(report_type, ctx)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={report_type}_report_{property_id}.pdf"},
     )
 
 

@@ -520,3 +520,96 @@
   padding-bottom: 10px;
   border-bottom: 1px solid #F1F5F9;
 }
+
+.agent-stage-select {
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.agent-stage-lead { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+.agent-stage-evaluation { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+.agent-stage-shortlisted { background: #EEF2FF; color: #4338CA; border-color: #C7D2FE; }
+.agent-stage-client-viewed { background: #F5F3FF; color: #6D28D9; border-color: #DDD6FE; }
+.agent-stage-site-visit { background: #FDF4FF; color: #A21CAF; border-color: #F5D0FE; }
+.agent-stage-negotiation { background: #FFFBEB; color: #B45309; border-color: #FDE68A; }
+.agent-stage-due-diligence { background: #FFF7ED; color: #C2410C; border-color: #FED7AA; }
+.agent-stage-deal { background: #ECFDF5; color: #047857; border-color: #A7F3D0; }
+.agent-stage-lost { background: #FEF2F2; color: #B91C1C; border-color: #FECACA; }
+
+.agent-branding-link {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  width: 100%;
+}
+
+.agent-branding-form {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.agent-branding-footer-input {
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid #CBD5E1;
+  border-radius: 7px;
+  font-size: 13.5px;
+  font-family: inherit;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.agent-property-block {
+  border-bottom: 1px solid #F1F5F9;
+  padding-bottom: 4px;
+}
+
+.agent-reports-panel {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 8px 0 14px;
+}
+
+.agent-reports-panel-label {
+  font-size: 12.5px;
+  color: #475569;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.agent-reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.agent-report-type-btn {
+  background: white;
+  border: 1px solid #C7D2FE;
+  color: #4338CA;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.agent-report-type-btn:hover {
+  background: #EEF2FF;
+}
+
+.agent-report-type-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

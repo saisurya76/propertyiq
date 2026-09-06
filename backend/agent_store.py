@@ -49,6 +49,9 @@ def initialize_agent_store() -> None:
                 )
                 """
             )
+            cursor.execute(
+                "ALTER TABLE agent_client_properties ADD COLUMN IF NOT EXISTS stage TEXT NOT NULL DEFAULT 'Lead'"
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_clients_email ON agent_clients (agent_email)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_props_client ON agent_client_properties (client_id)")
         connection.commit()
@@ -189,6 +192,15 @@ def list_properties_for_client(client_id: str) -> list[dict[str, Any]]:
     return results
 
 
+# The real workflow every agent's own deal genuinely moves through,
+# in order -- shared here (not duplicated per-caller) so the backend
+# validates against the same list the frontend renders as a dropdown.
+PIPELINE_STAGES = [
+    "Lead", "Evaluation", "Shortlisted", "Client Viewed",
+    "Site Visit", "Negotiation", "Due Diligence", "Deal", "Lost",
+]
+
+
 def update_client_property(*, property_id: str, property_payload: dict[str, Any], lat: Optional[float] = None, lon: Optional[float] = None) -> Optional[dict[str, Any]]:
     """Same real reasoning as update_client — editing an existing
     property doesn't touch the per-client property-count quota, since
@@ -198,6 +210,19 @@ def update_client_property(*, property_id: str, property_payload: dict[str, Any]
             cursor.execute(
                 "UPDATE agent_client_properties SET property_payload = %s, lat = %s, lon = %s WHERE property_id = %s",
                 (json.dumps(property_payload), lat, lon, property_id),
+            )
+        connection.commit()
+    return get_client_property(property_id)
+
+
+def update_property_stage(*, property_id: str, stage: str) -> Optional[dict[str, Any]]:
+    if stage not in PIPELINE_STAGES:
+        raise ValueError(f"Invalid stage. Must be one of: {', '.join(PIPELINE_STAGES)}")
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE agent_client_properties SET stage = %s WHERE property_id = %s",
+                (stage, property_id),
             )
         connection.commit()
     return get_client_property(property_id)

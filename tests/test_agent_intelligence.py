@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 os.environ.setdefault("DODO_PAYMENTS_API_KEY", "test")
 os.environ.setdefault("DODO_REPORT_PRODUCT_ID", "test")
 os.environ.setdefault("ADMIN_DASHBOARD_PASSWORD", "test-admin-pw")
@@ -481,13 +483,15 @@ def test_report_includes_comparison_against_client_other_properties(monkeypatch)
     from pypdf import PdfReader
     reader = PdfReader(io.BytesIO(r.content))
     text = "".join(page.extract_text() for page in reader.pages)
-    assert "Comparison Against This Client" in text
+    assert "Area Comparison" in text
     assert "Second Property" in text
 
 
 def test_report_omits_comparison_section_for_a_clients_only_property(monkeypatch):
     """The opposite, equally real case: a client with just one
-    property must not show a comparison section at all."""
+    property shows the Area Comparison section honestly saying there's
+    nothing to compare against, rather than a real comparison table
+    with fabricated or empty rows."""
     import backend.api as api_module
     monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
     monkeypatch.setattr(api_module, "FRED_API_KEY", "")
@@ -503,7 +507,8 @@ def test_report_omits_comparison_section_for_a_clients_only_property(monkeypatch
     from pypdf import PdfReader
     reader = PdfReader(io.BytesIO(r.content))
     text = "".join(page.extract_text() for page in reader.pages)
-    assert "Comparison Against This Client" not in text
+    assert "Area Comparison" in text
+    assert "no other properties" in text.lower()
 
 
 def test_report_includes_amortization_schedule_and_checklist_and_footer(monkeypatch):
@@ -631,3 +636,300 @@ def test_report_footer_has_real_clickable_link_annotations_on_every_page(monkeyp
             "https://app.propertyiqweb.com/terms-of-service.html",
             "https://app.propertyiqweb.com/refund-policy.html",
         }
+
+
+def test_pipeline_stages_endpoint_is_public_and_returns_the_real_stage_list():
+    r = client.get("/api/agent/pipeline-stages")
+    assert r.status_code == 200
+    assert r.json()["stages"] == [
+        "Lead", "Evaluation", "Shortlisted", "Client Viewed",
+        "Site Visit", "Negotiation", "Due Diligence", "Deal", "Lost",
+    ]
+
+
+def test_new_property_defaults_to_lead_stage():
+    headers = _entitled_headers("agentstagedefault@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Stage Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    assert prop["stage"] == "Lead"
+
+
+def test_update_property_stage_moves_it_through_the_real_pipeline():
+    headers = _entitled_headers("agentstageupdate@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Stage Update Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.put(f"/api/agent/properties/{prop['property_id']}/stage", json={"stage": "Negotiation"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["stage"] == "Negotiation"
+
+    r2 = client.get(f"/api/agent/clients/{created_client['client_id']}/properties", headers=headers)
+    assert r2.json()["properties"][0]["stage"] == "Negotiation"
+
+
+def test_update_property_stage_rejects_an_invalid_stage_name():
+    headers = _entitled_headers("agentstageinvalid@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Invalid Stage Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.put(f"/api/agent/properties/{prop['property_id']}/stage", json={"stage": "Made Up Stage"}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_update_property_stage_requires_ownership():
+    headers = _entitled_headers("agentstageowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Owner Stage Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    stranger_headers = _entitled_headers("agentstagestranger@example.com")
+    r = client.put(f"/api/agent/properties/{prop['property_id']}/stage", json={"stage": "Deal"}, headers=stranger_headers)
+    assert r.status_code == 404
+
+
+def test_get_branding_defaults_to_all_none_for_a_fresh_account():
+    headers = _entitled_headers("agentbrandingfresh@example.com")
+    r = client.get("/api/agent/branding", headers=headers)
+    assert r.status_code == 200
+    assert all(v is None for v in r.json().values())
+
+
+def test_update_branding_sets_the_provided_fields():
+    headers = _entitled_headers("agentbrandingset@example.com")
+    r = client.post("/api/agent/branding", json={"brokerage_name": "ABC Realty", "contact_phone": "+91 98765 43210"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["brokerage_name"] == "ABC Realty"
+    assert r.json()["contact_phone"] == "+91 98765 43210"
+
+
+def test_partial_branding_update_does_not_blank_out_other_fields():
+    """The real bug this guards against: a partial update request must
+    only touch the fields it actually sends, not silently null out
+    everything else already saved."""
+    headers = _entitled_headers("agentbrandingpartial@example.com")
+    client.post("/api/agent/branding", json={"brokerage_name": "First Brokerage", "contact_phone": "+91 11111 11111"}, headers=headers)
+    r = client.post("/api/agent/branding", json={"contact_phone": "+91 22222 22222"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["contact_phone"] == "+91 22222 22222"
+    assert r.json()["brokerage_name"] == "First Brokerage"  # must survive the partial update
+
+
+def test_branding_field_can_be_cleared_with_an_empty_string():
+    headers = _entitled_headers("agentbrandingclear@example.com")
+    client.post("/api/agent/branding", json={"brokerage_name": "Temp Brokerage"}, headers=headers)
+    r = client.post("/api/agent/branding", json={"brokerage_name": ""}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["brokerage_name"] is None
+
+
+def test_share_slug_must_be_alphanumeric_with_hyphens_only():
+    headers = _entitled_headers("agentbrandingslugformat@example.com")
+    r = client.post("/api/agent/branding", json={"share_slug": "not valid!"}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_share_slug_uniqueness_is_enforced_across_agents():
+    headers_a = _entitled_headers("agentslugownera@example.com")
+    headers_b = _entitled_headers("agentslugownerb@example.com")
+    r1 = client.post("/api/agent/branding", json={"share_slug": "priya-sharma"}, headers=headers_a)
+    assert r1.status_code == 200
+    r2 = client.post("/api/agent/branding", json={"share_slug": "priya-sharma"}, headers=headers_b)
+    assert r2.status_code == 409
+
+
+def test_share_slug_can_be_kept_by_its_own_owner_on_re_save():
+    """Re-saving the same slug (e.g. alongside other branding changes)
+    must not be rejected as a collision with oneself."""
+    headers = _entitled_headers("agentslugreowner@example.com")
+    client.post("/api/agent/branding", json={"share_slug": "my-own-slug"}, headers=headers)
+    r = client.post("/api/agent/branding", json={"share_slug": "my-own-slug", "brokerage_name": "Updated"}, headers=headers)
+    assert r.status_code == 200
+
+
+def test_report_includes_agent_branding_in_the_header(monkeypatch):
+    """Direct proof, via real extracted PDF text, that a saved
+    brokerage name, contact phone, and share slug all genuinely
+    appear in the generated report."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentbrandedreport@example.com")
+    client.post("/api/agent/branding", json={
+        "brokerage_name": "Skyline Realty", "contact_phone": "+91 90000 11111", "share_slug": "skyline-priya",
+    }, headers=headers)
+
+    created_client = client.post("/api/agent/clients", json={"client_name": "Branded Report Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    normalized = " ".join(text.split())  # PDF text extraction can insert a newline mid-value when a long cell wraps visually — not a real bug in the report itself
+    assert "Skyline Realty" in normalized
+    assert "+91 90000 11111" in normalized
+    assert "skyline-priya" in normalized
+
+
+def test_report_uses_custom_footer_text_when_set(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentcustomfooter@example.com")
+    client.post("/api/agent/branding", json={"custom_footer_text": "Trusted advisor since 2015 — always here for you"}, headers=headers)
+
+    created_client = client.post("/api/agent/clients", json={"client_name": "Custom Footer Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Trusted advisor since 2015" in text
+
+
+def test_report_works_normally_with_no_branding_set_at_all(monkeypatch):
+    """A real resilience requirement: an agent who never touched
+    branding must still get a normal, working report with the
+    original default footer."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentnobranding@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Branding Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "for internal advisory use by the preparing agent" in text
+
+
+def test_report_survives_a_broken_logo_url_gracefully(monkeypatch):
+    """Direct proof a bad/unreachable photo_url doesn't crash report
+    generation -- a logo is a nice-to-have, not a hard dependency."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentbrokenlogo@example.com")
+    client.post("/api/agent/branding", json={"photo_url": "https://this-domain-genuinely-does-not-exist-xyz123.invalid/logo.png"}, headers=headers)
+
+    created_client = client.post("/api/agent/clients", json={"client_name": "Broken Logo Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report", headers=headers)
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
+
+
+def test_report_types_catalog_lists_all_9_named_types():
+    r = client.get("/api/agent/report-types")
+    assert r.status_code == 200
+    ids = {t["id"] for t in r.json()["report_types"]}
+    assert ids == {
+        "property_intelligence", "location", "area_comparison", "investment_analysis",
+        "buyer_due_diligence", "construction", "client_property_comparison", "recommendation", "handover",
+    }
+    assert "quick" not in ids  # the original quick report isn't part of the named catalog
+
+
+def test_named_report_endpoint_rejects_an_unknown_report_type():
+    headers = _entitled_headers("agentunknownreporttype@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Unknown Type Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/not-a-real-type", headers=headers)
+    assert r.status_code == 404
+
+
+def test_named_report_endpoint_rejects_quick_as_a_named_type():
+    """quick is the original report's own internal id -- it must not
+    be reachable through the named-report URL, only its own dedicated
+    endpoint, to keep the two conceptually distinct for the frontend."""
+    headers = _entitled_headers("agentquickasnamedcheck@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Quick Named Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/quick", headers=headers)
+    assert r.status_code == 404
+
+
+@pytest.mark.parametrize("report_type,expected_heading", [
+    ("property_intelligence", "PROPERTY INTELLIGENCE REPORT"),
+    ("location", "LOCATION REPORT"),
+    ("area_comparison", "AREA COMPARISON REPORT"),
+    ("investment_analysis", "INVESTMENT ANALYSIS REPORT"),
+    ("buyer_due_diligence", "BUYER DUE-DILIGENCE REPORT"),
+    ("construction", "CONSTRUCTION REPORT"),
+    ("client_property_comparison", "CLIENT PROPERTY COMPARISON"),
+    ("recommendation", "RECOMMENDATION REPORT"),
+    ("handover", "HANDOVER REPORT"),
+])
+def test_each_named_report_type_generates_a_real_pdf_with_its_own_heading(monkeypatch, report_type, expected_heading):
+    """Direct proof, via real extracted PDF text, that all 9 named
+    report types genuinely generate and each carries its own distinct
+    title -- not 9 endpoints all quietly rendering the same content."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers(f"agentnamedreport{report_type}@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Named Report Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/{report_type}", headers=headers)
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert expected_heading in text
+
+
+def test_handover_report_shows_real_country_specific_items(monkeypatch):
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agenthandoverindia@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Handover India Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/handover", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "Registered sale deed" in text
+    assert "Encumbrance certificate" in text
+
+
+def test_construction_report_is_honest_about_no_linked_design():
+    headers = _entitled_headers("agentconstructionhonest@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Construction Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/construction", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "no linked Construction Studio design" in text
+
+
+def test_named_report_requires_entitlement_and_ownership():
+    headers = _authed_headers("agentnamedreportnosub@example.com")
+    r = client.post("/api/agent/properties/fake-id/generate-report/location", headers=headers)
+    assert r.status_code == 403

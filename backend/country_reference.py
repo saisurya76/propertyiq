@@ -29,6 +29,16 @@ COUNTRY_REFERENCE: dict[str, dict[str, Any]] = {
             ("Municipal Corporation / Panchayat", "Property tax records, building plan approvals"),
             ("State Consumer Helpline", "1915"),
         ],
+        "handover_checklist": [
+            "Registered sale deed, handed over in original",
+            "Encumbrance certificate up to the date of handover",
+            "Latest property tax receipt in the new owner's name (post-mutation)",
+            "Occupancy certificate (OC) and completion certificate (CC), if applicable",
+            "No-dues certificate from the builder/society for maintenance and utilities",
+            "All sets of keys, remote controls (gate/garage), and access cards/fobs",
+            "Original approved building plan and any structural warranty documents",
+            "Copies of utility connection documents (electricity, water, gas) for transfer to the new owner's name",
+        ],
     },
     "thailand": {
         "checklist": [
@@ -42,6 +52,14 @@ COUNTRY_REFERENCE: dict[str, dict[str, Any]] = {
         "authority_contacts": [
             ("Department of Lands (Land Department)", "National title registry and transfer authority — verify Chanote status here"),
             ("Local Land Office", "Handles title checks and registration for the property's specific district"),
+        ],
+        "handover_checklist": [
+            "Chanote (title deed) transferred and registered at the Land Office in the new owner's name",
+            "Original title deed, handed over along with the Land Office transfer receipt",
+            "House registration book (Tabien Baan), updated to reflect the new owner",
+            "All keys, access cards, and remote controls for gates/parking",
+            "Outstanding common-area fee (juristic person) clearance certificate, if a condo",
+            "Copies of utility account documents for transfer (electricity, water)",
         ],
     },
     "philippines": {
@@ -58,6 +76,14 @@ COUNTRY_REFERENCE: dict[str, dict[str, Any]] = {
             ("DHSUD", "Department of Human Settlements and Urban Development — developer/project licensing"),
             ("Bureau of Internal Revenue (BIR)", "Transfer taxes and the Certificate Authorizing Registration (CAR)"),
         ],
+        "handover_checklist": [
+            "Transfer Certificate of Title (TCT) or Condominium Certificate of Title (CCT), transferred to the new owner's name",
+            "Certificate Authorizing Registration (CAR) from the BIR",
+            "Updated tax declaration in the new owner's name from the Assessor's Office",
+            "Latest real property tax receipt, clearance of any arrears",
+            "All keys, access cards, and remote controls",
+            "Condominium Certificate of Management/HOA clearance, if applicable",
+        ],
     },
     "vietnam": {
         "checklist": [
@@ -71,6 +97,13 @@ COUNTRY_REFERENCE: dict[str, dict[str, Any]] = {
         "authority_contacts": [
             ("Provincial land registration office", "Under the Ministry of Agriculture and Environment — Pink Book issuance and verification"),
             ("Commune-level People's Committee", "Since July 2025, first-time certificates are issued here, not at district level"),
+        ],
+        "handover_checklist": [
+            "Pink Book, transferred and re-issued in the new owner's name",
+            "Sale contract, notarized copy retained by the new owner",
+            "Confirmation of full tax obligations paid (registration fee, personal income tax on the sale)",
+            "All keys, access cards, and remote controls",
+            "Building management/homeowners' association clearance, if applicable",
         ],
     },
     "indonesia": {
@@ -86,6 +119,13 @@ COUNTRY_REFERENCE: dict[str, dict[str, Any]] = {
             ("BPN / ATR", "Badan Pertanahan Nasional — land certificate verification and registration"),
             ("Local PPAT", "Land deed notary — required to execute and register any property transfer"),
         ],
+        "handover_checklist": [
+            "Land certificate (Hak Milik/Hak Pakai/HGB), transferred and registered at the BPN in the new owner's name",
+            "Notarized deed of sale (Akta Jual Beli) from the PPAT",
+            "Land and Building Tax (PBB) receipt, up to date",
+            "All keys, access cards, and remote controls",
+            "Building approval (PBG) and fitness-for-use certificate (SLF) documents, if available",
+        ],
     },
 }
 
@@ -96,4 +136,4 @@ def get_country_reference(country: str) -> dict[str, Any]:
     supported countries, but real code should never assume) falls
     back to an empty checklist/contacts list rather than raising or
     silently reusing India's."""
-    return COUNTRY_REFERENCE.get((country or "").strip().lower(), {"checklist": [], "authority_contacts": []})
+    return COUNTRY_REFERENCE.get((country or "").strip().lower(), {"checklist": [], "authority_contacts": [], "handover_checklist": []})

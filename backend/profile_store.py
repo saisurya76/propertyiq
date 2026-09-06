@@ -54,7 +54,77 @@ def initialize_profile_store() -> None:
                 )
                 """
             )
+            cursor.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS photo_url TEXT")
+            cursor.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS contact_phone TEXT")
+            cursor.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS contact_email TEXT")
+            cursor.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS brokerage_name TEXT")
+            cursor.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS custom_footer_text TEXT")
+            cursor.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS share_slug TEXT")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_share_slug ON user_profiles (share_slug) WHERE share_slug IS NOT NULL")
         connection.commit()
+
+
+_BRANDING_FIELDS = ["photo_url", "contact_phone", "contact_email", "brokerage_name", "custom_footer_text", "share_slug"]
+
+
+def get_agent_branding(email: str) -> dict[str, Optional[str]]:
+    """Real branding an agent has set for themselves, shown on their
+    own Agent Intelligence reports and workspace UI — every field
+    starts as None for every existing account, since none of this
+    existed before. Callers render each field's own honest fallback
+    (e.g. the agent's display name/email) rather than treating a
+    missing value as an error."""
+    email = email.strip().lower()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT {', '.join(_BRANDING_FIELDS)} FROM user_profiles WHERE email = %s", (email,))
+            row = cursor.fetchone()
+    if not row:
+        return {field: None for field in _BRANDING_FIELDS}
+    return {field: row[field] for field in _BRANDING_FIELDS}
+
+
+def set_agent_branding(email: str, **fields: Optional[str]) -> dict[str, Optional[str]]:
+    """Only updates the fields actually passed in -- a caller sending
+    just `brokerage_name` doesn't accidentally blank out the agent's
+    already-set photo_url or contact_phone. Each passed value is
+    trimmed, with an empty string treated as a deliberate "clear this
+    field" (same reasoning as set_display_name), not left as literal
+    empty-string noise in the database."""
+    email = email.strip().lower()
+    unknown = set(fields) - set(_BRANDING_FIELDS)
+    if unknown:
+        raise ValueError(f"Unknown branding field(s): {', '.join(sorted(unknown))}")
+    cleaned = {k: (v.strip() if v and v.strip() else None) for k, v in fields.items()}
+    if not cleaned:
+        return get_agent_branding(email)
+
+    set_clause = ", ".join(f"{k} = %s" for k in cleaned)
+    insert_cols = ", ".join(["email"] + list(cleaned.keys()))
+    insert_placeholders = ", ".join(["%s"] * (1 + len(cleaned)))
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO user_profiles ({insert_cols}) VALUES ({insert_placeholders})
+                ON CONFLICT (email) DO UPDATE SET {set_clause}
+                """,
+                [email] + list(cleaned.values()) + list(cleaned.values()),
+            )
+        connection.commit()
+    return get_agent_branding(email)
+
+
+def get_email_for_share_slug(slug: str) -> Optional[str]:
+    """Real, case-insensitive lookup for a branded share link
+    (app.propertyiqweb.com/a/{slug}) -- used to resolve a public link
+    back to the agent who owns it, without ever exposing their email
+    in the URL itself."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT email FROM user_profiles WHERE LOWER(share_slug) = LOWER(%s)", (slug.strip(),))
+            row = cursor.fetchone()
+    return row["email"] if row else None
 
 
 def get_display_name(email: str) -> Optional[str]:

@@ -51,6 +51,14 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
   const [authStep, setAuthStep] = useState(null); // null | "paywall"
   const [paywallTiers, setPaywallTiers] = useState(null);
   const [quota, setQuota] = useState(null);
+  const [pipelineStages, setPipelineStages] = useState([]);
+  const [updatingStageFor, setUpdatingStageFor] = useState(null);
+  const [branding, setBranding] = useState(null);
+  const [brandingForm, setBrandingForm] = useState(null);
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [reportTypes, setReportTypes] = useState([]);
+  const [reportsPanelFor, setReportsPanelFor] = useState(null); // property_id currently showing its Reports panel
+  const [generatingNamedReportFor, setGeneratingNamedReportFor] = useState(null); // `${propertyId}:${reportType}` currently downloading
   const [successMessage, setSuccessMessage] = useState("");
 
   const [showAddClient, setShowAddClient] = useState(false);
@@ -115,6 +123,8 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
   useEffect(() => {
     fetchClients();
     refreshQuota();
+    studioApi.agentGetPipelineStages().then((res) => setPipelineStages(res.stages)).catch(() => {});
+    studioApi.agentGetReportTypes().then((res) => setReportTypes(res.report_types)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -286,6 +296,43 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
     }
   };
 
+  const openBranding = () => {
+    setView("branding");
+    if (!branding) {
+      studioApi.agentGetBranding().then((res) => { setBranding(res); setBrandingForm(res); }).catch(() => {});
+    }
+  };
+
+  const handleSaveBranding = async (e) => {
+    e.preventDefault();
+    setSavingBranding(true);
+    setError("");
+    try {
+      const updated = await studioApi.agentUpdateBranding(brandingForm);
+      setBranding(updated);
+      setBrandingForm(updated);
+      setSuccessMessage("Branding saved — it will now appear on every report you generate.");
+    } catch (err) {
+      setError(err.message || "Couldn't save your branding settings.");
+    } finally {
+      setSavingBranding(false);
+    }
+  };
+
+  const handleStageChange = async (clientId, propertyId, newStage) => {
+    setUpdatingStageFor(propertyId);
+    setError("");
+    try {
+      await studioApi.agentUpdatePropertyStage(propertyId, newStage);
+      const res = await studioApi.agentListClientProperties(clientId);
+      setPropertiesByClient((prev) => ({ ...prev, [clientId]: res.properties }));
+    } catch (err) {
+      setError(err.message || "Couldn't update the stage for this property.");
+    } finally {
+      setUpdatingStageFor(null);
+    }
+  };
+
   const handleGenerateReport = async (propertyId) => {
     setGeneratingReportFor(propertyId);
     setError("");
@@ -307,6 +354,31 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
       setError(err.message || "Couldn't generate the report right now.");
     } finally {
       setGeneratingReportFor(null);
+    }
+  };
+
+  const handleGenerateNamedReport = async (propertyId, reportType) => {
+    const key = `${propertyId}:${reportType}`;
+    setGeneratingNamedReportFor(key);
+    setError("");
+    try {
+      const session = getSession();
+      const res = await fetch(`${API_BASE}/api/agent/properties/${propertyId}/generate-report/${reportType}`, {
+        method: "POST",
+        headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {},
+      });
+      if (!res.ok) throw new Error("Couldn't generate this report.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${reportType}_report_${propertyId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "Couldn't generate this report right now.");
+    } finally {
+      setGeneratingNamedReportFor(null);
     }
   };
 
@@ -404,6 +476,46 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                 <button type="button" className="agent-primary-btn agent-enter-workspace-btn" onClick={() => setView("workspace")}>
                   Go to Workspace →
                 </button>
+                <button type="button" className="agent-text-btn agent-branding-link" onClick={openBranding}>
+                  ✎ Set up your branding (name, logo, contact, share link)
+                </button>
+              </div>
+            )}
+
+            {view === "branding" && (
+              <div className="agent-workspace-body">
+                <div className="agent-workspace-header">
+                  <button type="button" className="agent-back-link" onClick={() => setView("dashboard")}>← Dashboard</button>
+                </div>
+                <h3>Your Branding</h3>
+                <p className="agent-empty-note" style={{ textAlign: "left", padding: 0, marginBottom: 16 }}>
+                  Shown on every report you generate, and on your branded share link.
+                </p>
+                {!brandingForm && <p>Loading...</p>}
+                {brandingForm && (
+                  <form onSubmit={handleSaveBranding} className="agent-branding-form">
+                    <div className="agent-form-grid">
+                      <input type="url" placeholder="Logo/photo URL (optional)" value={brandingForm.photo_url || ""} onChange={(e) => setBrandingForm({ ...brandingForm, photo_url: e.target.value })} />
+                      <input type="text" placeholder="Contact phone" value={brandingForm.contact_phone || ""} onChange={(e) => setBrandingForm({ ...brandingForm, contact_phone: e.target.value })} />
+                      <input type="email" placeholder="Contact email" value={brandingForm.contact_email || ""} onChange={(e) => setBrandingForm({ ...brandingForm, contact_email: e.target.value })} />
+                      <input type="text" placeholder="Brokerage name (optional)" value={brandingForm.brokerage_name || ""} onChange={(e) => setBrandingForm({ ...brandingForm, brokerage_name: e.target.value })} />
+                      <input type="text" placeholder="Share link — yourname (letters, numbers, hyphens)" value={brandingForm.share_slug || ""} onChange={(e) => setBrandingForm({ ...brandingForm, share_slug: e.target.value })} />
+                    </div>
+                    <textarea
+                      placeholder="Custom footer text for your reports (optional) — replaces the default line"
+                      value={brandingForm.custom_footer_text || ""}
+                      onChange={(e) => setBrandingForm({ ...brandingForm, custom_footer_text: e.target.value })}
+                      rows={2}
+                      className="agent-branding-footer-input"
+                    />
+                    {brandingForm.share_slug && (
+                      <p className="agent-coords-confirm">Your link: app.propertyiqweb.com/a/{brandingForm.share_slug}</p>
+                    )}
+                    <button type="submit" className="agent-primary-btn" disabled={savingBranding}>
+                      {savingBranding ? "Saving..." : "Save Branding"}
+                    </button>
+                  </form>
+                )}
               </div>
             )}
 
@@ -482,7 +594,8 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                           )}
 
                           {(propertiesByClient[c.client_id] || []).map((p) => (
-                            <div key={p.property_id} className="agent-property-row">
+                            <div key={p.property_id} className="agent-property-block">
+                            <div className="agent-property-row">
                               <div className="agent-property-row-main">
                                 {compareModeForClient === c.client_id && (
                                   <input
@@ -496,6 +609,16 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                                 <div>
                                   <strong>{p.property_payload.propertyName}</strong>
                                   <div className="agent-property-meta">{p.property_payload.location}, {p.property_payload.city}{p.lat == null && <span className="agent-no-coords-note"> · no coordinates yet</span>}</div>
+                                  <select
+                                    className={`agent-stage-select agent-stage-${(p.stage || "Lead").toLowerCase().replace(/\s+/g, "-")}`}
+                                    value={p.stage || "Lead"}
+                                    disabled={updatingStageFor === p.property_id}
+                                    onChange={(e) => handleStageChange(c.client_id, p.property_id, e.target.value)}
+                                  >
+                                    {pipelineStages.map((s) => (
+                                      <option key={s} value={s}>{s}</option>
+                                    ))}
+                                  </select>
                                 </div>
                               </div>
                               <div className="agent-property-actions">
@@ -505,13 +628,44 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                                   onClick={() => handleGenerateReport(p.property_id)}
                                   disabled={generatingReportFor === p.property_id}
                                 >
-                                  {generatingReportFor === p.property_id ? "Generating..." : "📄 Generate Report"}
+                                  {generatingReportFor === p.property_id ? "Generating..." : "📄 Generate Quick Report"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="agent-text-btn"
+                                  onClick={() => setReportsPanelFor(reportsPanelFor === p.property_id ? null : p.property_id)}
+                                >
+                                  📋 Reports
                                 </button>
                                 <button type="button" className="agent-text-btn" onClick={() => openEditProperty(c.client_id, p)}>Edit</button>
                                 <button type="button" className="agent-text-btn agent-delete-btn" onClick={() => handleDeleteProperty(c.client_id, p.property_id)}>
                                   Delete
                                 </button>
                               </div>
+                            </div>
+
+                              {reportsPanelFor === p.property_id && (
+                                <div className="agent-reports-panel">
+                                  <p className="agent-reports-panel-label">Generate a specific report for {c.client_name}:</p>
+                                  <div className="agent-reports-grid">
+                                    {reportTypes.map((rt) => {
+                                      const key = `${p.property_id}:${rt.id}`;
+                                      const isGenerating = generatingNamedReportFor === key;
+                                      return (
+                                        <button
+                                          key={rt.id}
+                                          type="button"
+                                          className="agent-report-type-btn"
+                                          onClick={() => handleGenerateNamedReport(p.property_id, rt.id)}
+                                          disabled={isGenerating}
+                                        >
+                                          {isGenerating ? "Generating..." : rt.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
 

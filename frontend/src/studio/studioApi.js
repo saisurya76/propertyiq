@@ -123,6 +123,12 @@ export const studioApi = {
     apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}`, { method: "DELETE" }),
   agentCompareProperties: (clientId, propertyIds) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/compare-properties`, { method: "POST", body: JSON.stringify({ property_ids: propertyIds }) }),
+  agentGetPipelineStages: () => apiFetch("/api/agent/pipeline-stages"),
+  agentGetBranding: () => apiFetch("/api/agent/branding"),
+  agentUpdateBranding: (fields) => apiFetch("/api/agent/branding", { method: "POST", body: JSON.stringify(fields) }),
+  agentUpdatePropertyStage: (propertyId, stage) =>
+    apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}/stage`, { method: "PUT", body: JSON.stringify({ stage }) }),
+  agentGetReportTypes: () => apiFetch("/api/agent/report-types"),
 
   adminLookupPayments: (password, email) =>
     apiFetch("/api/admin/payments", { method: "POST", body: JSON.stringify({ password, email }) }),
