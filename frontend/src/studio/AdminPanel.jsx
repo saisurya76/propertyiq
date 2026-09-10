@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { studioApi } from "./studioApi";
+import WorldUsersMap from "./WorldUsersMap";
 
 const TIER_ORDER = ["insight_addon", "studio_starter", "studio_pro", "studio_unlimited"];
 
@@ -55,6 +56,9 @@ function AdminPanel({ onBack }) {
   const [niSectionVisibility, setNiSectionVisibility] = useState(null);
   const [niVisibilitySaveMessage, setNiVisibilitySaveMessage] = useState("");
   const [homepagePanelVisibility, setHomepagePanelVisibility] = useState(null);
+  const [featureUsage, setFeatureUsage] = useState(null);
+  const [techStack, setTechStack] = useState([]);
+  const [usersByCountry, setUsersByCountry] = useState([]);
   const [homepageVisibilitySaveMessage, setHomepageVisibilitySaveMessage] = useState("");
 
   // Refunds screen state
@@ -91,6 +95,9 @@ function AdminPanel({ onBack }) {
       setGeminiKeyConfigured(!!data.gemini_api_key_configured);
       setNiSectionVisibility(data.ni_section_visibility || null);
       setHomepagePanelVisibility(data.homepage_panel_visibility || null);
+      setFeatureUsage(data.feature_usage || null);
+      setTechStack(data.tech_stack || []);
+      setUsersByCountry(data.users_by_country || []);
       setAuthed(true);
     } catch (err) {
       setError(err.message || "Incorrect password.");
@@ -416,6 +423,9 @@ function AdminPanel({ onBack }) {
       setTierConfig(data.tier_config);
       setSubscriptions(data.subscriptions);
       setGrants(data.insight_grants);
+      setFeatureUsage(data.feature_usage || null);
+      setTechStack(data.tech_stack || []);
+      setUsersByCountry(data.users_by_country || []);
     } catch (err) {
       setError(err.message || "Couldn't refresh.");
     }
@@ -578,6 +588,71 @@ function AdminPanel({ onBack }) {
               </div>
             </div>
           )}
+
+          {revenueAnalytics && (
+            <div className="admin-section admin-section-purple">
+              <h3>Users by Tier</h3>
+              <div className="admin-tier-bar-chart">
+                {revenueAnalytics.subscriptionTiers.map((t) => {
+                  const maxCount = Math.max(1, ...revenueAnalytics.subscriptionTiers.map((x) => x.activeCount));
+                  return (
+                    <div key={t.tierId} className="admin-tier-bar-row">
+                      <span className="admin-tier-bar-label">{t.label}</span>
+                      <div className="admin-tier-bar-track">
+                        <div className="admin-tier-bar-fill" style={{ width: `${(t.activeCount / maxCount) * 100}%` }} />
+                      </div>
+                      <span className="admin-tier-bar-count">{t.activeCount}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {featureUsage && (
+            <div className="admin-section admin-section-blue">
+              <h3>Usage Stats per Feature</h3>
+              <p className="admin-section-note" style={{ marginTop: -8 }}>
+                Real counts from the database — a row only exists here if a user actually used that feature.
+              </p>
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead><tr><th>Feature</th><th>Real Usage Count</th></tr></thead>
+                  <tbody>
+                    {Object.entries(featureUsage.counts).map(([label, count]) => (
+                      <tr key={label}><td>{label}</td><td>{count}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {featureUsage.not_tracked?.length > 0 && (
+                <p className="admin-empty-note" style={{ marginTop: 12 }}>
+                  Not tracked yet (on-demand features with no saved record): {featureUsage.not_tracked.join(", ")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {techStack.length > 0 && (
+            <div className="admin-section admin-section-green">
+              <h3>Tech Stack Status</h3>
+              <div className="admin-tech-stack-grid">
+                {techStack.map((s) => (
+                  <div key={s.name} className={`admin-tech-stack-item ${s.configured ? "admin-tech-ok" : "admin-tech-missing"}`}>
+                    <span>{s.configured ? "✓" : "✗"}</span> {s.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="admin-section admin-section-slate">
+            <h3>Subscribers by Location</h3>
+            <p className="admin-section-note" style={{ marginTop: -8 }}>
+              Captured from a visitor's own real location at sign-in, going forward only — not retroactive for users who signed in before this was added.
+            </p>
+            <WorldUsersMap usersByCountry={usersByCountry} />
+          </div>
         </>
       )}
 

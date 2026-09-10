@@ -19,6 +19,27 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+const DETECTED_COUNTRY_KEY = "propertyiq_detected_country";
+
+// The real country ipapi.co already detects on page load (App.jsx's
+// own existing effect, for language/currency defaults) — stashed here
+// so verifyOtp below can send it along at sign-in without a second,
+// duplicate geolocation lookup, and without threading it as a prop
+// through every one of this app's many separate sign-in forms.
+export function getDetectedCountry() {
+  try {
+    const raw = localStorage.getItem(DETECTED_COUNTRY_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDetectedCountry(code, name) {
+  if (!code || !name) return;
+  localStorage.setItem(DETECTED_COUNTRY_KEY, JSON.stringify({ code, name }));
+}
+
 function authHeaders() {
   const session = getSession();
   return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
@@ -55,8 +76,10 @@ export const studioApi = {
   requestOtp: (email) =>
     apiFetch("/api/auth/request-otp", { method: "POST", body: JSON.stringify({ email }) }),
 
-  verifyOtp: (email, code) =>
-    apiFetch("/api/auth/verify-otp", { method: "POST", body: JSON.stringify({ email, code }) }),
+  verifyOtp: (email, code) => {
+    const detected = getDetectedCountry();
+    return apiFetch("/api/auth/verify-otp", { method: "POST", body: JSON.stringify({ email, code, country_code: detected?.code, country_name: detected?.name }) });
+  },
 
   getTiers: () => apiFetch("/api/tiers"),
 

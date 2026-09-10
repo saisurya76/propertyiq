@@ -101,6 +101,7 @@ from backend.agent_store import (
     delete_client_property,
 )
 from backend.agent_report import build_agent_advisory_pdf, build_agent_report_pdf, REPORT_TYPES
+from backend.admin_analytics import get_feature_usage_stats, get_tech_stack_status
 from backend.report_translations import get_report_language
 from backend.country_reference import get_country_reference
 from backend.report_dynamic_translation import translate_dynamic_strings, LANGUAGE_NAMES
@@ -130,6 +131,7 @@ from backend.auth_store import (
     create_otp,
     verify_otp,
     create_session,
+    get_users_by_country,
 )
 
 from backend.auth import (
@@ -1167,6 +1169,8 @@ class RequestOtpRequest(BaseModel):
 class VerifyOtpRequest(BaseModel):
     email: str
     code: str
+    country_code: Optional[str] = None
+    country_name: Optional[str] = None
 
 
 class AdminTierConfigRequest(BaseModel):
@@ -1219,7 +1223,7 @@ def verify_otp_endpoint(request: VerifyOtpRequest):
     """Step 2: verifying the code registers/logs in the user and returns a
     bearer session token (30-day expiry) to use as
     'Authorization: Bearer <token>' on subsequent calls."""
-    if not verify_otp(request.email, request.code):
+    if not verify_otp(request.email, request.code, request.country_code, request.country_name):
         raise HTTPException(status_code=401, detail="Invalid or expired code")
 
     token = create_session(request.email)
@@ -1289,6 +1293,15 @@ def admin_overview(request: AdminAuthRequest):
         "ni_section_visibility": get_ni_section_visibility(),
         # Same real reasoning, for the 5 free homepage quick-check panels.
         "homepage_panel_visibility": get_homepage_panel_visibility(),
+        # Real usage counts per feature, real per-service configuration
+        # status, and real per-country user counts (only for users who
+        # signed in after location capture was added — see
+        # verify_otp's own docstring) — all genuine, queried data, no
+        # estimates. See admin_analytics.py's own module docstring for
+        # what's honestly excluded (features with no usage log at all).
+        "feature_usage": get_feature_usage_stats(),
+        "tech_stack": get_tech_stack_status(),
+        "users_by_country": get_users_by_country(),
     }
 
 

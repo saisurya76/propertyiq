@@ -24,7 +24,7 @@ import SessionBar from "./studio/SessionBar";
 import StudioTopBar from "./studio/StudioTopBar";
 import LegalFooter from "./components/LegalFooter";
 import useTermsGate from "./hooks/useTermsGate";
-import { getSession, clearSession, studioApi } from "./studio/studioApi";
+import { getSession, clearSession, studioApi, saveDetectedCountry } from "./studio/studioApi";
 
 
 const LANGUAGE_OPTIONS = [
@@ -341,6 +341,12 @@ function App() {
           // signal — it should win over IP-based geolocation, not get
           // silently overridden by wherever the visitor actually is.
           if (data.currency && !cancelled && !urlCountryContext) setCurrency(data.currency);
+          // Real, unrestricted IP-geolocation result (any country, not
+          // just the 5 this app has property data for), stashed for
+          // the admin dashboard's own real user-location analytics —
+          // see saveDetectedCountry's own docstring for why this lives
+          // here rather than a second, duplicate lookup at sign-in.
+          if (data.country_code && data.country_name && !cancelled) saveDetectedCountry(data.country_code, data.country_name);
           // Real IP-geolocation result, mapped to one of the 5
           // countries this app actually has hottest-properties data
           // for — anything else (a visitor from a country PropertyIQ
