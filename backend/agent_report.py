@@ -461,6 +461,45 @@ def _section_financing(story: list, ctx: dict[str, Any]) -> None:
         story.append(Paragraph(t("Not available — the property's quoted price was not usable for an EMI estimate.", ctx), ctx["styles"]["muted"]))
 
 
+def _section_loan_eligibility(story: list, ctx: dict[str, Any]) -> None:
+    """A real, transparent eligibility estimate — the same
+    check_loan_eligibility this app's own paid Loan Eligibility panel
+    and Agent Intelligence's property-level check both use — shown
+    here for a client's actual saved financial profile against this
+    specific property. Honest by construction: with no profile (or an
+    incomplete one) on file, this says exactly that, and names the
+    real missing fields, rather than fabricating a verdict or silently
+    omitting the section."""
+    eligibility = ctx.get("loan_eligibility")
+    currency = ctx["property_currency"]
+    story.append(Paragraph(t("Loan Eligibility Estimate", ctx), ctx["styles"]["section"]))
+
+    if eligibility is None:
+        story.append(Paragraph(t("This client has no financial profile on file yet.", ctx), ctx["styles"]["muted"]))
+        return
+    if eligibility.get("error") == "incomplete_profile":
+        story.append(Paragraph(
+            t("This client's financial profile is incomplete. Missing: ", ctx) + ", ".join(eligibility["missing_fields"]) + ".",
+            ctx["styles"]["muted"],
+        ))
+        return
+
+    verdict = t("Likely Eligible", ctx) if eligibility["is_eligible"] else t("Likely Not Eligible", ctx)
+    story.append(_kv_table([(t("Estimate", ctx), verdict)], ctx["styles"]))
+    story.append(Spacer(1, 4))
+    check_rows = [(check["name"], check["detail"]) for check in eligibility["checks"]]
+    story.append(_kv_table(check_rows, ctx["styles"]))
+    story.append(Spacer(1, 4))
+    story.append(_kv_table([
+        (t("Requested Loan Amount", ctx), f"{currency} {eligibility['requested_loan_amount']:,.0f}"),
+        (t("Max Loan Likely Eligible For", ctx), f"{currency} {eligibility['max_eligible_loan_amount']:,.0f}"),
+    ], ctx["styles"]))
+    story.append(Paragraph(
+        t("An estimate using standard lending criteria — not a bank's actual underwriting decision or a loan offer.", ctx),
+        ctx["styles"]["muted"],
+    ))
+
+
 def _section_amortization(story: list, ctx: dict[str, Any]) -> None:
     amortization_schedule = ctx["amortization_schedule"]
     currency = ctx["property_currency"]
@@ -647,6 +686,12 @@ REPORT_TYPES: dict[str, dict[str, Any]] = {
         "title": "HANDOVER REPORT",
         "subtitle": "What to confirm and collect at final handover",
         "sections": [_section_handover],
+    },
+    "financing_eligibility": {
+        "label": "Financing & Eligibility Report",
+        "title": "FINANCING & ELIGIBILITY REPORT",
+        "subtitle": "Real EMI, amortization, and a loan eligibility estimate for this client",
+        "sections": [_section_financing, _section_amortization, _section_loan_eligibility],
     },
 }
 

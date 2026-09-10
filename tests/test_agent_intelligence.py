@@ -832,13 +832,14 @@ def test_report_survives_a_broken_logo_url_gracefully(monkeypatch):
     assert r.content[:4] == b"%PDF"
 
 
-def test_report_types_catalog_lists_all_9_named_types():
+def test_report_types_catalog_lists_all_10_named_types():
     r = client.get("/api/agent/report-types")
     assert r.status_code == 200
     ids = {t["id"] for t in r.json()["report_types"]}
     assert ids == {
         "property_intelligence", "location", "area_comparison", "investment_analysis",
         "buyer_due_diligence", "construction", "client_property_comparison", "recommendation", "handover",
+        "financing_eligibility",
     }
     assert "quick" not in ids  # the original quick report isn't part of the named catalog
 
@@ -872,6 +873,7 @@ def test_named_report_endpoint_rejects_quick_as_a_named_type():
     ("client_property_comparison", "CLIENT PROPERTY COMPARISON"),
     ("recommendation", "RECOMMENDATION REPORT"),
     ("handover", "HANDOVER REPORT"),
+    ("financing_eligibility", "FINANCING & ELIGIBILITY REPORT"),
 ])
 def test_each_named_report_type_generates_a_real_pdf_with_its_own_heading(monkeypatch, report_type, expected_heading):
     """Direct proof, via real extracted PDF text, that all 9 named
@@ -1356,3 +1358,78 @@ def test_agent_property_loan_eligibility_requires_ownership():
     stranger_headers = _entitled_headers("agentloanpropstranger@example.com")
     r = client.get(f"/api/agent/properties/{prop['property_id']}/loan-eligibility", headers=stranger_headers)
     assert r.status_code == 404
+
+
+def test_financing_eligibility_report_honest_with_no_profile(monkeypatch):
+    """Direct proof, via real extracted PDF text: a client with no
+    financial profile at all gets an honest, clear message -- not a
+    blank section or a fabricated verdict."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentfinreportnoprofile@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Profile Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/financing_eligibility", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    assert "no financial profile on file yet" in text
+
+
+def test_financing_eligibility_report_honest_with_a_partial_profile(monkeypatch):
+    """Real proof the report names the actual missing fields, not a
+    generic 'incomplete' message."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentfinreportpartial@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Partial Profile Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"monthly_income": 100000, "client_age": 35}, headers=headers)
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/financing_eligibility", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    normalized = " ".join(text.split())
+    assert "incomplete" in normalized.lower()
+    assert "existing_monthly_obligations" in normalized
+    assert "credit_rating" in normalized
+
+
+def test_financing_eligibility_report_shows_real_verdict_with_complete_profile(monkeypatch):
+    """Direct proof of the actual, real eligibility math showing up in
+    the generated PDF -- not just that the section is present."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+    monkeypatch.setattr(api_module, "FRED_API_KEY", "")
+
+    headers = _entitled_headers("agentfinreportcomplete@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Complete Profile Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={
+        "monthly_income": 100000, "existing_monthly_obligations": 0, "down_payment_available": 2000000,
+        "client_age": 35, "credit_rating": "good",
+    }, headers=headers)
+    payload = _property_payload()
+    payload.update({"quotedPrice": 9000000, "marketAverage": 5000, "governmentGuidance": 4500})
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=payload, headers=headers).json()
+    r = client.post(f"/api/agent/properties/{prop['property_id']}/generate-report/financing_eligibility", headers=headers)
+    assert r.status_code == 200
+
+    import io
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(r.content))
+    text = "".join(page.extract_text() for page in reader.pages)
+    normalized = " ".join(text.split())
+    assert "Likely Not Eligible" in normalized  # 60.7% FOIR exceeds the 50% default max
+    assert "Debt-to-income" in normalized
+    assert "Requested Loan Amount" in normalized
+    assert "Max Loan Likely Eligible For" in normalized

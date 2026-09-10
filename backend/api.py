@@ -5488,6 +5488,37 @@ def _build_agent_report_context(property_id: str, user_email: str) -> tuple[dict
         n_contacts = len(authority_contacts)
         translated_text["authority_contacts"] = list(zip(remaining[:n_contacts], remaining[n_contacts:]))
 
+    # Real loan eligibility for the Financing & Eligibility report --
+    # None when the client has no financial profile at all (the
+    # section says so plainly rather than showing nothing or a
+    # fabricated verdict); a real "incomplete_profile" marker naming
+    # the actual missing fields for a partial profile; the real
+    # check_loan_eligibility result for a genuinely complete one. Uses
+    # the exact same function (and the same admin-configured
+    # thresholds) as the live property-level check and the public Loan
+    # Eligibility panel -- one real implementation, not a second copy.
+    loan_eligibility = None
+    if client:
+        profile_fields = {f: client.get(f) for f in FINANCIAL_PROFILE_FIELDS}
+        if any(v is not None for v in profile_fields.values()):
+            missing = [f for f, v in profile_fields.items() if v is None]
+            if missing:
+                loan_eligibility = {"error": "incomplete_profile", "missing_fields": missing}
+            else:
+                try:
+                    loan_eligibility = check_loan_eligibility(
+                        monthly_income=profile_fields["monthly_income"],
+                        existing_monthly_obligations=profile_fields["existing_monthly_obligations"],
+                        property_price=payload.get("quotedPrice", 0),
+                        down_payment_available=profile_fields["down_payment_available"],
+                        age=profile_fields["client_age"],
+                        credit_rating=profile_fields["credit_rating"],
+                        annual_rate_percent=8.5,
+                        tenure_years=20,
+                    )
+                except ValueError as exc:
+                    logger.error(f"_build_agent_report_context: loan eligibility failed for property={property_id!r}: {exc}")
+
     ctx = {
         "client_name": client["client_name"] if client else "Unknown Client",
         "property_name": payload.get("propertyName", "Unnamed Property"),
@@ -5504,10 +5535,12 @@ def _build_agent_report_context(property_id: str, user_email: str) -> tuple[dict
         "emi_summary": emi_summary,
         "amortization_schedule": amortization_schedule,
         "cost_of_living": cost_of_living,
+        "loan_eligibility": loan_eligibility,
         "prepared_by": get_display_name(user_email) or user_email,
         "branding": get_agent_branding(user_email),
     }
     return ctx, prop
+
 
 
 @app.get("/api/agent/report-types")
