@@ -160,7 +160,7 @@ def test_admin_settings_partial_update_does_not_reset_other_thresholds():
 
 def test_feature_is_gated_correctly_for_a_tier_without_it(monkeypatch):
     import backend.api as api_module
-    monkeypatch.setattr(api_module, "has_feature", lambda tier_id, feature: False)
+    monkeypatch.setattr(api_module, "user_has_feature", lambda user_email, feature: False)
     headers = _entitled_headers("loangatedoff@example.com")
     r = client.post("/api/neighborhood-insights/loan-eligibility", json=_eligibility_payload(), headers=headers)
     assert r.status_code == 403

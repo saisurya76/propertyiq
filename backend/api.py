@@ -169,6 +169,8 @@ from backend.config_store import (
     get_tier,
     get_all_tiers_merged,
     has_feature,
+    user_has_feature,
+    get_granting_tier_id,
     ALL_FEATURES,
     set_app_setting,
     get_app_setting,
@@ -207,6 +209,7 @@ from backend.insight_store import (
     grant_insight_access,
     has_insight_access,
     list_all_grants,
+    grant_one_time_tier,
 )
 
 from backend.similar_properties import (
@@ -610,8 +613,7 @@ def assess(data: PropertyRequest, user_email: str = Depends(get_current_user_ema
     called from any frontend UI at all — the entire assessment flow
     was giving away the full result for free with no working path to
     a paid version of it whatsoever."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "property_assessment"):
+    if not user_has_feature(user_email, "property_assessment"):
         raise HTTPException(
             status_code=403,
             detail="Generating a property assessment requires an active Studio subscription that includes this feature.",
@@ -1143,8 +1145,7 @@ def generate_report(data: PropertyRequest, user_email: str = Depends(get_current
     get the full assessment via PDF, completely bypassing /assess's
     own property_assessment paywall. Gated the same way /assess already
     is, so re-enabling this button doesn't reintroduce that gap."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "property_assessment"):
+    if not user_has_feature(user_email, "property_assessment"):
         raise HTTPException(
             status_code=403,
             detail="Downloading a property report requires an active Studio subscription that includes this feature.",
@@ -2015,8 +2016,7 @@ def property_extract_from_url(request: PropertyUrlExtractRequest, user_email: st
     null for a field than guess or hallucinate a value for something a
     real fraud-detection tool needs to independently verify, not trust
     from the same listing it's meant to be checking."""
-    tier_id = get_active_tier(user_email)
-    if not has_feature(tier_id, "property_url_import"):
+    if not user_has_feature(user_email, "property_url_import"):
         raise HTTPException(
             status_code=403,
             detail="Importing property details from a URL requires an active Studio "
@@ -2267,6 +2267,12 @@ async def dodo_webhook(request: Request):
         set_status_by_dodo_id(dodo_subscription_id, "payment_failed")
     elif event_type == "payment.succeeded" and tier_id == "insight_addon" and metadata.get("report_id") and user_email:
         grant_insight_access(metadata["report_id"], user_email)
+        # Real, account-wide, permanent unlock of whatever features are
+        # actually configured for insight_addon in the admin dashboard
+        # (see user_has_feature) — kept alongside the report-scoped
+        # grant above for backwards compatibility with the existing
+        # per-report similar-property-suggestions check.
+        grant_one_time_tier(user_email, "insight_addon")
         _send_payment_confirmation_email(
             user_email,
             "Insight Add-on",
@@ -2536,8 +2542,11 @@ def delete_account_endpoint(request: ProfileDeleteAccountRequest, user_email: st
 def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
     """Access via free mode (an admin-toggleable, product-wide setting —
     see insight_addon's "mode" field), the one-time Insight Add-on grant
-    for this specific report, or an active subscription tier whose
-    features include it."""
+    for this specific report (kept for backwards compatibility with
+    purchases made before one-time grants became account-wide — see
+    grant_one_time_tier), or user_has_feature's own real, account-wide
+    check (an active subscription tier OR any one-time purchase whose
+    configured features include it)."""
     insight_tier = get_tier("insight_addon")
     if insight_tier and insight_tier.get("mode") == "free":
         return True
@@ -2545,13 +2554,7 @@ def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
     if has_insight_access(report_id, user_email):
         return True
 
-    tier_id = get_active_tier(user_email)
-    if tier_id:
-        tier = get_tier(tier_id)
-        if tier and "similar_property_suggestions" in tier.get("features", []):
-            return True
-
-    return False
+    return user_has_feature(user_email, "similar_property_suggestions")
 
 
 class InstantScoreRequest(BaseModel):
@@ -2754,8 +2757,7 @@ def neighborhood_cost_of_living(lat: Optional[float] = None, lon: Optional[float
     _fetch_cost_of_living's own docstring for the real, honest
     breakdown of which of the 12 requested items actually have real
     data behind them."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "cost_of_living"):
+    if not user_has_feature(user_email, "cost_of_living"):
         raise HTTPException(
             status_code=403,
             detail="The cost of living panel requires an active Studio subscription that includes this feature.",
@@ -2770,8 +2772,7 @@ def neighborhood_price_trends(country: str, years: int = 8, user_email: str = De
     explicit business decision to gate each of these 4 new
     Neighborhood Insights panels independently. See _fetch_price_trend
     for the real, honest data-sourcing story."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "price_trends"):
+    if not user_has_feature(user_email, "price_trends"):
         raise HTTPException(
             status_code=403,
             detail="Price trends requires an active Studio subscription that includes this feature.",
@@ -2796,8 +2797,7 @@ def neighborhood_emi_calculator(request: EmiCalculatorRequest, user_email: str =
     financial math (see loan_calculator.py's own module docstring) —
     no external data, no honesty/estimate concerns of the kind the
     rest of this page has to navigate."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "emi_calculator"):
+    if not user_has_feature(user_email, "emi_calculator"):
         raise HTTPException(
             status_code=403,
             detail="The EMI calculator requires an active Studio subscription that includes this feature.",
@@ -2821,8 +2821,7 @@ def neighborhood_amortization_schedule(request: AmortizationRequest, user_email:
     tier-configurable — a tier could plausibly include one without
     the other, e.g. a quick EMI estimate for everyone but the full
     month-by-month projection reserved for a higher tier."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "amortization_projector"):
+    if not user_has_feature(user_email, "amortization_projector"):
         raise HTTPException(
             status_code=403,
             detail="The amortization projector requires an active Studio subscription that includes this feature.",
@@ -2841,8 +2840,7 @@ def neighborhood_amortization_export(principal: float, annual_rate_percent: floa
     unlike JSON which would need reformatting before it's usable the
     way a borrower would actually want to use this (sort, chart,
     total a specific year's interest, etc.)."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "amortization_projector"):
+    if not user_has_feature(user_email, "amortization_projector"):
         raise HTTPException(
             status_code=403,
             detail="The amortization projector requires an active Studio subscription that includes this feature.",
@@ -2885,8 +2883,7 @@ def neighborhood_loan_eligibility(request: LoanEligibilityRequest, user_email: s
     docstring for why this is honestly labeled an estimate, not a
     real bank's actual underwriting decision) using standard, real,
     admin-configurable lending thresholds."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "loan_eligibility"):
+    if not user_has_feature(user_email, "loan_eligibility"):
         raise HTTPException(
             status_code=403,
             detail="Loan eligibility checking requires an active Studio subscription that includes this feature.",
@@ -3489,8 +3486,7 @@ def neighborhood_create_comparison(request: NeighborhoodComparisonCreateRequest,
     single-area page already uses, then persists the result set so it
     can be reloaded instantly (get_comparison below) rather than
     re-fetched on every visit."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "area_comparison"):
+    if not user_has_feature(user_email, "area_comparison"):
         raise HTTPException(
             status_code=403,
             detail="Comparing areas requires an active Studio subscription that includes the area comparison feature.",
@@ -3549,8 +3545,7 @@ def neighborhood_refresh_comparison(comparison_id: str, user_email: str = Depend
     letting them create comparisons for free. Manually re-fetches a
     comparison's data right now, independent of the hourly monitoring
     loop, for a visitor who wants current data immediately."""
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "area_comparison"):
+    if not user_has_feature(user_email, "area_comparison"):
         raise HTTPException(
             status_code=403,
             detail="Refreshing a comparison requires an active Studio subscription that includes the area comparison feature.",
@@ -3589,8 +3584,7 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     since a subscription cancelled after this was turned on must not
     keep getting free, ongoing refreshes forever."""
     if request.monitoring:
-        tier_id = get_active_tier(user_email) if user_email else None
-        if not tier_id or not has_feature(tier_id, "area_comparison"):
+        if not user_has_feature(user_email, "area_comparison"):
             raise HTTPException(
                 status_code=403,
                 detail="Keeping a comparison monitored requires an active Studio subscription that includes the area comparison feature.",
@@ -3941,8 +3935,8 @@ def api_create_price_watch(request: CreatePriceWatchRequest, user_email: str = D
     itself right here — the frontend never needs to guess or send
     placeholder values for fields a URL-based watch will genuinely learn
     from the page itself."""
-    tier_id = get_active_tier(user_email)
-    if not has_feature(tier_id, "price_drop_alert"):
+    tier_id = get_granting_tier_id(user_email, "price_drop_alert")
+    if not tier_id:
         raise HTTPException(
             status_code=403,
             detail="Price Drop Alert requires an active Studio subscription that includes this feature."
@@ -4161,10 +4155,9 @@ def construction_materials(region: str = "global", user_email: str = Depends(get
     building in — e.g. an India-region user on Studio Pro can also see
     and select Thai, Vietnamese, Indonesian, or Philippine suppliers for
     an imported/alternative material, not just India's own options."""
-    tier_id = get_active_tier(user_email)
-    if has_feature(tier_id, "premium_global_suppliers"):
+    if user_has_feature(user_email, "premium_global_suppliers"):
         effective_region = "global"
-    elif has_feature(tier_id, "standard_suppliers"):
+    elif user_has_feature(user_email, "standard_suppliers"):
         effective_region = region
     else:
         raise HTTPException(
@@ -4379,8 +4372,7 @@ def construction_vastu_check(request: VastuCheckRequest, user_email: str = Depen
     The universal, country-agnostic adjacency (space-planning) check is
     unaffected either way — it's a separate endpoint/section that
     already works for any country."""
-    tier_id = get_active_tier(user_email)
-    if not has_feature(tier_id, "vastu_compliance"):
+    if not user_has_feature(user_email, "vastu_compliance"):
         raise HTTPException(
             status_code=403,
             detail="Vastu/traditional-building compliance checking requires an active Studio "
@@ -4872,8 +4864,8 @@ def api_export_property(property_id: str, user_email: str = Depends(get_current_
 # ============================================================
 
 def _require_agent_entitlement(user_email: str) -> str:
-    tier_id = get_active_tier(user_email)
-    if not tier_id or not has_feature(tier_id, "agent_intelligence"):
+    tier_id = get_granting_tier_id(user_email, "agent_intelligence")
+    if not tier_id:
         raise HTTPException(
             status_code=403,
             detail="Agent Intelligence requires an active Studio subscription that includes this feature.",
@@ -5706,8 +5698,7 @@ def api_share_property(property_id: str, request: ShareRequest, user_email: str 
     collaborator doesn't need their own subscription to use a design
     shared with them, matching how a real team seat works."""
     prop = _require_property_owner(property_id, user_email)
-    tier_id = get_active_tier(user_email)
-    if not has_feature(tier_id, "team_seats"):
+    if not user_has_feature(user_email, "team_seats"):
         raise HTTPException(
             status_code=403,
             detail="Sharing a design with teammates requires an active Studio subscription "

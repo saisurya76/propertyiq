@@ -277,3 +277,52 @@ def has_feature(tier_id: str | None, feature: str) -> bool:
     if not tier:
         return False
     return feature in tier.get("features", [])
+
+
+def get_granting_tier_id(user_email: str, feature: str) -> str | None:
+    """The real tier_id actually responsible for this person having
+    access to `feature` — their active subscription's tier if that's
+    what grants it, else the first one-time-purchased tier whose own
+    features include it, else None. Exists so callers that need more
+    than a yes/no (e.g. to look up that tier's own quota fields, like
+    max_agent_clients) get the real, correct tier config to read from
+    — including a one-time tier's own separately-configured quotas,
+    not just a bare true/false. user_has_feature is a thin wrapper
+    around this for callers that only need the yes/no."""
+    from backend.subscription_store import get_active_tier
+    from backend.insight_store import get_one_time_tier_grants
+
+    if not user_email:
+        return None
+
+    active_tier_id = get_active_tier(user_email)
+    if has_feature(active_tier_id, feature):
+        return active_tier_id
+
+    for granted_tier_id in get_one_time_tier_grants(user_email):
+        if has_feature(granted_tier_id, feature):
+            return granted_tier_id
+
+    return None
+
+
+def user_has_feature(user_email: str, feature: str) -> bool:
+    """The real, single place to check "can this person use X" — every
+    endpoint that gates on a feature should call THIS, not the plain
+    has_feature(get_active_tier(...), ...) pattern directly, so a
+    one-time purchase's own configured features (see
+    grant_one_time_tier) are honored everywhere consistently, the same
+    way an active subscription's features already are.
+
+    Checks two genuinely independent, real sources — an active
+    subscription's own tier features, OR any tier a one-time purchase
+    has permanently granted this email — and never touches or reads
+    from anything that could conflate the two. A user with, say, an
+    active Studio Pro subscription AND a separately-purchased one-time
+    tier gets the union of both tiers' features; buying the one-time
+    tier can never remove, downgrade, or otherwise affect their real
+    subscription, because this function only ever reads from
+    `subscriptions`, never writes to it, and the one-time grant lives
+    in a completely separate table."""
+    return get_granting_tier_id(user_email, feature) is not None
+

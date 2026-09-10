@@ -199,7 +199,7 @@ def test_endpoint_requires_the_feature_to_be_enabled_on_the_users_tier():
 
     with TestClient(app) as client:
         headers = _authed_headers(client, "no_feature_test@example.com")
-        with patch("backend.api.has_feature", return_value=False):
+        with patch("backend.api.get_granting_tier_id", return_value=None):
             r = client.post("/api/price-watches", json={
                 "price": 9500000, "city": "Hyderabad", "property_type": "Apartment",
                 "area_value": 1200, "target_price": 8500000,
