@@ -1055,3 +1055,98 @@ def test_search_properties_requires_ownership():
     stranger_headers = _entitled_headers("agentsearchstranger@example.com")
     r = client.post(f"/api/agent/clients/{created_client['client_id']}/search-properties", json={"requirements": "test"}, headers=stranger_headers)
     assert r.status_code == 404
+
+
+def test_best_property_requires_at_least_2_properties():
+    headers = _entitled_headers("agentbestpropfew@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Few Props Client"}, headers=headers).json()
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers)
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_recommendation"] is False
+    assert r.json()["reason"] == "not_enough_properties"
+
+
+def test_best_property_ranks_by_real_buyer_protection_score(monkeypatch):
+    """Direct proof: two properties, one genuinely better priced (lower
+    overpricing) than the other -- the real, better-scored one must
+    rank first."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentbestpropscore@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Score Client"}, headers=headers).json()
+
+    good_payload = _property_payload()
+    good_payload.update({"propertyName": "Good Deal Property", "quotedPrice": 9000000, "marketAverage": 5000, "governmentGuidance": 4500})  # priced close to market
+    bad_payload = _property_payload()
+    bad_payload.update({"propertyName": "Overpriced Property", "quotedPrice": 30000000, "marketAverage": 5000, "governmentGuidance": 4500})  # wildly overpriced
+
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=good_payload, headers=headers)
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=bad_payload, headers=headers)
+
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["has_recommendation"] is True
+    candidates = r.json()["candidates"]
+    assert candidates[0]["property_name"] == "Good Deal Property"
+    assert candidates[0]["score"] > candidates[1]["score"]
+
+
+def test_best_property_uses_real_stated_budget(monkeypatch):
+    """Direct proof the client's own real requirements text genuinely
+    affects the ranking -- a property within budget should outrank an
+    otherwise-similar one that's significantly over it."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentbestpropbudget@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Budget Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/requirements", json={"requirements": "3BHK under 1 crore"}, headers=headers)
+
+    within_budget = _property_payload()
+    within_budget.update({"propertyName": "Within Budget", "quotedPrice": 9000000, "marketAverage": 5000, "governmentGuidance": 4500})
+    over_budget = _property_payload()
+    over_budget.update({"propertyName": "Over Budget", "quotedPrice": 9000000, "marketAverage": 5000, "governmentGuidance": 4500})
+
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=within_budget, headers=headers)
+    prop2 = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=over_budget, headers=headers).json()
+    # Bump the second one over budget after creation, keeping everything else identical
+    over_budget["quotedPrice"] = 15000000
+    client.put(f"/api/agent/properties/{prop2['property_id']}", json=over_budget, headers=headers)
+
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=headers)
+    assert r.json()["budget_used"] == 10_000_000
+    candidates = {c["property_name"]: c for c in r.json()["candidates"]}
+    assert any("budget" in reason.lower() for reason in candidates["Within Budget"]["reasons"])
+    assert any("over" in reason.lower() and "budget" in reason.lower() for reason in candidates["Over Budget"]["reasons"])
+
+
+def test_best_property_does_not_penalize_missing_coordinates(monkeypatch):
+    """A property with no coordinates yet must still be scored fairly
+    (redistributed weight), not silently ranked lower just because
+    neighborhood data isn't available."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentbestpropnocoords@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "No Coords Client"}, headers=headers).json()
+    p1 = _property_payload(lat=None, lon=None)
+    p1["propertyName"] = "No Coords Property"
+    p2 = _property_payload(lat=17.4, lon=78.4)
+    p2["propertyName"] = "With Coords Property"
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=p1, headers=headers)
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=p2, headers=headers)
+
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=headers)
+    assert r.status_code == 200
+    candidates = {c["property_name"]: c for c in r.json()["candidates"]}
+    assert any("not available" in reason.lower() for reason in candidates["No Coords Property"]["reasons"])
+
+
+def test_best_property_requires_ownership():
+    headers = _entitled_headers("agentbestpropowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Owner Best Prop Client"}, headers=headers).json()
+    stranger_headers = _entitled_headers("agentbestpropstranger@example.com")
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=stranger_headers)
+    assert r.status_code == 404

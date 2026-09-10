@@ -63,6 +63,8 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
   const [savingRequirementsFor, setSavingRequirementsFor] = useState(null);
   const [searchResultsByClient, setSearchResultsByClient] = useState({});
   const [searchingFor, setSearchingFor] = useState(null);
+  const [bestPropertyByClient, setBestPropertyByClient] = useState({});
+  const [findingBestFor, setFindingBestFor] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
 
   const [showAddClient, setShowAddClient] = useState(false);
@@ -415,6 +417,19 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
     }
   };
 
+  const handleFindBestProperty = async (clientId) => {
+    setFindingBestFor(clientId);
+    setError("");
+    try {
+      const res = await studioApi.agentGetBestProperty(clientId);
+      setBestPropertyByClient((prev) => ({ ...prev, [clientId]: res }));
+    } catch (err) {
+      setError(err.message || "Couldn't find the best property right now.");
+    } finally {
+      setFindingBestFor(null);
+    }
+  };
+
   const startCompareMode = (clientId) => {
     setCompareModeForClient(clientId);
     setSelectedForCompare([]);
@@ -667,6 +682,34 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                             <p className="agent-compare-hint">
                               ⚖ Add {2 - (propertiesByClient[c.client_id] || []).length} more propert{(propertiesByClient[c.client_id] || []).length === 1 ? "y" : "ies"} for this client to unlock comparison.
                             </p>
+                          )}
+
+                          {(propertiesByClient[c.client_id] || []).length >= 2 && (
+                            <div className="agent-best-property-row">
+                              <button type="button" className="agent-text-btn" onClick={() => handleFindBestProperty(c.client_id)} disabled={findingBestFor === c.client_id}>
+                                {findingBestFor === c.client_id ? "Finding..." : `⭐ What's the best property for ${c.client_name}?`}
+                              </button>
+                              {bestPropertyByClient[c.client_id] && (
+                                <div className="agent-best-property-results">
+                                  {bestPropertyByClient[c.client_id].has_recommendation ? (
+                                    bestPropertyByClient[c.client_id].candidates.map((cand, i) => (
+                                      <div key={cand.property_id} className={`agent-best-property-card ${i === 0 ? "agent-best-property-top" : ""}`}>
+                                        <div className="agent-best-property-header">
+                                          {i === 0 && <span className="agent-best-property-badge">Best Match</span>}
+                                          <strong>{cand.property_name}</strong>
+                                          <span className="agent-best-property-score">{cand.score}/100</span>
+                                        </div>
+                                        <ul className="agent-best-property-reasons">
+                                          {cand.reasons.map((reason, j) => <li key={j}>{reason}</li>)}
+                                        </ul>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="agent-empty-note" style={{ padding: "8px 0" }}>Not enough properties with usable data to compare yet.</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
 
                           {(propertiesByClient[c.client_id] || []).map((p) => (

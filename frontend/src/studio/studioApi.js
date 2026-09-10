@@ -115,6 +115,7 @@ export const studioApi = {
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/requirements`, { method: "PUT", body: JSON.stringify({ requirements }) }),
   agentSearchProperties: (clientId, requirements) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/search-properties`, { method: "POST", body: JSON.stringify({ requirements }) }),
+  agentGetBestProperty: (clientId) => apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/best-property`),
   agentDeleteClient: (clientId) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}`, { method: "DELETE" }),
   agentListClientProperties: (clientId) =>

@@ -682,3 +682,61 @@
   color: #64748B;
   line-height: 1.4;
 }
+
+.agent-best-property-row {
+  margin: 4px 0 14px;
+}
+
+.agent-best-property-results {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-best-property-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: white;
+}
+
+.agent-best-property-top {
+  border-color: #A7F3D0;
+  background: #ECFDF5;
+}
+
+.agent-best-property-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.agent-best-property-badge {
+  background: #059669;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.agent-best-property-score {
+  margin-left: auto;
+  font-weight: 700;
+  color: #1E293B;
+  font-size: 13px;
+}
+
+.agent-best-property-reasons {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.agent-best-property-reasons li {
+  margin-bottom: 2px;
+}

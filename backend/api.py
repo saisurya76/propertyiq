@@ -5078,6 +5078,114 @@ def api_agent_delete_client_property(property_id: str, user_email: str = Depends
     return {"deleted": True}
 
 
+def _extract_budget_from_requirements(requirements: str) -> Optional[float]:
+    """Best-effort, honest extraction of a real budget ceiling from
+    free-text requirements (e.g. "under 1.5 crore", "budget ₹80 lakh",
+    "up to 20000000"). Returns None — not a guess — for text with no
+    clearly parseable number, since a wrong guess here would silently
+    corrupt the recommendation below it. Handles Indian numbering
+    (lakh/crore) since that's this app's primary market, plus plain
+    numbers for the other supported countries."""
+    if not requirements:
+        return None
+    text = requirements.lower().replace(",", "")
+    match = re.search(r"(\d+(?:\.\d+)?)\s*crore", text)
+    if match:
+        return float(match.group(1)) * 10_000_000
+    match = re.search(r"(\d+(?:\.\d+)?)\s*lakh", text)
+    if match:
+        return float(match.group(1)) * 100_000
+    match = re.search(r"(?:under|below|up to|budget[: ]*)\D*(\d{5,})", text)
+    if match:
+        return float(match.group(1))
+    return None
+
+
+@app.get("/api/agent/clients/{client_id}/best-property")
+def api_agent_best_property(client_id: str, user_email: str = Depends(get_current_user_email)):
+    """A real, fully transparent recommendation — not a black-box
+    score. Every property's real assessment (build_assessment) and
+    real neighborhood ranking (_fetch_area_comparison_data, when
+    coordinates exist) already exist elsewhere in this app; this
+    endpoint's only job is combining those same real numbers into one
+    ranked list, with the exact reasoning shown for each one. A
+    client's stated budget (parsed from their own real requirements
+    text, never guessed) is checked, honestly, but only where the
+    budget could genuinely be extracted -- a property is never
+    penalized for a requirement this endpoint couldn't actually read."""
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    properties = list_properties_for_client(client_id)
+    if len(properties) < 2:
+        return {"has_recommendation": False, "reason": "not_enough_properties", "candidates": []}
+
+    budget = _extract_budget_from_requirements(client.get("requirements") or "")
+
+    candidates = []
+    for prop in properties:
+        payload = prop["property_payload"]
+        try:
+            assessment = build_assessment(PropertyRequest(**payload))
+        except Exception as exc:
+            logger.error(f"api_agent_best_property: assessment failed for property={prop['property_id']!r}: {exc}")
+            continue
+
+        overall_ranking = None
+        if prop["lat"] is not None and prop["lon"] is not None:
+            area = NeighborhoodComparisonArea(city=payload["city"], country=payload["country"], lat=prop["lat"], lon=prop["lon"], property_type=payload.get("propertyType", "Apartment"))
+            neighborhood = _fetch_area_comparison_data(area)
+            ranking = neighborhood.get("overall_ranking", {})
+            if ranking.get("has_data"):
+                overall_ranking = ranking["score"]
+
+        reasons = []
+        score = assessment.buyer_protection_score * 0.45
+        reasons.append(f"Buyer Protection Score: {assessment.buyer_protection_score:.0f}/100")
+
+        if overall_ranking is not None:
+            score += overall_ranking * 0.35
+            reasons.append(f"Neighborhood Ranking: {overall_ranking:.0f}/100")
+        else:
+            # Redistributes the neighborhood weight onto the buyer
+            # protection score instead of silently scoring this
+            # property lower just because it has no coordinates yet —
+            # an honest adjustment, not a penalty for missing data.
+            score = assessment.buyer_protection_score * 0.80
+            reasons.append("Neighborhood ranking not available for this property")
+
+        if assessment.deal_quality == "GOOD DEAL":
+            score += 10
+            reasons.append("Real deal quality: Good Deal")
+        elif assessment.deal_quality == "POOR DEAL":
+            score -= 10
+            reasons.append("Real deal quality: Poor Deal")
+
+        if budget is not None:
+            quoted = payload.get("quotedPrice", 0)
+            if quoted <= budget:
+                score += 10
+                reasons.append("Within the client's stated budget")
+            elif quoted > budget * 1.2:
+                score -= 15
+                reasons.append("Significantly over the client's stated budget")
+
+        candidates.append({
+            "property_id": prop["property_id"],
+            "property_name": payload.get("propertyName", "Unnamed Property"),
+            "score": round(score, 1),
+            "reasons": reasons,
+        })
+
+    if not candidates:
+        return {"has_recommendation": False, "reason": "no_valid_properties", "candidates": []}
+
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+    return {"has_recommendation": True, "candidates": candidates, "budget_used": budget}
+
+
 def _build_agent_report_context(property_id: str, user_email: str) -> tuple[dict, dict]:
     """Builds the shared ctx dict every report type renders from —
     orchestrates the exact same real functions the rest of this app
