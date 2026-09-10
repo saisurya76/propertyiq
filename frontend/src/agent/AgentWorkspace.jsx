@@ -61,6 +61,11 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
   const [generatingNamedReportFor, setGeneratingNamedReportFor] = useState(null); // `${propertyId}:${reportType}` currently downloading
   const [requirementsInput, setRequirementsInput] = useState("");
   const [savingRequirementsFor, setSavingRequirementsFor] = useState(null);
+  const [financialProfileInput, setFinancialProfileInput] = useState({});
+  const [savingFinancialProfileFor, setSavingFinancialProfileFor] = useState(null);
+  const [financialProfileExpandedFor, setFinancialProfileExpandedFor] = useState(null);
+  const [propertyLoanEligibility, setPropertyLoanEligibility] = useState({}); // property_id -> result
+  const [checkingLoanEligibilityFor, setCheckingLoanEligibilityFor] = useState(null);
   const [searchResultsByClient, setSearchResultsByClient] = useState({});
   const [searchingFor, setSearchingFor] = useState(null);
   const [bestPropertyByClient, setBestPropertyByClient] = useState({});
@@ -199,6 +204,13 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
     setExpandedClientId(clientId);
     const currentClient = clients?.find((c) => c.client_id === clientId);
     setRequirementsInput(currentClient?.requirements || "");
+    setFinancialProfileInput({
+      monthly_income: currentClient?.monthly_income ?? "",
+      existing_monthly_obligations: currentClient?.existing_monthly_obligations ?? "",
+      down_payment_available: currentClient?.down_payment_available ?? "",
+      client_age: currentClient?.client_age ?? "",
+      credit_rating: currentClient?.credit_rating ?? "",
+    });
     if (!propertiesByClient[clientId]) {
       try {
         const res = await studioApi.agentListClientProperties(clientId);
@@ -403,6 +415,43 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
       setSavingRequirementsFor(null);
     }
   };
+
+  const handleSaveFinancialProfile = async (clientId) => {
+    setSavingFinancialProfileFor(clientId);
+    setError("");
+    try {
+      // Only real, non-empty values are sent -- an empty input field
+      // means "leave this alone," not "clear it," matching how the
+      // rest of this form already behaves (nothing here forces an
+      // agent to fill in every field at once).
+      const fields = {};
+      for (const [key, value] of Object.entries(financialProfileInput)) {
+        if (value === "" || value === null || value === undefined) continue;
+        fields[key] = key === "credit_rating" ? value : Number(value);
+      }
+      const updated = await studioApi.agentUpdateFinancialProfile(clientId, fields);
+      setClients((prev) => prev.map((c) => (c.client_id === clientId ? { ...c, ...updated } : c)));
+      setSuccessMessage("Financial profile saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save the financial profile.");
+    } finally {
+      setSavingFinancialProfileFor(null);
+    }
+  };
+
+  const handleCheckPropertyLoanEligibility = async (propertyId) => {
+    setCheckingLoanEligibilityFor(propertyId);
+    setError("");
+    try {
+      const result = await studioApi.agentGetPropertyLoanEligibility(propertyId);
+      setPropertyLoanEligibility((prev) => ({ ...prev, [propertyId]: result }));
+    } catch (err) {
+      setPropertyLoanEligibility((prev) => ({ ...prev, [propertyId]: { error: err.message || "Couldn't check eligibility." } }));
+    } finally {
+      setCheckingLoanEligibilityFor(null);
+    }
+  };
+
 
   const handleSearchProperties = async (clientId) => {
     setSearchingFor(clientId);
@@ -663,6 +712,62 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                             )}
                           </div>
 
+                          <div className="agent-financial-profile-box">
+                            <button
+                              type="button"
+                              className="agent-text-btn"
+                              onClick={() => setFinancialProfileExpandedFor(financialProfileExpandedFor === c.client_id ? null : c.client_id)}
+                            >
+                              💰 {financialProfileExpandedFor === c.client_id ? "Hide" : "Set"} Financial Profile (optional)
+                            </button>
+                            {financialProfileExpandedFor === c.client_id && (
+                              <div className="agent-financial-profile-fields">
+                                <p className="agent-empty-note" style={{ padding: "0 0 10px" }}>
+                                  Every field is optional. Fill in all 5 to unlock loan-eligibility scoring in "Best Property" — or use them individually when checking a specific property's eligibility.
+                                </p>
+                                <div className="agent-form-grid">
+                                  <input
+                                    type="number" placeholder="Monthly income"
+                                    value={financialProfileInput.monthly_income ?? ""}
+                                    onChange={(e) => setFinancialProfileInput({ ...financialProfileInput, monthly_income: e.target.value })}
+                                  />
+                                  <input
+                                    type="number" placeholder="Existing monthly obligations"
+                                    value={financialProfileInput.existing_monthly_obligations ?? ""}
+                                    onChange={(e) => setFinancialProfileInput({ ...financialProfileInput, existing_monthly_obligations: e.target.value })}
+                                  />
+                                  <input
+                                    type="number" placeholder="Down payment available"
+                                    value={financialProfileInput.down_payment_available ?? ""}
+                                    onChange={(e) => setFinancialProfileInput({ ...financialProfileInput, down_payment_available: e.target.value })}
+                                  />
+                                  <input
+                                    type="number" placeholder="Client age"
+                                    value={financialProfileInput.client_age ?? ""}
+                                    onChange={(e) => setFinancialProfileInput({ ...financialProfileInput, client_age: e.target.value })}
+                                  />
+                                  <select
+                                    value={financialProfileInput.credit_rating ?? ""}
+                                    onChange={(e) => setFinancialProfileInput({ ...financialProfileInput, credit_rating: e.target.value })}
+                                  >
+                                    <option value="">Credit rating (self-assessed)</option>
+                                    <option value="poor">Poor</option>
+                                    <option value="fair">Fair</option>
+                                    <option value="good">Good</option>
+                                    <option value="excellent">Excellent</option>
+                                  </select>
+                                </div>
+                                <button
+                                  type="button" className="agent-text-btn" style={{ marginTop: 10 }}
+                                  onClick={() => handleSaveFinancialProfile(c.client_id)}
+                                  disabled={savingFinancialProfileFor === c.client_id}
+                                >
+                                  {savingFinancialProfileFor === c.client_id ? "Saving..." : "Save Financial Profile"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
                           {(propertiesByClient[c.client_id] || []).length >= 2 ? (
                             <div className="agent-compare-toggle-row">
                               {compareModeForClient === c.client_id ? (
@@ -756,12 +861,39 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
                                 >
                                   📋 Reports
                                 </button>
+                                <button
+                                  type="button"
+                                  className="agent-text-btn"
+                                  onClick={() => handleCheckPropertyLoanEligibility(p.property_id)}
+                                  disabled={checkingLoanEligibilityFor === p.property_id}
+                                >
+                                  {checkingLoanEligibilityFor === p.property_id ? "Checking..." : "💰 Loan Eligibility"}
+                                </button>
                                 <button type="button" className="agent-text-btn" onClick={() => openEditProperty(c.client_id, p)}>Edit</button>
                                 <button type="button" className="agent-text-btn agent-delete-btn" onClick={() => handleDeleteProperty(c.client_id, p.property_id)}>
                                   Delete
                                 </button>
                               </div>
                             </div>
+
+                            {propertyLoanEligibility[p.property_id] && (
+                              <div className="agent-loan-eligibility-result">
+                                {propertyLoanEligibility[p.property_id].error ? (
+                                  <p className="agent-empty-note" style={{ padding: "8px 0" }}>{propertyLoanEligibility[p.property_id].error}</p>
+                                ) : (
+                                  <>
+                                    <div className={`agent-loan-verdict ${propertyLoanEligibility[p.property_id].is_eligible ? "agent-loan-eligible" : "agent-loan-ineligible"}`}>
+                                      {propertyLoanEligibility[p.property_id].is_eligible ? "✓ Likely Eligible" : "✗ Likely Not Eligible"}
+                                    </div>
+                                    <ul className="agent-loan-checks">
+                                      {propertyLoanEligibility[p.property_id].checks.map((check) => (
+                                        <li key={check.name}>{check.pass ? "✓" : "✗"} {check.name}: {check.detail}</li>
+                                      ))}
+                                    </ul>
+                                  </>
+                                )}
+                              </div>
+                            )}
 
                               {reportsPanelFor === p.property_id && (
                                 <div className="agent-reports-panel">

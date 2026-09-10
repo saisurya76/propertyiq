@@ -142,6 +142,10 @@ export const studioApi = {
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}`, { method: "PUT", body: JSON.stringify({ client_name: clientName, client_contact: clientContact }) }),
   agentUpdateClientRequirements: (clientId, requirements) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/requirements`, { method: "PUT", body: JSON.stringify({ requirements }) }),
+  agentUpdateFinancialProfile: (clientId, fields) =>
+    apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/financial-profile`, { method: "PUT", body: JSON.stringify(fields) }),
+  agentGetPropertyLoanEligibility: (propertyId) =>
+    apiFetch(`/api/agent/properties/${encodeURIComponent(propertyId)}/loan-eligibility`),
   agentSearchProperties: (clientId, requirements) =>
     apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/search-properties`, { method: "POST", body: JSON.stringify({ requirements }) }),
   agentGetBestProperty: (clientId) => apiFetch(`/api/agent/clients/${encodeURIComponent(clientId)}/best-property`),
