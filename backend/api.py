@@ -101,6 +101,9 @@ from backend.agent_store import (
     delete_client_property,
 )
 from backend.agent_report import build_agent_advisory_pdf, build_agent_report_pdf, REPORT_TYPES
+from backend.report_translations import get_report_language
+from backend.country_reference import get_country_reference
+from backend.report_dynamic_translation import translate_dynamic_strings, LANGUAGE_NAMES
 from backend.main_report import build_main_property_report_pdf
 
 from backend.neighborhood_comparison_store import (
@@ -5249,13 +5252,54 @@ def _build_agent_report_context(property_id: str, user_email: str) -> tuple[dict
                 comparison_results.append({"property_name": sibling_payload.get("propertyName", "Unnamed"), **sibling_data})
 
     property_currency = COMPARISON_COUNTRY_CURRENCY.get((payload.get("country") or "").strip().lower(), "INR")
+    property_country = payload.get("country", "India")
+
+    # Real, live translation for the report's own dynamically-generated
+    # narrative text and this country's real checklist/authority-contact
+    # content -- the part report_translations.py's static label
+    # dictionary genuinely can't cover, since none of this is known
+    # ahead of time. Batched into one real API call; falls back to the
+    # original English strings entirely (not partially) on any failure,
+    # so a translation problem can never break report generation itself.
+    language = get_report_language(property_country)
+    translated_text: dict[str, Any] = {}
+    if language != "en":
+        reference = get_country_reference(property_country)
+        checklist = reference.get("checklist") or []
+        handover_checklist = reference.get("handover_checklist") or []
+        authority_contacts = reference.get("authority_contacts") or []
+
+        dynamic_strings = [
+            assessment.recommendation,
+            assessment.decision.narrative,
+            (neighborhood.get("infrastructure", {}).get("summary") or "") if neighborhood else "",
+        ]
+        n_fixed = len(dynamic_strings)
+        dynamic_strings += checklist
+        n_checklist = len(checklist)
+        dynamic_strings += handover_checklist
+        n_handover = len(handover_checklist)
+        dynamic_strings += [label for label, _ in authority_contacts] + [detail for _, detail in authority_contacts]
+
+        translated = translate_dynamic_strings(dynamic_strings, LANGUAGE_NAMES.get(language, language))
+
+        (
+            translated_text["recommendation"], translated_text["decision_narrative"], translated_text["infrastructure_summary"],
+        ) = translated[:n_fixed]
+        translated_text["checklist"] = translated[n_fixed:n_fixed + n_checklist]
+        translated_text["handover_checklist"] = translated[n_fixed + n_checklist:n_fixed + n_checklist + n_handover]
+        remaining = translated[n_fixed + n_checklist + n_handover:]
+        n_contacts = len(authority_contacts)
+        translated_text["authority_contacts"] = list(zip(remaining[:n_contacts], remaining[n_contacts:]))
 
     ctx = {
         "client_name": client["client_name"] if client else "Unknown Client",
         "property_name": payload.get("propertyName", "Unnamed Property"),
         "property_address": f"{payload.get('location', '')}, {payload.get('city', '')}",
-        "property_country": payload.get("country", "India"),
+        "property_country": property_country,
         "property_currency": property_currency,
+        "language": language,
+        "translated_text": translated_text,
         "assessment": assessment,
         "recommendation_reasons": recommendation_reasons,
         "neighborhood": neighborhood,

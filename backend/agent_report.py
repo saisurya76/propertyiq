@@ -18,6 +18,7 @@ construction_report.py uses — no new library.
 """
 
 import io
+import os
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
@@ -26,10 +27,15 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 
 from backend.country_reference import get_country_reference
+from backend.report_translations import translate_label
 
 # A distinct palette from Construction Studio's own amber/navy report —
 # slate + indigo + emerald, meant to read as "professional business
@@ -43,13 +49,60 @@ _TEXT_MUTED = "#64748B"
 _TEXT_DARK = "#0F172A"
 
 _STYLES = getSampleStyleSheet()
-_TITLE_STYLE = ParagraphStyle("AgentTitle", parent=_STYLES["Title"], fontSize=22, textColor=HexColor("#FFFFFF"), alignment=0, fontName="Helvetica-Bold")
-_SUBTITLE_STYLE = ParagraphStyle("AgentSubtitle", parent=_STYLES["Normal"], fontSize=10, textColor=HexColor("#C7D2FE"))
-_SECTION_STYLE = ParagraphStyle("AgentSection", parent=_STYLES["Heading2"], fontSize=14, textColor=HexColor(_INDIGO), spaceBefore=16, spaceAfter=8, fontName="Helvetica-Bold")
-_BODY_STYLE = ParagraphStyle("AgentBody", parent=_STYLES["Normal"], fontSize=10, textColor=HexColor(_TEXT_DARK), leading=14)
-_MUTED_STYLE = ParagraphStyle("AgentMuted", parent=_STYLES["Normal"], fontSize=8.5, textColor=HexColor(_TEXT_MUTED))
-_LABEL_STYLE = ParagraphStyle("AgentLabel", parent=_STYLES["Normal"], fontSize=9, textColor=HexColor(_TEXT_MUTED), fontName="Helvetica-Bold")
-_BULLET_STYLE = ParagraphStyle("AgentBullet", parent=_STYLES["Normal"], fontSize=9.5, textColor=HexColor(_TEXT_DARK), leading=13, spaceAfter=4)
+
+# Real Unicode fonts, embedded so Thai/Vietnamese/Indonesian reports
+# actually render — confirmed directly (not assumed) that reportlab's
+# default base-14 fonts have NO Thai glyph coverage at all: an early
+# version of this feature generated a real Thai report and every
+# Thai character came out as a solid black box. Fixed by embedding
+# Google's own Noto Sans fonts (Thai script coverage for Thai; broad
+# Latin+diacritics coverage for Vietnamese/Indonesian). Neither has a
+# separate static bold file available upstream, so bold styles reuse
+# the same regular-weight file for non-English reports — real,
+# readable text without bold emphasis, a deliberate trade-off against
+# the alternative (unreadable boxes).
+_FONTS_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+_FONT_REGISTERED: dict[str, bool] = {}
+
+
+def _register_font_once(name: str, filename: str) -> None:
+    if _FONT_REGISTERED.get(name):
+        return
+    pdfmetrics.registerFont(TTFont(name, f"{_FONTS_DIR}/{filename}"))
+    _FONT_REGISTERED[name] = True
+
+
+# language -> (regular font name, bold font name) -- both real,
+# registered fonts; English keeps reportlab's own built-in Helvetica.
+_FONTS_BY_LANGUAGE: dict[str, tuple[str, str]] = {
+    "th": ("NotoSansThai", "NotoSansThai"),
+    "vi": ("NotoSans", "NotoSans"),
+    "id": ("NotoSans", "NotoSans"),
+}
+
+
+def _get_styles(language: str) -> dict[str, ParagraphStyle]:
+    """Builds a fresh, real set of styles for THIS report only --
+    never shared module-level mutable state, since a FastAPI sync
+    endpoint runs in a threadpool and two agents generating reports in
+    different languages at the same time would otherwise be able to
+    corrupt each other's fonts mid-request."""
+    if language in _FONTS_BY_LANGUAGE:
+        regular_name, bold_name = _FONTS_BY_LANGUAGE[language]
+        _register_font_once("NotoSansThai", "NotoSansThai-Regular.ttf")
+        _register_font_once("NotoSans", "NotoSans-Regular.ttf")
+    else:
+        regular_name, bold_name = "Helvetica", "Helvetica-Bold"
+
+    return {
+        "title": ParagraphStyle("AgentTitle", parent=_STYLES["Title"], fontSize=22, textColor=HexColor("#FFFFFF"), alignment=0, fontName=bold_name),
+        "subtitle": ParagraphStyle("AgentSubtitle", parent=_STYLES["Normal"], fontSize=10, textColor=HexColor("#C7D2FE"), fontName=regular_name),
+        "section": ParagraphStyle("AgentSection", parent=_STYLES["Heading2"], fontSize=14, textColor=HexColor(_INDIGO), spaceBefore=16, spaceAfter=8, fontName=bold_name),
+        "body": ParagraphStyle("AgentBody", parent=_STYLES["Normal"], fontSize=10, textColor=HexColor(_TEXT_DARK), leading=14, fontName=regular_name),
+        "muted": ParagraphStyle("AgentMuted", parent=_STYLES["Normal"], fontSize=8.5, textColor=HexColor(_TEXT_MUTED), fontName=regular_name),
+        "label": ParagraphStyle("AgentLabel", parent=_STYLES["Normal"], fontSize=9, textColor=HexColor(_TEXT_MUTED), fontName=bold_name),
+        "bullet": ParagraphStyle("AgentBullet", parent=_STYLES["Normal"], fontSize=9.5, textColor=HexColor(_TEXT_DARK), leading=13, spaceAfter=4, fontName=regular_name),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +213,29 @@ def _fetch_logo_image(photo_url: Optional[str]) -> Optional[Image]:
         return None
 
 
-def _kv_table(rows: list[tuple[str, str]]) -> Table:
-    data = [[Paragraph(k, _LABEL_STYLE), Paragraph(str(v), _BODY_STYLE)] for k, v in rows]
+def t(label: str, ctx: dict[str, Any]) -> str:
+    """The one place every static section heading/field label in this
+    module goes through — real, static dictionary lookup for this
+    report's real target language (English if the property's country
+    has no translation, e.g. India/Philippines). See
+    report_translations.py for the actual translations."""
+    return translate_label(label, ctx.get("language", "en"))
+
+
+def _dt(key: str, fallback: str, ctx: dict[str, Any]) -> str:
+    """Same idea as t(), but for the handful of real, dynamically-
+    generated narrative strings (the assessment engine's own
+    recommendation text, decision narrative, etc.) that a static
+    dictionary can't cover — these were translated once, per report,
+    via a real Gemini call in _build_agent_report_context (api.py).
+    Falls back to the real original English value whenever no
+    translation exists for this key (English reports, or a translation
+    call that failed) rather than ever showing a blank."""
+    return ctx.get("translated_text", {}).get(key) or fallback
+
+
+def _kv_table(rows: list[tuple[str, str]], styles: dict[str, ParagraphStyle]) -> Table:
+    data = [[Paragraph(k, styles["label"]), Paragraph(str(v), styles["body"])] for k, v in rows]
     table = Table(data, colWidths=[2.0 * inch, 4.3 * inch])
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -181,8 +255,8 @@ def _kv_table(rows: list[tuple[str, str]]) -> Table:
 
 def _section_header_block(story: list, ctx: dict[str, Any], title: str, subtitle: str) -> None:
     header_table = Table(
-        [[Paragraph(title, _TITLE_STYLE)],
-         [Paragraph(subtitle, _SUBTITLE_STYLE)]],
+        [[Paragraph(title, ctx["styles"]["title"])],
+         [Paragraph(subtitle, ctx["styles"]["subtitle"])]],
         colWidths=[6.3 * inch],
     )
     header_table.setStyle(TableStyle([
@@ -206,32 +280,32 @@ def _section_header_block(story: list, ctx: dict[str, Any], title: str, subtitle
         prepared_by_line += f"  |  app.propertyiqweb.com/a/{branding['share_slug']}"
 
     info_rows = [
-        ("Client", ctx["client_name"]),
-        ("Property", f"{ctx['property_name']} — {ctx['property_address']}"),
-        ("Prepared by", prepared_by_line),
-        ("Generated", datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")),
+        (t("Client", ctx), ctx["client_name"]),
+        (t("Property", ctx), f"{ctx['property_name']} — {ctx['property_address']}"),
+        (t("Prepared by", ctx), prepared_by_line),
+        (t("Generated", ctx), datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")),
     ]
     if logo_image:
-        info_table = _kv_table(info_rows)
+        info_table = _kv_table(info_rows, ctx["styles"])
         combined = Table([[logo_image, info_table]], colWidths=[0.8 * inch, 5.5 * inch])
         combined.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
         story.append(combined)
     else:
-        story.append(_kv_table(info_rows))
+        story.append(_kv_table(info_rows, ctx["styles"]))
 
 
 def _section_assessment(story: list, ctx: dict[str, Any]) -> None:
     assessment = ctx["assessment"]
     currency = ctx["property_currency"]
-    story.append(Paragraph("Property Assessment", _SECTION_STYLE))
+    story.append(Paragraph(t("Property Assessment", ctx), ctx["styles"]["section"]))
     story.append(_kv_table([
-        ("Buyer Protection Score", f"{assessment.buyer_protection_score:.1f} / 100 ({assessment.buyer_protection_rating})"),
-        ("Recommendation", assessment.recommendation),
-        ("Deal Quality", assessment.deal_quality),
-        ("Negotiation Position", assessment.negotiation_position),
-        ("Target Price", f"{currency} {assessment.target_price:,.0f}"),
-        ("Potential Savings", f"{currency} {assessment.potential_savings:,.0f}"),
-    ]))
+        (t("Buyer Protection Score", ctx), f"{assessment.buyer_protection_score:.1f} / 100 ({assessment.buyer_protection_rating})"),
+        (t("Recommendation", ctx), _dt("recommendation", assessment.recommendation, ctx)),
+        (t("Deal Quality", ctx), t(assessment.deal_quality, ctx)),
+        (t("Negotiation Position", ctx), t(assessment.negotiation_position, ctx)),
+        (t("Target Price", ctx), f"{currency} {assessment.target_price:,.0f}"),
+        (t("Potential Savings", ctx), f"{currency} {assessment.potential_savings:,.0f}"),
+    ], ctx["styles"]))
 
 
 def _section_recommendation(story: list, ctx: dict[str, Any]) -> None:
@@ -239,24 +313,24 @@ def _section_recommendation(story: list, ctx: dict[str, Any]) -> None:
     recommendation and the real reasoning behind it, for a client who
     wants the bottom line without the full data dump."""
     assessment = ctx["assessment"]
-    story.append(Paragraph("Recommendation", _SECTION_STYLE))
+    story.append(Paragraph(t("Recommendation", ctx), ctx["styles"]["section"]))
     story.append(_kv_table([
-        ("Recommendation", assessment.recommendation),
-        ("Decision", f"{assessment.decision.category} — {assessment.decision.action}"),
-    ]))
+        (t("Recommendation", ctx), _dt("recommendation", assessment.recommendation, ctx)),
+        (t("Decision", ctx), f"{assessment.decision.category} — {assessment.decision.action}"),
+    ], ctx["styles"]))
     story.append(Spacer(1, 6))
-    story.append(Paragraph(assessment.decision.narrative, _BODY_STYLE))
+    story.append(Paragraph(_dt("decision_narrative", assessment.decision.narrative, ctx), ctx["styles"]["body"]))
     story.append(Spacer(1, 10))
-    story.append(Paragraph("Why This Recommendation", _SECTION_STYLE))
+    story.append(Paragraph(t("Why This Recommendation", ctx), ctx["styles"]["section"]))
     for reason in ctx.get("recommendation_reasons") or []:
-        story.append(Paragraph(f"• {reason}", _BULLET_STYLE))
+        story.append(Paragraph(f"• {reason}", ctx["styles"]["bullet"]))
 
 
 def _section_neighborhood(story: list, ctx: dict[str, Any]) -> None:
     neighborhood = ctx["neighborhood"]
-    story.append(Paragraph("Neighborhood Insights", _SECTION_STYLE))
+    story.append(Paragraph(t("Neighborhood Insights", ctx), ctx["styles"]["section"]))
     if not neighborhood:
-        story.append(Paragraph("Not available for this property — no coordinates were captured for it.", _MUTED_STYLE))
+        story.append(Paragraph(t("Not available for this property — no coordinates were captured for it.", ctx), ctx["styles"]["muted"]))
         return
 
     resale = neighborhood.get("resale_signal", {})
@@ -268,55 +342,55 @@ def _section_neighborhood(story: list, ctx: dict[str, Any]) -> None:
     muni = neighborhood.get("municipality_ranking", {})
 
     story.append(_kv_table([
-        ("Overall Ranking", f"{overall.get('score')} / 100" if overall.get("has_data") else "Not enough data"),
-        ("Avg. Price/Sqft (resale signal)", f"{resale.get('currency', '')} {resale.get('average_price_per_sqft', 0):,.0f}" if resale.get("has_data") else "No data"),
-        ("Comparable Listings", str(resale.get("comparable_count", "—")) if resale.get("has_data") else "—"),
-        ("Infrastructure News", infra.get("summary", "No recent news found") if infra.get("has_data") else "No recent news found"),
-        ("Flood-Risk Proximity", f"{flood.get('nearby_water_count')} nearby water body(ies) within 2km" if flood.get("has_data") else "Not available"),
-        ("Air Pollution Index", f"{air.get('aqi_label')} ({air.get('aqi')}/5) — PM2.5: {air.get('pm2_5')}" if air.get("has_data") else "Not available"),
-    ]))
+        (t("Overall Ranking", ctx), f"{overall.get('score')} / 100" if overall.get("has_data") else "Not enough data"),
+        (t("Avg. Price/Sqft (resale signal)", ctx), f"{resale.get('currency', '')} {resale.get('average_price_per_sqft', 0):,.0f}" if resale.get("has_data") else "No data"),
+        (t("Comparable Listings", ctx), str(resale.get("comparable_count", "—")) if resale.get("has_data") else "—"),
+        (t("Infrastructure News", ctx), _dt("infrastructure_summary", infra.get("summary", "No recent news found"), ctx) if infra.get("has_data") else "No recent news found"),
+        (t("Flood-Risk Proximity", ctx), f"{flood.get('nearby_water_count')} nearby water body(ies) within 2km" if flood.get("has_data") else "Not available"),
+        (t("Air Pollution Index", ctx), f"{air.get('aqi_label')} ({air.get('aqi')}/5) — PM2.5: {air.get('pm2_5')}" if air.get("has_data") else "Not available"),
+    ], ctx["styles"]))
 
     wb_rows = []
     if wb.get("has_data"):
         if wb.get("unemployment_rate"):
-            wb_rows.append(("Job Prospects (unemployment rate)", f"{wb['unemployment_rate']['value']:.1f}% ({wb['unemployment_rate']['year']})"))
+            wb_rows.append((t("Job Prospects (unemployment rate)", ctx), f"{wb['unemployment_rate']['value']:.1f}% ({wb['unemployment_rate']['year']})"))
         if wb.get("gdp_growth"):
-            wb_rows.append(("Business Environment (GDP growth)", f"{wb['gdp_growth']['value']:.1f}% ({wb['gdp_growth']['year']})"))
+            wb_rows.append((t("Business Environment (GDP growth)", ctx), f"{wb['gdp_growth']['value']:.1f}% ({wb['gdp_growth']['year']})"))
         if wb.get("tourist_arrivals"):
-            wb_rows.append(("Tourism Index (annual arrivals)", f"{wb['tourist_arrivals']['value'] / 1_000_000:.1f}M/yr ({wb['tourist_arrivals']['year']})"))
+            wb_rows.append((t("Tourism Index (annual arrivals)", ctx), f"{wb['tourist_arrivals']['value'] / 1_000_000:.1f}M/yr ({wb['tourist_arrivals']['year']})"))
         if wb.get("life_expectancy"):
-            wb_rows.append(("Diseases (life expectancy proxy)", f"{wb['life_expectancy']['value']:.1f} yrs ({wb['life_expectancy']['year']})"))
+            wb_rows.append((t("Diseases (life expectancy proxy)", ctx), f"{wb['life_expectancy']['value']:.1f} yrs ({wb['life_expectancy']['year']})"))
     if muni.get("has_data"):
-        wb_rows.append(("Municipality Ranking (Swachh Survekshan)", f"Rank {muni.get('rank')} of {muni.get('total_cities_ranked')}"))
+        wb_rows.append((t("Municipality Ranking (Swachh Survekshan)", ctx), f"Rank {muni.get('rank')} of {muni.get('total_cities_ranked')}"))
     if wb_rows:
         story.append(Spacer(1, 4))
-        story.append(_kv_table(wb_rows))
+        story.append(_kv_table(wb_rows, ctx["styles"]))
     else:
-        story.append(Paragraph("Country-level indicators (job market, tourism, municipality ranking) not available for this country.", _MUTED_STYLE))
+        story.append(Paragraph(t("Country-level indicators (job market, tourism, municipality ranking) not available for this country.", ctx), ctx["styles"]["muted"]))
 
 
 def _section_price_trends(story: list, ctx: dict[str, Any]) -> None:
     price_trend = ctx["price_trend"]
-    story.append(Paragraph("Price Trends", _SECTION_STYLE))
+    story.append(Paragraph(t("Price Trends", ctx), ctx["styles"]["section"]))
     if price_trend and price_trend.get("has_data"):
         first_point = price_trend["points"][0]
         last_point = price_trend["points"][-1]
         change_pct = ((last_point["value"] - first_point["value"]) / first_point["value"]) * 100 if first_point["value"] else 0
         story.append(_kv_table([
-            ("Index (real, country-level)", price_trend.get("unit", "")),
-            ("Earliest on Record", f"{first_point['date']}: {first_point['value']:.1f}"),
-            ("Latest on Record", f"{last_point['date']}: {last_point['value']:.1f}"),
-            ("Change Over Period", f"{change_pct:+.1f}%"),
-        ]))
-        story.append(Paragraph(f"Source: {price_trend.get('source', 'Bank for International Settlements, via FRED')}. Country-level, not neighborhood-specific.", _MUTED_STYLE))
+            (t("Index (real, country-level)", ctx), price_trend.get("unit", "")),
+            (t("Earliest on Record", ctx), f"{first_point['date']}: {first_point['value']:.1f}"),
+            (t("Latest on Record", ctx), f"{last_point['date']}: {last_point['value']:.1f}"),
+            (t("Change Over Period", ctx), f"{change_pct:+.1f}%"),
+        ], ctx["styles"]))
+        story.append(Paragraph(f"Source: {price_trend.get('source', 'Bank for International Settlements, via FRED')}. Country-level, not neighborhood-specific.", ctx["styles"]["muted"]))
     else:
         reason = price_trend.get("reason") if price_trend else "no_coordinates"
         message = "No real historical price index exists for this country." if reason == "country_not_covered" else "Not available for this property right now."
-        story.append(Paragraph(message, _MUTED_STYLE))
+        story.append(Paragraph(message, ctx["styles"]["muted"]))
 
 
-def _comparison_table(comparison_results: list[dict[str, Any]]) -> Table:
-    header_row = ["Metric"] + [Paragraph(r["property_name"], _LABEL_STYLE) for r in comparison_results]
+def _comparison_table(comparison_results: list[dict[str, Any]], ctx: dict[str, Any]) -> Table:
+    header_row = ["Metric"] + [Paragraph(r["property_name"], ctx["styles"]["label"]) for r in comparison_results]
     rows = [header_row]
 
     def _resale_cell(r):
@@ -331,9 +405,9 @@ def _comparison_table(comparison_results: list[dict[str, Any]]) -> Table:
         flood = r.get("flood_risk", {})
         return f"{flood.get('nearby_water_count')} nearby" if flood.get("has_data") else "Not available"
 
-    rows.append(["Avg. Price/Sqft"] + [_resale_cell(r) for r in comparison_results])
-    rows.append(["Overall Ranking"] + [_ranking_cell(r) for r in comparison_results])
-    rows.append(["Flood-Risk Proximity"] + [_flood_cell(r) for r in comparison_results])
+    rows.append([t("Avg. Price/Sqft (resale signal)", ctx)] + [_resale_cell(r) for r in comparison_results])
+    rows.append([t("Overall Ranking", ctx)] + [_ranking_cell(r) for r in comparison_results])
+    rows.append([t("Flood-Risk Proximity", ctx)] + [_flood_cell(r) for r in comparison_results])
 
     col_width = min(1.5 * inch, 6.3 * inch / len(header_row))
     comp_table = Table(rows, colWidths=[1.5 * inch] + [col_width] * len(comparison_results))
@@ -351,11 +425,11 @@ def _section_area_comparison(story: list, ctx: dict[str, Any]) -> None:
     """Neighborhood/location metrics only, across this client's other
     properties -- the "which area is better" view, not full pricing."""
     comparison_results = ctx.get("comparison_results")
-    story.append(Paragraph("Area Comparison", _SECTION_STYLE))
+    story.append(Paragraph(t("Area Comparison", ctx), ctx["styles"]["section"]))
     if not comparison_results:
-        story.append(Paragraph("This client has no other properties with captured coordinates to compare against.", _MUTED_STYLE))
+        story.append(Paragraph(t("This client has no other properties with captured coordinates to compare against.", ctx), ctx["styles"]["muted"]))
         return
-    story.append(_comparison_table(comparison_results))
+    story.append(_comparison_table(comparison_results, ctx))
 
 
 def _section_client_property_comparison(story: list, ctx: dict[str, Any]) -> None:
@@ -365,35 +439,35 @@ def _section_client_property_comparison(story: list, ctx: dict[str, Any]) -> Non
     _section_assessment(story, ctx)
     story.append(Spacer(1, 8))
     comparison_results = ctx.get("comparison_results")
-    story.append(Paragraph("Comparison Against This Client's Other Properties", _SECTION_STYLE))
+    story.append(Paragraph(t("Comparison Against This Client's Other Properties", ctx), ctx["styles"]["section"]))
     if not comparison_results:
-        story.append(Paragraph("This client has no other properties with captured coordinates to compare against.", _MUTED_STYLE))
+        story.append(Paragraph(t("This client has no other properties with captured coordinates to compare against.", ctx), ctx["styles"]["muted"]))
         return
-    story.append(_comparison_table(comparison_results))
+    story.append(_comparison_table(comparison_results, ctx))
 
 
 def _section_financing(story: list, ctx: dict[str, Any]) -> None:
     emi_summary = ctx["emi_summary"]
     currency = ctx["property_currency"]
-    story.append(Paragraph("Financing Snapshot (EMI Estimate)", _SECTION_STYLE))
+    story.append(Paragraph(t("Financing Snapshot (EMI Estimate)", ctx), ctx["styles"]["section"]))
     if emi_summary:
         story.append(_kv_table([
-            ("Estimated Monthly EMI", f"{currency} {emi_summary.get('emi', 0):,.2f}"),
-            ("Total Interest (full tenure)", f"{currency} {emi_summary.get('total_interest', 0):,.2f}"),
-            ("Total Amount Payable", f"{currency} {emi_summary.get('total_paid', 0):,.2f}"),
-        ]))
-        story.append(Paragraph("Illustrative only, based on the property's quoted price at a default rate/tenure — not a loan offer.", _MUTED_STYLE))
+            (t("Estimated Monthly EMI", ctx), f"{currency} {emi_summary.get('emi', 0):,.2f}"),
+            (t("Total Interest (full tenure)", ctx), f"{currency} {emi_summary.get('total_interest', 0):,.2f}"),
+            (t("Total Amount Payable", ctx), f"{currency} {emi_summary.get('total_paid', 0):,.2f}"),
+        ], ctx["styles"]))
+        story.append(Paragraph(t("Illustrative only, based on the property's quoted price at a default rate/tenure — not a loan offer.", ctx), ctx["styles"]["muted"]))
     else:
-        story.append(Paragraph("Not available — the property's quoted price was not usable for an EMI estimate.", _MUTED_STYLE))
+        story.append(Paragraph(t("Not available — the property's quoted price was not usable for an EMI estimate.", ctx), ctx["styles"]["muted"]))
 
 
 def _section_amortization(story: list, ctx: dict[str, Any]) -> None:
     amortization_schedule = ctx["amortization_schedule"]
     currency = ctx["property_currency"]
-    story.append(Paragraph("Amortization Projector", _SECTION_STYLE))
+    story.append(Paragraph(t("Amortization Projector", ctx), ctx["styles"]["section"]))
     if amortization_schedule:
         yearly_rows = [row for i, row in enumerate(amortization_schedule) if (i + 1) % 12 == 0 or i == len(amortization_schedule) - 1]
-        header_row = [Paragraph(h, _LABEL_STYLE) for h in ["Year", "Payment", "Principal", "Interest", "Balance"]]
+        header_row = [Paragraph(h, ctx["styles"]["label"]) for h in ["Year", "Payment", "Principal", "Interest", "Balance"]]
         rows = [header_row]
         for row in yearly_rows:
             year_num = -(-row["month"] // 12)  # ceiling division
@@ -413,9 +487,9 @@ def _section_amortization(story: list, ctx: dict[str, Any]) -> None:
             ("FONTSIZE", (0, 0), (-1, -1), 8),
         ]))
         story.append(amort_table)
-        story.append(Paragraph("One row per year, for readability — same illustrative loan assumptions as the EMI estimate above.", _MUTED_STYLE))
+        story.append(Paragraph(t("One row per year, for readability — same illustrative loan assumptions as the EMI estimate above.", ctx), ctx["styles"]["muted"]))
     else:
-        story.append(Paragraph("Not available — the property's quoted price was not usable for an amortization projection.", _MUTED_STYLE))
+        story.append(Paragraph(t("Not available — the property's quoted price was not usable for an amortization projection.", ctx), ctx["styles"]["muted"]))
 
 
 def _section_investment_analysis(story: list, ctx: dict[str, Any]) -> None:
@@ -431,17 +505,17 @@ def _section_investment_analysis(story: list, ctx: dict[str, Any]) -> None:
 
 def _section_cost_of_living(story: list, ctx: dict[str, Any]) -> None:
     cost_of_living = ctx["cost_of_living"]
-    story.append(Paragraph("Cost of Living Factors", _SECTION_STYLE))
+    story.append(Paragraph(t("Cost of Living Factors", ctx), ctx["styles"]["section"]))
     if cost_of_living:
         school = cost_of_living.get("school_access", {})
         hospital = cost_of_living.get("hospital_access", {})
         story.append(_kv_table([
-            ("School Access (within 2km)", f"{school.get('count_within_2km')} school(s) nearby" if school.get("has_data") else "Not available"),
-            ("Hospital Access (within 2km)", f"{hospital.get('count_within_2km')} hospital(s) nearby" if hospital.get("has_data") else "Not available"),
-        ]))
-        story.append(Paragraph("Remaining cost-of-living factors (fuel, tolls, utilities, etc.) have no verified per-area data source and are omitted rather than estimated.", _MUTED_STYLE))
+            (t("School Access (within 2km)", ctx), f"{school.get('count_within_2km')} school(s) nearby" if school.get("has_data") else "Not available"),
+            (t("Hospital Access (within 2km)", ctx), f"{hospital.get('count_within_2km')} hospital(s) nearby" if hospital.get("has_data") else "Not available"),
+        ], ctx["styles"]))
+        story.append(Paragraph(t("Remaining cost-of-living factors (fuel, tolls, utilities, etc.) have no verified per-area data source and are omitted rather than estimated.", ctx), ctx["styles"]["muted"]))
     else:
-        story.append(Paragraph("Not available for this property — no coordinates were captured for it.", _MUTED_STYLE))
+        story.append(Paragraph(t("Not available for this property — no coordinates were captured for it.", ctx), ctx["styles"]["muted"]))
 
 
 def _section_location(story: list, ctx: dict[str, Any]) -> None:
@@ -454,13 +528,16 @@ def _section_location(story: list, ctx: dict[str, Any]) -> None:
 
 def _section_due_diligence(story: list, ctx: dict[str, Any]) -> None:
     reference = get_country_reference(ctx["property_country"])
-    if reference["checklist"]:
-        story.append(Paragraph("Buyer's Due-Diligence Checklist", _SECTION_STYLE))
-        for item in reference["checklist"]:
-            story.append(Paragraph(f"☐ {item}", _BULLET_STYLE))
-    if reference["authority_contacts"]:
-        story.append(Paragraph("Local Authority Contacts", _SECTION_STYLE))
-        story.append(_kv_table(reference["authority_contacts"]))
+    translated = ctx.get("translated_text", {})
+    checklist = translated.get("checklist") or reference["checklist"]
+    authority_contacts = translated.get("authority_contacts") or reference["authority_contacts"]
+    if checklist:
+        story.append(Paragraph(t("Buyer's Due-Diligence Checklist", ctx), ctx["styles"]["section"]))
+        for item in checklist:
+            story.append(Paragraph(f"☐ {item}", ctx["styles"]["bullet"]))
+    if authority_contacts:
+        story.append(Paragraph(t("Local Authority Contacts", ctx), ctx["styles"]["section"]))
+        story.append(_kv_table(authority_contacts, ctx["styles"]))
 
 
 def _section_handover(story: list, ctx: dict[str, Any]) -> None:
@@ -470,14 +547,14 @@ def _section_handover(story: list, ctx: dict[str, Any]) -> None:
     handover_checklist, same honest, static-reference-data reasoning
     as the due-diligence checklist above."""
     reference = get_country_reference(ctx["property_country"])
-    story.append(Paragraph("Handover Checklist", _SECTION_STYLE))
-    items = reference.get("handover_checklist") or []
+    story.append(Paragraph(t("Handover Checklist", ctx), ctx["styles"]["section"]))
+    items = ctx.get("translated_text", {}).get("handover_checklist") or reference.get("handover_checklist") or []
     if not items:
-        story.append(Paragraph("No handover checklist is available for this country yet.", _MUTED_STYLE))
+        story.append(Paragraph(t("No handover checklist is available for this country yet.", ctx), ctx["styles"]["muted"]))
         return
     for item in items:
-        story.append(Paragraph(f"☐ {item}", _BULLET_STYLE))
-    story.append(Paragraph("Confirm all items above are received and verified before releasing final payment or possession.", _MUTED_STYLE))
+        story.append(Paragraph(f"☐ {item}", ctx["styles"]["bullet"]))
+    story.append(Paragraph(t("Confirm all items above are received and verified before releasing final payment or possession.", ctx), ctx["styles"]["muted"]))
 
 
 def _section_construction(story: list, ctx: dict[str, Any]) -> None:
@@ -485,11 +562,11 @@ def _section_construction(story: list, ctx: dict[str, Any]) -> None:
     yet linked to an agent's own client properties (a genuinely
     separate system today) -- rather than fabricate a design summary
     or silently produce an empty report, this says so plainly."""
-    story.append(Paragraph("Construction Report", _SECTION_STYLE))
+    story.append(Paragraph(t("Construction Report", ctx), ctx["styles"]["section"]))
     story.append(Paragraph(
         "This property has no linked Construction Studio design yet. Create one in Construction Studio and link it "
         "to this property to include a construction report here.",
-        _MUTED_STYLE,
+        ctx["styles"]["muted"],
     ))
 
 
@@ -498,7 +575,7 @@ def _section_disclaimer(story: list, ctx: dict[str, Any]) -> None:
     story.append(Paragraph(
         "This report consolidates PropertyIQ's own independent, evidence-based analysis tools for internal advisory "
         "use by the preparing agent. It does not constitute a financial, legal, or investment recommendation.",
-        _MUTED_STYLE,
+        ctx["styles"]["muted"],
     ))
 
 
@@ -586,6 +663,7 @@ def build_agent_report_pdf(report_type: str, ctx: dict[str, Any]) -> bytes:
     read that key."""
     report_def = REPORT_TYPES.get(report_type, REPORT_TYPES["quick"])
     ctx = {**ctx, "branding": ctx.get("branding") or {}}
+    ctx["styles"] = _get_styles(ctx.get("language", "en"))
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5 * inch, bottomMargin=0.95 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch)
@@ -622,5 +700,7 @@ def build_agent_advisory_pdf(**kwargs) -> bytes:
         "prepared_by": kwargs["prepared_by"],
         "branding": kwargs.get("branding"),
         "recommendation_reasons": kwargs.get("recommendation_reasons"),
+        "language": kwargs.get("language", "en"),
+        "translated_text": kwargs.get("translated_text", {}),
     }
     return build_agent_report_pdf("quick", ctx)
