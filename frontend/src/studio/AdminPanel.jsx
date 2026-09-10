@@ -29,6 +29,7 @@ const MENU_ITEMS = [
   { screen: "overview", label: "Overview & Analytics", desc: "Subscription counts, insight purchases, and estimated revenue." },
   { screen: "tiers", label: "Tier Configuration", desc: "Prices, quotas, and which features each tier includes." },
   { screen: "gemini", label: "Property URL Import — Gemini API Key", desc: "The LLM fallback key used when free structured-data extraction isn't enough." },
+  { screen: "loan-eligibility", label: "Loan Eligibility — Thresholds", desc: "The real, configurable lending criteria (debt-to-income, loan-to-value, age cap, minimum credit rating) used for eligibility estimates." },
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
   { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any of the 5 free homepage panels (Instant Property Score, Hidden Deal, Red Flag Hunt, Should I Buy This, Price Drop Alert)." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
@@ -53,6 +54,8 @@ function AdminPanel({ onBack }) {
   const [geminiKeyConfigured, setGeminiKeyConfigured] = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
   const [geminiSaveMessage, setGeminiSaveMessage] = useState("");
+  const [loanEligibilitySettings, setLoanEligibilitySettings] = useState(null);
+  const [loanEligibilitySaveMessage, setLoanEligibilitySaveMessage] = useState("");
   const [niSectionVisibility, setNiSectionVisibility] = useState(null);
   const [niVisibilitySaveMessage, setNiVisibilitySaveMessage] = useState("");
   const [homepagePanelVisibility, setHomepagePanelVisibility] = useState(null);
@@ -183,6 +186,24 @@ function AdminPanel({ onBack }) {
     }
   };
 
+  // Only sends the one field that actually changed -- the backend's
+  // own partial-update handling means the other 3 thresholds stay
+  // exactly as an admin already configured them.
+  const saveLoanEligibilitySetting = async (field, value) => {
+    setLoanEligibilitySaveMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const updated = await studioApi.adminUpdateLoanEligibilitySettings(password, { [field]: value });
+      setLoanEligibilitySettings(updated);
+      setLoanEligibilitySaveMessage("Saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save this threshold.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Toggling here only changes in-memory state — nothing takes effect
   // on the live page until "Save" below actually persists it, same
   // pattern as every other admin setting on this page.
@@ -239,6 +260,13 @@ function AdminPanel({ onBack }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately only re-runs on screen change, not on every password/authed re-render — loadRefundHistory itself is stable enough here and re-fetching on unrelated state changes isn't needed
   }, [screen]);
+
+  useEffect(() => {
+    if (screen === "loan-eligibility" && authed && !loanEligibilitySettings) {
+      studioApi.getLoanEligibilitySettings().then(setLoanEligibilitySettings).catch((err) => setError(err.message || "Couldn't load loan eligibility settings."));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, authed]);
 
   const loadRefundRequests = async (statusFilter) => {
     try {
@@ -830,6 +858,61 @@ function AdminPanel({ onBack }) {
               </button>
             </div>
             {geminiSaveMessage && <div className="studio-status-banner">{geminiSaveMessage}</div>}
+          </div>
+        </>
+      )}
+
+      {screen === "loan-eligibility" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section admin-section-purple">
+            <h3>Loan Eligibility — Thresholds</h3>
+            <p className="admin-section-note">
+              These are estimates using standard lending rules of thumb — not a real bank's actual underwriting
+              decision. Every threshold below is real and takes effect immediately across both the public Loan
+              Eligibility panel and Agent Intelligence's own eligibility checks.
+            </p>
+            {!loanEligibilitySettings ? (
+              <p>Loading...</p>
+            ) : (
+              <div className="admin-loan-settings-grid">
+                <label>
+                  Max debt-to-income (FOIR) %
+                  <input
+                    type="number" min="1" max="100" defaultValue={loanEligibilitySettings.max_foir_percent}
+                    onBlur={(e) => e.target.value && saveLoanEligibilitySetting("max_foir_percent", Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  Max loan-to-value (LTV) %
+                  <input
+                    type="number" min="1" max="100" defaultValue={loanEligibilitySettings.max_ltv_percent}
+                    onBlur={(e) => e.target.value && saveLoanEligibilitySetting("max_ltv_percent", Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  Max age at loan maturity
+                  <input
+                    type="number" min="19" max="100" defaultValue={loanEligibilitySettings.max_age_at_maturity}
+                    onBlur={(e) => e.target.value && saveLoanEligibilitySetting("max_age_at_maturity", Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  Minimum credit rating
+                  <select
+                    defaultValue={loanEligibilitySettings.min_credit_rating}
+                    onChange={(e) => saveLoanEligibilitySetting("min_credit_rating", e.target.value)}
+                  >
+                    <option value="poor">Poor</option>
+                    <option value="fair">Fair</option>
+                    <option value="good">Good</option>
+                    <option value="excellent">Excellent</option>
+                  </select>
+                </label>
+              </div>
+            )}
+            {loanEligibilitySaveMessage && <div className="studio-status-banner">{loanEligibilitySaveMessage}</div>}
           </div>
         </>
       )}

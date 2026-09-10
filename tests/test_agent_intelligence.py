@@ -1234,3 +1234,125 @@ def test_translate_label_falls_back_to_english_for_unknown_labels():
     from backend.report_translations import translate_label
     assert translate_label("Some Label Never Added", "th") == "Some Label Never Added"
     assert translate_label("Client", "en") == "Client"
+
+
+def test_update_financial_profile_saves_and_is_partial_safe():
+    headers = _entitled_headers("agentfinprofile@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Fin Client"}, headers=headers).json()
+
+    r = client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"monthly_income": 100000, "client_age": 35}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["monthly_income"] == 100000
+    assert r.json()["client_age"] == 35
+
+    r2 = client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"credit_rating": "good"}, headers=headers)
+    assert r2.json()["monthly_income"] == 100000  # survives the partial update
+    assert r2.json()["credit_rating"] == "good"
+
+
+def test_update_financial_profile_rejects_invalid_credit_rating():
+    headers = _entitled_headers("agentfinbadcredit@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Bad Credit Client"}, headers=headers).json()
+    r = client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"credit_rating": "amazing"}, headers=headers)
+    assert r.status_code == 400
+
+
+def test_update_financial_profile_requires_ownership():
+    headers = _entitled_headers("agentfinowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Owner Fin Client"}, headers=headers).json()
+    stranger_headers = _entitled_headers("agentfinstranger@example.com")
+    r = client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"monthly_income": 50000}, headers=stranger_headers)
+    assert r.status_code == 404
+
+
+def test_best_property_ignores_a_partially_filled_financial_profile(monkeypatch):
+    """A profile with only some fields set must not trigger the
+    loan-eligibility factor at all -- confirmed by checking no
+    eligibility-related reason appears in the output."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentfinpartial@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Partial Fin Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"monthly_income": 100000}, headers=headers)
+
+    p1 = _property_payload()
+    p1["propertyName"] = "Property One"
+    p2 = _property_payload()
+    p2["propertyName"] = "Property Two"
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=p1, headers=headers)
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=p2, headers=headers)
+
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=headers)
+    all_reasons = " ".join(reason for c in r.json()["candidates"] for reason in c["reasons"])
+    assert "loan" not in all_reasons.lower()
+
+
+def test_best_property_applies_real_loan_eligibility_when_profile_is_complete(monkeypatch):
+    """Direct proof: a complete financial profile genuinely changes
+    the ranking -- a property this client can't realistically afford
+    should rank below an otherwise-similar one they can."""
+    import backend.api as api_module
+    monkeypatch.setattr(api_module, "neighborhood_nearby", lambda *a, **k: [])
+
+    headers = _entitled_headers("agentfincompleteprofile@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Complete Fin Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={
+        "monthly_income": 100000, "existing_monthly_obligations": 0, "down_payment_available": 2000000,
+        "client_age": 35, "credit_rating": "good",
+    }, headers=headers)
+
+    affordable = _property_payload()
+    affordable.update({"propertyName": "Affordable Property", "quotedPrice": 3000000, "marketAverage": 5000, "governmentGuidance": 4500})
+    unaffordable = _property_payload()
+    unaffordable.update({"propertyName": "Unaffordable Property", "quotedPrice": 30000000, "marketAverage": 5000, "governmentGuidance": 4500})
+
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=affordable, headers=headers)
+    client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=unaffordable, headers=headers)
+
+    r = client.get(f"/api/agent/clients/{created_client['client_id']}/best-property", headers=headers)
+    candidates = {c["property_name"]: c for c in r.json()["candidates"]}
+    assert any("loan-eligible" in reason for reason in candidates["Affordable Property"]["reasons"])
+    assert any("would not qualify" in reason for reason in candidates["Unaffordable Property"]["reasons"])
+    assert candidates["Affordable Property"]["score"] > candidates["Unaffordable Property"]["score"]
+
+
+def test_agent_property_loan_eligibility_requires_complete_financial_profile():
+    """Direct proof of the 'mandatory when choosing this feature'
+    requirement: an incomplete profile must be honestly rejected with
+    the real missing fields named, not silently defaulted."""
+    headers = _entitled_headers("agentloanpropmissing@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Missing Profile Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={"monthly_income": 100000}, headers=headers)
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.get(f"/api/agent/properties/{prop['property_id']}/loan-eligibility", headers=headers)
+    assert r.status_code == 400
+    assert "existing_monthly_obligations" in r.json()["detail"]
+    assert "credit_rating" in r.json()["detail"]
+
+
+def test_agent_property_loan_eligibility_works_with_a_complete_profile(monkeypatch):
+    headers = _entitled_headers("agentloanpropcomplete@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Complete Profile Client"}, headers=headers).json()
+    client.put(f"/api/agent/clients/{created_client['client_id']}/financial-profile", json={
+        "monthly_income": 100000, "existing_monthly_obligations": 0, "down_payment_available": 2000000,
+        "client_age": 35, "credit_rating": "good",
+    }, headers=headers)
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+
+    r = client.get(f"/api/agent/properties/{prop['property_id']}/loan-eligibility", headers=headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert "is_eligible" in data
+    assert data["client_name"] == "Complete Profile Client"
+    assert len(data["checks"]) == 4
+
+
+def test_agent_property_loan_eligibility_requires_ownership():
+    headers = _entitled_headers("agentloanpropowner@example.com")
+    created_client = client.post("/api/agent/clients", json={"client_name": "Owner Loan Client"}, headers=headers).json()
+    prop = client.post(f"/api/agent/clients/{created_client['client_id']}/properties", json=_property_payload(), headers=headers).json()
+    stranger_headers = _entitled_headers("agentloanpropstranger@example.com")
+    r = client.get(f"/api/agent/properties/{prop['property_id']}/loan-eligibility", headers=stranger_headers)
+    assert r.status_code == 404

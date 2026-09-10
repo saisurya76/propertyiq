@@ -82,6 +82,7 @@ from backend.neighborhood_infrastructure import get_infrastructure_summary, TAVI
 from tavily import TavilyClient
 
 from backend.loan_calculator import build_amortization_schedule, summarize_loan
+from backend.loan_eligibility import check_loan_eligibility, get_loan_eligibility_settings, set_loan_eligibility_settings
 
 from backend.agent_store import (
     initialize_agent_store,
@@ -90,6 +91,8 @@ from backend.agent_store import (
     list_clients_for_agent,
     update_client,
     update_client_requirements,
+    update_client_financial_profile,
+    FINANCIAL_PROFILE_FIELDS,
     delete_client,
     count_properties_for_client,
     create_client_property_if_under_limit,
@@ -2862,6 +2865,78 @@ def neighborhood_amortization_export(principal: float, annual_rate_percent: floa
     )
 
 
+class LoanEligibilityRequest(BaseModel):
+    monthly_income: float
+    existing_monthly_obligations: float = 0
+    property_price: float
+    down_payment_available: float = 0
+    age: int
+    credit_rating: str
+    annual_rate_percent: float
+    tenure_years: float
+
+
+@app.post("/api/neighborhood-insights/loan-eligibility")
+def neighborhood_loan_eligibility(request: LoanEligibilityRequest, user_email: str = Depends(get_current_user_email)):
+    """Gated separately from the other financial panels, per the same
+    real, explicit per-feature tier-configurability this app already
+    applies to emi_calculator/amortization_projector/price_trends —
+    an eligibility ESTIMATE (see loan_eligibility.py's own module
+    docstring for why this is honestly labeled an estimate, not a
+    real bank's actual underwriting decision) using standard, real,
+    admin-configurable lending thresholds."""
+    tier_id = get_active_tier(user_email)
+    if not tier_id or not has_feature(tier_id, "loan_eligibility"):
+        raise HTTPException(
+            status_code=403,
+            detail="Loan eligibility checking requires an active Studio subscription that includes this feature.",
+        )
+    try:
+        return check_loan_eligibility(
+            monthly_income=request.monthly_income,
+            existing_monthly_obligations=request.existing_monthly_obligations,
+            property_price=request.property_price,
+            down_payment_available=request.down_payment_available,
+            age=request.age,
+            credit_rating=request.credit_rating,
+            annual_rate_percent=request.annual_rate_percent,
+            tenure_years=request.tenure_years,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/loan-eligibility/settings")
+def public_loan_eligibility_settings():
+    """Public (no auth) — the real, current thresholds an eligibility
+    check will actually be evaluated against, so the frontend form can
+    show real context (e.g. "we look for FOIR under 50%") before the
+    person even submits anything."""
+    return get_loan_eligibility_settings()
+
+
+class AdminLoanEligibilitySettingsRequest(BaseModel):
+    password: str
+    max_foir_percent: Optional[float] = None
+    max_ltv_percent: Optional[float] = None
+    max_age_at_maturity: Optional[int] = None
+    min_credit_rating: Optional[str] = None
+
+
+@app.post("/api/admin/loan-eligibility-settings")
+def admin_update_loan_eligibility_settings(request: AdminLoanEligibilitySettingsRequest):
+    _require_admin_password(request.password)
+    try:
+        return set_loan_eligibility_settings(
+            max_foir_percent=request.max_foir_percent,
+            max_ltv_percent=request.max_ltv_percent,
+            max_age_at_maturity=request.max_age_at_maturity,
+            min_credit_rating=request.min_credit_rating,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 class NeighborhoodComparisonArea(BaseModel):
     city: str
     country: str = "India"
@@ -3530,7 +3605,7 @@ def neighborhood_set_comparison_monitoring(comparison_id: str, request: Neighbor
     return record
 
 
-NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "price_trends", "cost_of_living", "emi_calculator", "amortization_projector", "checklist", "authority_contacts", "cross_sell", "share"]
+NI_SECTIONS = ["map", "flood_risk", "infrastructure", "resale_signal", "extended_metrics", "comparison", "price_trends", "cost_of_living", "emi_calculator", "amortization_projector", "loan_eligibility", "checklist", "authority_contacts", "cross_sell", "share"]
 NI_VISIBILITY_SETTING_KEY = "ni_section_visibility"
 
 
@@ -4914,6 +4989,32 @@ def api_agent_update_client_requirements(client_id: str, request: AgentUpdateReq
     return update_client_requirements(client_id=client_id, requirements=request.requirements)
 
 
+class AgentUpdateFinancialProfileRequest(BaseModel):
+    monthly_income: Optional[float] = None
+    existing_monthly_obligations: Optional[float] = None
+    down_payment_available: Optional[float] = None
+    client_age: Optional[int] = None
+    credit_rating: Optional[str] = None
+
+
+@app.put("/api/agent/clients/{client_id}/financial-profile")
+def api_agent_update_financial_profile(client_id: str, request: AgentUpdateFinancialProfileRequest, user_email: str = Depends(get_current_user_email)):
+    """Every field is genuinely optional -- an agent can fill in as
+    much or as little as they currently know. Only affects the "best
+    property" recommendation once ALL 5 fields are set (see
+    get_best_property's own docstring below); a partially-filled
+    profile is saved as-is and simply doesn't trigger the
+    loan-eligibility factor yet."""
+    _require_agent_entitlement(user_email)
+    client = get_client(client_id)
+    if client is None or client["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Client not found.")
+    try:
+        return update_client_financial_profile(client_id=client_id, **request.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 class AgentSearchPropertiesRequest(BaseModel):
     requirements: Optional[str] = None  # override; falls back to the client's own saved requirements if omitted
     country: str = "India"
@@ -5128,7 +5229,20 @@ def api_agent_best_property(client_id: str, user_email: str = Depends(get_curren
     client's stated budget (parsed from their own real requirements
     text, never guessed) is checked, honestly, but only where the
     budget could genuinely be extracted -- a property is never
-    penalized for a requirement this endpoint couldn't actually read."""
+    penalized for a requirement this endpoint couldn't actually read.
+
+    A client's financial profile (income, existing obligations, down
+    payment, age, credit rating — see FINANCIAL_PROFILE_FIELDS) is
+    entirely optional and never required to use this feature at all.
+    When, and only when, every one of those 5 fields has actually been
+    filled in, each property also gets a real loan-eligibility check
+    (the same check_loan_eligibility this app's own paid Loan
+    Eligibility panel uses, at the app's standard illustrative
+    rate/tenure) folded into its score — a property this client
+    genuinely couldn't get approved for is flagged honestly, not
+    silently recommended anyway. A partially-filled profile changes
+    nothing here — this factor simply doesn't apply yet, the same way
+    a missing budget doesn't penalize a property above."""
     _require_agent_entitlement(user_email)
     client = get_client(client_id)
     if client is None or client["agent_email"] != user_email.strip().lower():
@@ -5139,6 +5253,8 @@ def api_agent_best_property(client_id: str, user_email: str = Depends(get_curren
         return {"has_recommendation": False, "reason": "not_enough_properties", "candidates": []}
 
     budget = _extract_budget_from_requirements(client.get("requirements") or "")
+
+    has_full_financial_profile = all(client.get(field) is not None for field in FINANCIAL_PROFILE_FIELDS)
 
     candidates = []
     for prop in properties:
@@ -5188,6 +5304,32 @@ def api_agent_best_property(client_id: str, user_email: str = Depends(get_curren
                 score -= 15
                 reasons.append("Significantly over the client's stated budget")
 
+        if has_full_financial_profile:
+            try:
+                eligibility = check_loan_eligibility(
+                    monthly_income=client["monthly_income"],
+                    existing_monthly_obligations=client["existing_monthly_obligations"],
+                    property_price=payload.get("quotedPrice", 0),
+                    down_payment_available=client["down_payment_available"],
+                    age=client["client_age"],
+                    credit_rating=client["credit_rating"],
+                    annual_rate_percent=8.5,
+                    tenure_years=20,
+                )
+                if eligibility["is_eligible"]:
+                    score += 10
+                    reasons.append("Client is likely loan-eligible for this property")
+                else:
+                    score -= 15
+                    failed = ", ".join(c["name"] for c in eligibility["checks"] if not c["pass"])
+                    reasons.append(f"Client likely would not qualify for a loan on this property ({failed})")
+            except ValueError as exc:
+                # A genuinely invalid stored profile (shouldn't happen —
+                # update_client_financial_profile validates credit_rating
+                # at write time — but never let a bad value crash the
+                # whole recommendation for every property).
+                logger.error(f"api_agent_best_property: loan eligibility check failed for property={prop['property_id']!r}: {exc}")
+
         candidates.append({
             "property_id": prop["property_id"],
             "property_name": payload.get("propertyName", "Unnamed Property"),
@@ -5200,6 +5342,47 @@ def api_agent_best_property(client_id: str, user_email: str = Depends(get_curren
 
     candidates.sort(key=lambda c: c["score"], reverse=True)
     return {"has_recommendation": True, "candidates": candidates, "budget_used": budget}
+
+
+@app.get("/api/agent/properties/{property_id}/loan-eligibility")
+def api_agent_property_loan_eligibility(property_id: str, user_email: str = Depends(get_current_user_email)):
+    """Unlike best-property above (where the financial profile is
+    always optional and simply skipped if incomplete), explicitly
+    requesting a real loan-eligibility check for one specific property
+    genuinely needs the full profile — there's no honest partial
+    answer to "is this client eligible" the way there is for a general
+    ranking, so this is the one place those 5 fields become mandatory,
+    with a clear, real error naming exactly what's still missing."""
+    _require_agent_entitlement(user_email)
+    prop = get_client_property(property_id)
+    if prop is None or prop["agent_email"] != user_email.strip().lower():
+        raise HTTPException(status_code=404, detail="Property not found.")
+    client = get_client(prop["client_id"])
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    missing = [f for f in FINANCIAL_PROFILE_FIELDS if client.get(f) is None]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This client's financial profile is incomplete. Missing: {', '.join(missing)}. Fill these in before checking loan eligibility.",
+        )
+
+    payload = prop["property_payload"]
+    try:
+        result = check_loan_eligibility(
+            monthly_income=client["monthly_income"],
+            existing_monthly_obligations=client["existing_monthly_obligations"],
+            property_price=payload.get("quotedPrice", 0),
+            down_payment_available=client["down_payment_available"],
+            age=client["client_age"],
+            credit_rating=client["credit_rating"],
+            annual_rate_percent=8.5,
+            tenure_years=20,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"client_name": client["client_name"], "property_name": payload.get("propertyName", "Unnamed Property"), **result}
 
 
 def _build_agent_report_context(property_id: str, user_email: str) -> tuple[dict, dict]:

@@ -6,6 +6,7 @@ import NeighborhoodComparison from "./NeighborhoodComparison";
 import PriceTrends from "./PriceTrends";
 import CostOfLiving from "./CostOfLiving";
 import EmiCalculator from "./EmiCalculator";
+import LoanEligibility from "./LoanEligibility";
 import AmortizationProjector from "./AmortizationProjector";
 
 const API_BASE = "https://propertyiq-api-q21y.onrender.com";
@@ -1027,6 +1028,12 @@ function NeighborhoodInsights({ countryCode }) {
       {sectionVisibility.amortization_projector && (
         <div className="ni-card">
           <AmortizationProjector currency={country.currency} />
+        </div>
+      )}
+
+      {sectionVisibility.loan_eligibility && (
+        <div className="ni-card">
+          <LoanEligibility currency={country.currency} />
         </div>
       )}
 

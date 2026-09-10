@@ -37,6 +37,19 @@ def initialize_agent_store() -> None:
                 """
             )
             cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS requirements TEXT")
+            # Financial profile — every field genuinely optional (a
+            # client's own income/credit details are sensitive, and an
+            # agent may not always have them yet). Only used when
+            # present: the "best property" recommendation folds in a
+            # real loan-eligibility check per property when the full
+            # profile is filled in, and stays purely requirements/
+            # assessment-based otherwise -- see get_best_property's own
+            # docstring in api.py for exactly which fields are needed.
+            cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS monthly_income DOUBLE PRECISION")
+            cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS existing_monthly_obligations DOUBLE PRECISION")
+            cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS down_payment_available DOUBLE PRECISION")
+            cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS client_age INTEGER")
+            cursor.execute("ALTER TABLE agent_clients ADD COLUMN IF NOT EXISTS credit_rating TEXT")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS agent_client_properties (
@@ -146,6 +159,43 @@ def update_client_requirements(*, client_id: str, requirements: Optional[str]) -
             cursor.execute(
                 "UPDATE agent_clients SET requirements = %s WHERE client_id = %s",
                 (cleaned, client_id),
+            )
+        connection.commit()
+    return get_client(client_id)
+
+
+CREDIT_RATING_VALUES = ["poor", "fair", "good", "excellent"]
+
+# Field name -> whether it's a real, meaningful "has this field been
+# filled in" signal. All 5 together are exactly what
+# check_loan_eligibility needs (plus a property's own price and the
+# app's own default rate/tenure) — see api.py's get_best_property for
+# how a partially-filled profile is handled (never required, but the
+# loan-eligibility factor only applies once every one of these is set).
+FINANCIAL_PROFILE_FIELDS = ["monthly_income", "existing_monthly_obligations", "down_payment_available", "client_age", "credit_rating"]
+
+
+def update_client_financial_profile(*, client_id: str, **fields: Any) -> Optional[dict[str, Any]]:
+    """Same partial-update reasoning as set_agent_branding in
+    profile_store.py — only the fields actually passed are touched, so
+    an agent filling in income today and credit rating next week never
+    accidentally blanks out what's already saved. Every field is
+    genuinely optional; None is a valid, deliberate "clear this field"
+    value, same as elsewhere in this app."""
+    unknown = set(fields) - set(FINANCIAL_PROFILE_FIELDS)
+    if unknown:
+        raise ValueError(f"Unknown financial profile field(s): {', '.join(sorted(unknown))}")
+    if "credit_rating" in fields and fields["credit_rating"] is not None and fields["credit_rating"] not in CREDIT_RATING_VALUES:
+        raise ValueError(f"credit_rating must be one of: {', '.join(CREDIT_RATING_VALUES)}")
+    if not fields:
+        return get_client(client_id)
+
+    set_clause = ", ".join(f"{k} = %s" for k in fields)
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE agent_clients SET {set_clause} WHERE client_id = %s",
+                list(fields.values()) + [client_id],
             )
         connection.commit()
     return get_client(client_id)

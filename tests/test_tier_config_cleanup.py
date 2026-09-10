@@ -44,7 +44,9 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
     cost_of_living (real school/hospital access data, also gated
     independently), agent_intelligence (the full Agent Workspace —
     client/property CRUD + consolidated advisory report generation,
-    all gated behind _require_agent_entitlement)."""
+    all gated behind _require_agent_entitlement), loan_eligibility (its
+    own Neighborhood Insights endpoint, gated independently of the
+    other financial panels)."""
     assert set(ALL_FEATURES) == {
         "similar_property_suggestions",
         "vastu_compliance",
@@ -61,6 +63,7 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
         "price_trends",
         "cost_of_living",
         "agent_intelligence",
+        "loan_eligibility",
     }
 
 

@@ -122,6 +122,12 @@ export const studioApi = {
   adminOverview: (password, forceRefreshPrices = false) =>
     apiFetch("/api/admin/overview", { method: "POST", body: JSON.stringify({ password, force_refresh_prices: forceRefreshPrices }) }),
 
+  getLoanEligibilitySettings: () => apiFetch("/api/loan-eligibility/settings"),
+  adminUpdateLoanEligibilitySettings: (password, fields) =>
+    apiFetch("/api/admin/loan-eligibility-settings", { method: "POST", body: JSON.stringify({ password, ...fields }) }),
+  checkLoanEligibility: (payload) =>
+    apiFetch("/api/neighborhood-insights/loan-eligibility", { method: "POST", body: JSON.stringify(payload) }),
+
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
 

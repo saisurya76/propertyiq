@@ -39,6 +39,7 @@ DEFAULT_TIER_CONFIG = {
             "cost_of_living",
             "price_trends",
             "emi_calculator",
+            "loan_eligibility",
             "amortization_projector",
             "agent_intelligence",
         ],
@@ -63,6 +64,7 @@ DEFAULT_TIER_CONFIG = {
             "cost_of_living",
             "price_trends",
             "emi_calculator",
+            "loan_eligibility",
             "amortization_projector",
             "agent_intelligence",
         ],
@@ -89,6 +91,7 @@ DEFAULT_TIER_CONFIG = {
             "cost_of_living",
             "price_trends",
             "emi_calculator",
+            "loan_eligibility",
             "amortization_projector",
             "agent_intelligence",
         ],
@@ -257,6 +260,7 @@ ALL_FEATURES = [
     "emi_calculator",
     "amortization_projector",
     "agent_intelligence",
+    "loan_eligibility",
 ]
 
 
