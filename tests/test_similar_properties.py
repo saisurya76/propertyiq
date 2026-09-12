@@ -92,7 +92,7 @@ def test_insight_grant_is_per_user_not_global():
 
 
 def test_insight_status_endpoint_reflects_grant():
-    """Real, confirmed gap this closes: the Insight Add-on's checkout
+    """Real, confirmed gap this closes: Quick Analysis's checkout
     return_url previously pointed at /report/{report_id}?insight=1, a
     path this SPA has no route for, with zero frontend code reading the
     insight=1 param either — a user could pay and see no acknowledgment

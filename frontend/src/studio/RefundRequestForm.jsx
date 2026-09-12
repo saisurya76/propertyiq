@@ -10,7 +10,7 @@ const REASON_OPTIONS = [
   { value: "report_never_generated", label: "I was charged but my report was never generated" },
   { value: "duplicate_charge", label: "I was charged more than once for the same purchase" },
   { value: "report_incorrect", label: "My report is materially incomplete or incorrect" },
-  { value: "insight_addon_technical_failure", label: "The Insight Add-on didn't unlock after payment" },
+  { value: "insight_addon_technical_failure", label: "Quick Analysis didn't unlock after payment" },
   { value: "first_month_guarantee", label: "I'm unhappy with my first month (within 7 days)" },
   { value: "charged_after_cancellation", label: "I was charged after already cancelling" },
   { value: "wrong_plan_charged", label: "I was charged for the wrong plan" },

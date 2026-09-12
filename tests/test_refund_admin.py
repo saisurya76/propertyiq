@@ -325,7 +325,7 @@ def test_admin_issue_refund_cancels_the_customers_subscription_by_default():
 
 
 def test_admin_issue_refund_skips_cancellation_when_explicitly_opted_out():
-    """A one-time purchase (Standard Report, Insight Add-on) refund has
+    """A one-time purchase (Standard Report, Quick Analysis) refund has
     no subscription to cancel -- admin can explicitly opt out."""
     from backend.subscription_store import upsert_subscription
 

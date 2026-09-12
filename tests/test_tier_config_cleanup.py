@@ -93,6 +93,10 @@ def test_migration_strips_the_dead_feature_from_an_already_seeded_database():
     # feature already on the stale config survives untouched.
     assert "similar_property_suggestions" in cleaned["studio_starter"]["features"]
     assert "vastu_compliance" in cleaned["studio_starter"]["features"]
+    # And confirms the separate, real label-rename migration fires
+    # alongside this one in the same startup pass -- the stale stored
+    # "Insight Add-on" label genuinely becomes "Quick Analysis".
+    assert cleaned["insight_addon"]["label"] == "Quick Analysis"
     assert "premium_global_suppliers" in cleaned["studio_pro"]["features"]
 
 
@@ -108,3 +112,41 @@ def test_migration_is_a_genuine_no_op_when_theres_nothing_to_clean():
     initialize_config_store()
 
     assert get_tier_config() == clean_config
+
+
+def test_label_migration_never_overwrites_an_admins_own_customized_name():
+    """The critical safety property for the rename migration: an admin
+    who already renamed this tier to something of their own choosing
+    must never have that choice silently overwritten on the next
+    startup -- the migration only fires when the stored label is
+    STILL the exact original stock value."""
+    from backend.config_store import initialize_config_store, get_tier_config, set_tier_config
+
+    custom_config = {
+        "insight_addon": {"label": "My Own Custom Name", "billing": "one_time", "price_usd": 4, "features": ["similar_property_suggestions"]},
+    }
+    set_tier_config(custom_config)
+
+    initialize_config_store()
+
+    cleaned = get_tier_config()
+    assert cleaned["insight_addon"]["label"] == "My Own Custom Name"
+
+
+def test_label_migration_is_idempotent_across_repeated_startups():
+    """A database already renamed (by this migration or by an admin
+    picking the exact new name) must never be touched again -- the
+    migration's own equality check against the OLD name means it's a
+    permanent no-op once the label no longer matches it."""
+    from backend.config_store import initialize_config_store, get_tier_config, set_tier_config
+
+    already_renamed = {
+        "insight_addon": {"label": "Quick Analysis", "billing": "one_time", "price_usd": 4, "features": ["similar_property_suggestions"]},
+    }
+    set_tier_config(already_renamed)
+
+    initialize_config_store()
+    initialize_config_store()  # a second real startup pass
+
+    cleaned = get_tier_config()
+    assert cleaned["insight_addon"]["label"] == "Quick Analysis"

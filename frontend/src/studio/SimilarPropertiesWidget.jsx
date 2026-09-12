@@ -51,7 +51,7 @@ function SimilarPropertiesWidget({ reportId, city, propertyType, subjectPricePer
       <div className="sp-widget">
         <div className="sp-locked">
           <p>
-            Purchase the Insight Add-on using the "Unlock Similar-Property Insights" button
+            Purchase Quick Analysis using the "Unlock for this report" button
             further up this page (in the Final Recommendation section) to see comparable
             properties here — no need for a separate purchase path.
           </p>

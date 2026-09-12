@@ -30,7 +30,7 @@ def test_build_payment_confirmation_html_includes_order_details_and_payment_id()
 def test_build_payment_confirmation_html_includes_the_real_footer_links():
     """Matches the user's explicit ask for a footer -- the same three
     legal links the site's own LegalFooter component uses."""
-    html = build_payment_confirmation_html(product_name="Insight Add-on", amount_usd=4.0, currency="usd", payment_id="pay_x")
+    html = build_payment_confirmation_html(product_name="Quick Analysis", amount_usd=4.0, currency="usd", payment_id="pay_x")
     assert "privacy-policy.html" in html
     assert "terms-of-service.html" in html
     assert "refund-policy.html" in html
@@ -130,7 +130,7 @@ def test_insight_addon_purchase_sends_a_confirmation():
     mock_send.assert_called_once()
     call_kwargs = mock_send.call_args.kwargs
     assert call_kwargs["to_email"] == "insighttest@example.com"
-    assert "Insight Add-on" in call_kwargs["subject"]
+    assert "Quick Analysis" in call_kwargs["subject"]
     assert "4.0" in call_kwargs["html"] or "4.00" in call_kwargs["html"]
 
 

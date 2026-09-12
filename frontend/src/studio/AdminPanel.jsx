@@ -18,7 +18,7 @@ const REFUND_REASON_LABELS = {
   report_never_generated: "Report never generated",
   duplicate_charge: "Duplicate charge",
   report_incorrect: "Report materially incorrect",
-  insight_addon_technical_failure: "Insight Add-on didn't unlock",
+  insight_addon_technical_failure: "Quick Analysis didn't unlock",
   first_month_guarantee: "First-month guarantee",
   charged_after_cancellation: "Charged after cancellation",
   wrong_plan_charged: "Charged for the wrong plan",
@@ -33,7 +33,7 @@ const MENU_ITEMS = [
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
   { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any of the 5 free homepage panels (Instant Property Score, Hidden Deal, Red Flag Hunt, Should I Buy This, Price Drop Alert)." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
-  { screen: "grants", label: "Insight Add-on Grants", desc: "Every Insight Add-on purchase and who it was granted to." },
+  { screen: "grants", label: "Quick Analysis Grants", desc: "Every Quick Analysis purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
   { screen: "refund-requests", label: "Refund Requests", desc: "Review and act on refund requests customers have actually submitted." },
   { screen: "reset-quota", label: "Reset User Quota", desc: "Give a user a fresh monthly design quota without waiting for the month to roll over." },
@@ -488,8 +488,9 @@ function AdminPanel({ onBack }) {
     const estimatedMrrUsd = subscriptionTiers.reduce((sum, t) => sum + t.subtotalUsd, 0);
     const insightPriceUsd = tierConfig.insight_addon?.price_usd || 0;
     const insightRevenueUsd = grants.length * insightPriceUsd;
+    const insightLabel = tierConfig.insight_addon?.label || "Quick Analysis";
 
-    return { subscriptionTiers, estimatedMrrUsd, insightRevenueUsd, insightPriceUsd };
+    return { subscriptionTiers, estimatedMrrUsd, insightRevenueUsd, insightPriceUsd, insightLabel };
   }, [tierConfig, subscriptions, grants]);
 
   if (!authed) {
@@ -564,7 +565,7 @@ function AdminPanel({ onBack }) {
             </div>
             <div className="admin-stat-card admin-stat-green">
               <div className="admin-stat-value">{grants.length}</div>
-              <div className="admin-stat-label">Insight Add-on Purchases</div>
+              <div className="admin-stat-label">{revenueAnalytics?.insightLabel || "Quick Analysis"} Purchases</div>
             </div>
             <div className="admin-stat-card admin-stat-slate">
               <div className="admin-stat-value">{TIER_ORDER.filter((id) => tierConfig?.[id]).length}</div>
@@ -587,7 +588,7 @@ function AdminPanel({ onBack }) {
                 </div>
                 <div className="admin-stat-card admin-stat-green">
                   <div className="admin-stat-value">${revenueAnalytics.insightRevenueUsd.toLocaleString()}</div>
-                  <div className="admin-stat-label">Insight Add-on Revenue (one-time, all-time)</div>
+                  <div className="admin-stat-label">{revenueAnalytics.insightLabel} Revenue (one-time, all-time)</div>
                 </div>
               </div>
 
@@ -606,7 +607,7 @@ function AdminPanel({ onBack }) {
                       </tr>
                     ))}
                     <tr>
-                      <td><strong>Insight Add-on</strong></td>
+                      <td><strong>{revenueAnalytics.insightLabel}</strong></td>
                       <td>{grants.length} purchase{grants.length === 1 ? "" : "s"}</td>
                       <td>${revenueAnalytics.insightPriceUsd}</td>
                       <td>${revenueAnalytics.insightRevenueUsd.toLocaleString()}</td>
@@ -1056,7 +1057,7 @@ function AdminPanel({ onBack }) {
           <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
 
           <div className="admin-section admin-section-green">
-            <h3>Insight Add-on Grants ({grants.length})</h3>
+            <h3>Quick Analysis Grants ({grants.length})</h3>
             {grants.length === 0 ? (
               <p className="admin-empty-note">No Insight purchases yet.</p>
             ) : (
@@ -1091,7 +1092,7 @@ function AdminPanel({ onBack }) {
             <h3>Look up payments &amp; issue a refund</h3>
             <p className="admin-section-note">
               Works for subscription payments (Starter/Pro/Unlimited) by email — looked up directly from Dodo.
-              For a one-time purchase (Insight Add-on, Standard Report), there's no subscription to look up by;
+              For a one-time purchase (Quick Analysis, Standard Report), there's no subscription to look up by;
               paste the payment_id from Dodo's own dashboard into the manual section below instead.
             </p>
             <div className="admin-tier-row" style={{ gridTemplateColumns: "1fr auto" }}>

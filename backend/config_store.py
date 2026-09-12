@@ -7,7 +7,7 @@ from backend.db import get_connection
 # estimates are (see backend/construction_studio.py fx_rates_usd_base).
 DEFAULT_TIER_CONFIG = {
     "insight_addon": {
-        "label": "Insight Add-on",
+        "label": "Quick Analysis",
         "billing": "one_time",
         "price_usd": 4,
         "features": ["similar_property_suggestions"],
@@ -142,6 +142,21 @@ def initialize_config_store() -> None:
         if isinstance(features, list) and "construction_studio_lite" in features:
             tier["features"] = [f for f in features if f != "construction_studio_lite"]
             changed = True
+
+    # Same real, one-time-per-deployment reasoning as above: renames the
+    # stock "Insight Add-on" label to the new "Quick Analysis" name on
+    # an already-seeded database. Only touches it if it's STILL the
+    # exact original stock label — an admin who has already customized
+    # this tier's name to something else keeps their own choice,
+    # untouched. Genuinely idempotent (a database already renamed, or a
+    # fresh one seeded with the new DEFAULT_TIER_CONFIG label below,
+    # never matches the old string again), so safe to leave here
+    # permanently rather than needing a separate one-off script.
+    insight_tier = existing.get("insight_addon")
+    if insight_tier and insight_tier.get("label") == "Insight Add-on":
+        insight_tier["label"] = "Quick Analysis"
+        changed = True
+
     if changed:
         set_tier_config(existing)
 

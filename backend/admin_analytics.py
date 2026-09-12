@@ -36,7 +36,7 @@ _FEATURE_USAGE_TABLES: dict[str, str] = {
     "Price Drop Alert watches": "price_watches",
     "Agent Intelligence clients": "agent_clients",
     "Agent Intelligence properties": "agent_client_properties",
-    "Insight Add-on purchases": "insight_grants",
+    "Quick Analysis purchases": "insight_grants",
     "Challenge a Friend challenges": "property_challenges",
     "Saved properties (Construction Studio)": "properties",
 }

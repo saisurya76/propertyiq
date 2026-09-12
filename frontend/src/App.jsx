@@ -438,7 +438,7 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Same gap, same fix, for the subscription and Insight Add-on
+  // Same gap, same fix, for the subscription and Quick Analysis
   // checkout flows — both previously redirected to a path this SPA has
   // no route for at all (/studio and /report/{id}), with zero frontend
   // code reading either return query param, so a real, successful

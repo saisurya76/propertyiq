@@ -1321,7 +1321,7 @@ def admin_lookup_payments(request: AdminPaymentsLookupRequest):
     has on file for their email — so an admin can find the right
     payment_id to refund without needing to separately dig through
     Dodo's own dashboard first. Only covers subscription payments this
-    way; a one-time purchase (Insight Add-on, a Standard Report) has no
+    way; a one-time purchase (Quick Analysis, a Standard Report) has no
     subscription_id at all, so those still need the payment_id pasted
     in manually from Dodo's dashboard (see the admin panel's own refund
     form) — a real, honest limitation of this lookup, not a bug."""
@@ -1329,7 +1329,7 @@ def admin_lookup_payments(request: AdminPaymentsLookupRequest):
 
     subscription = get_subscription(request.email)
     if not subscription or not subscription.get("dodo_subscription_id"):
-        return {"payments": [], "note": "No subscription on file for this email — for a one-time purchase (Insight Add-on, Standard Report), paste the payment_id directly from Dodo's dashboard instead."}
+        return {"payments": [], "note": "No subscription on file for this email — for a one-time purchase (Quick Analysis, Standard Report), paste the payment_id directly from Dodo's dashboard instead."}
 
     if not DODO_API_KEY:
         raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
@@ -1933,7 +1933,7 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
 
 @app.post("/api/insight/checkout")
 def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(get_current_user_email)):
-    """One-time checkout for the Insight Add-on (similar property
+    """One-time checkout for Quick Analysis (similar property
     suggestions), tied to a specific report_id.
 
     BETA: if PROPERTYIQ_BETA_BYPASS_PAYMENTS=true, skips Dodo entirely and
@@ -1979,7 +1979,7 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
 
 @app.get("/api/insight/status/{report_id}")
 def insight_status(report_id: str, user_email: str = Depends(get_current_user_email)):
-    """Lets the frontend confirm the Insight Add-on payment actually went
+    """Lets the frontend confirm the Quick Analysis payment actually went
     through after returning from Dodo's checkout — a real, confirmed gap
     this closes alongside the subscription and report-unlock flows: the
     return_url previously pointed at /report/{report_id}?insight=1, a
@@ -2275,7 +2275,7 @@ async def dodo_webhook(request: Request):
         grant_one_time_tier(user_email, "insight_addon")
         _send_payment_confirmation_email(
             user_email,
-            "Insight Add-on",
+            "Quick Analysis",
             round(dodo_amount / 100, 2) if dodo_amount is not None else None,
             dodo_currency,
             dodo_payment_id,
@@ -2387,7 +2387,7 @@ def get_profile(user_email: str = Depends(get_current_user_email)):
             logger.error(f"get_profile: Dodo payment history lookup failed for {user_email!r}: {exc}")
             payments_note = "Couldn't load payment history right now — try again shortly."
     elif not sub or not sub.get("dodo_subscription_id"):
-        payments_note = "No subscription payments on file. A Standard Report or Insight Add-on purchase won't show here."
+        payments_note = "No subscription payments on file. A Standard Report or Quick Analysis purchase won't show here."
 
     notifications = []
     for req in list_refund_requests():
@@ -2541,7 +2541,7 @@ def delete_account_endpoint(request: ProfileDeleteAccountRequest, user_email: st
 
 def _has_similar_properties_access(user_email: str, report_id: str) -> bool:
     """Access via free mode (an admin-toggleable, product-wide setting —
-    see insight_addon's "mode" field), the one-time Insight Add-on grant
+    see insight_addon's "mode" field), the one-time Quick Analysis grant
     for this specific report (kept for backwards compatibility with
     purchases made before one-time grants became account-wide — see
     grant_one_time_tier), or user_has_feature's own real, account-wide
@@ -4065,7 +4065,7 @@ def similar_properties(
     if not _has_similar_properties_access(user_email, report_id):
         raise HTTPException(
             status_code=403,
-            detail="Similar property suggestions require the Insight Add-on for this report "
+            detail="Similar property suggestions require Quick Analysis for this report "
                    "(POST /api/insight/checkout) or an active Studio subscription."
         )
 

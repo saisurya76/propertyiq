@@ -18,7 +18,7 @@ def initialize_insight_store() -> None:
             )
             # A real, deliberate, SEPARATE mechanism from the
             # `subscriptions` table above -- not a variant of it. A
-            # one-time purchase (e.g. Insight Add-on) grants permanent,
+            # one-time purchase (e.g. Quick Analysis) grants permanent,
             # account-wide access to whatever features that tier's own
             # config lists, WITHOUT ever writing to `subscriptions`.
             # This is the actual safety property: there is no code
@@ -96,7 +96,7 @@ def has_insight_access(report_id: str, user_email: str) -> bool:
 
 
 def list_all_grants() -> list[dict]:
-    """For the admin overview panel — all Insight Add-on grants, most
+    """For the admin overview panel — all Quick Analysis grants, most
     recent first."""
     with get_connection() as connection:
         with connection.cursor() as cursor:
