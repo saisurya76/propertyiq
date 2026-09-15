@@ -2934,6 +2934,30 @@ def admin_update_loan_eligibility_settings(request: AdminLoanEligibilitySettings
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+# The real custom GPT this app's own homepage previously linked to
+# from a static marketing page (website/index.html) before that page
+# stopped being served -- brought inside the app itself as a real,
+# tier-gated feature instead. Not embedded/proxied (a ChatGPT custom
+# GPT can't be embedded in an iframe) -- the real destination a user
+# is sent to once they're confirmed entitled.
+PROPERTY_AI_ADVISOR_URL = "https://chatgpt.com/g/g-6a3d764cd690819180e776b79d816594-propertyiq-ai-advisor"
+
+
+@app.get("/api/property-ai-advisor/access")
+def property_ai_advisor_access(user_email: str = Depends(get_current_user_email)):
+    """Real, server-side entitlement check before handing back the
+    actual advisor URL -- the frontend never has the real destination
+    at all unless this confirms the person is genuinely entitled,
+    matching this app's own established pattern of gating the real
+    resource server-side rather than just hiding a button client-side."""
+    if not user_has_feature(user_email, "property_ai_advisor"):
+        raise HTTPException(
+            status_code=403,
+            detail="Property AI Advisor requires an active Studio subscription that includes this feature.",
+        )
+    return {"url": PROPERTY_AI_ADVISOR_URL}
+
+
 class NeighborhoodComparisonArea(BaseModel):
     city: str
     country: str = "India"
@@ -3629,7 +3653,7 @@ def neighborhood_section_visibility():
     return get_ni_section_visibility()
 
 
-HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker"]
+HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor"]
 HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
 
 

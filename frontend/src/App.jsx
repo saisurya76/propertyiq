@@ -787,6 +787,35 @@ function App() {
     setStudioView("agent");
   };
 
+  // Real, server-side entitlement check before ever revealing the real
+  // advisor URL — this app never trusts a client-side "is this hidden"
+  // decision alone for a paid feature. A signed-out visitor is routed
+  // through auth first (pendingAuthAction="ai_advisor" brings them
+  // straight back here on success); a signed-in but non-entitled
+  // person lands on Pricing, where this feature already shows up as a
+  // real, listed feature on whichever tier includes it.
+  const handlePropertyAiAdvisor = async () => {
+    const session = getSession();
+    if (!session) {
+      setPendingAuthAction("ai_advisor");
+      setStudioView("auth");
+      return;
+    }
+    try {
+      const res = await studioApi.getPropertyAiAdvisorAccess();
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      if (err.status === 401) {
+        clearSession();
+        setPendingAuthAction("ai_advisor");
+        setStudioView("auth");
+      } else {
+        setPricingContextMessage("Property AI Advisor requires an active Studio subscription that includes this feature.");
+        setStudioView("pricing");
+      }
+    }
+  };
+
   // A real, previously-missing gap this fixes: SessionBar's "Plan:
   // Studio Pro" badge is meant to always open Pricing (its own title
   // attribute literally says "Manage your subscription") but was
@@ -832,6 +861,11 @@ function App() {
     if (pendingAuthAction === "agent") {
       setPendingAuthAction(null);
       setStudioView("agent");
+      return;
+    }
+    if (pendingAuthAction === "ai_advisor") {
+      setPendingAuthAction(null);
+      handlePropertyAiAdvisor();
       return;
     }
     setPricingContextMessage(""); // reached auth via the generic "manage my plan" path, not a feature gate
@@ -1165,6 +1199,16 @@ function App() {
         </span>
         <span className="feature-strip-arrow">→</span>
       </div>
+
+      {homepagePanelVisibility.property_ai_advisor && (
+        <div className="feature-strip ai-advisor-feature-strip" onClick={handlePropertyAiAdvisor} role="button" tabIndex={0}>
+          <span className="feature-strip-icon">🧭</span>
+          <span className="feature-strip-text">
+            <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQ's own methodology, before you decide.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
 
       <div className="mission-section">
         <div className="mission-content">

@@ -123,6 +123,7 @@ export const studioApi = {
     apiFetch("/api/admin/overview", { method: "POST", body: JSON.stringify({ password, force_refresh_prices: forceRefreshPrices }) }),
 
   getLoanEligibilitySettings: () => apiFetch("/api/loan-eligibility/settings"),
+  getPropertyAiAdvisorAccess: () => apiFetch("/api/property-ai-advisor/access"),
   adminUpdateLoanEligibilitySettings: (password, fields) =>
     apiFetch("/api/admin/loan-eligibility-settings", { method: "POST", body: JSON.stringify({ password, ...fields }) }),
   checkLoanEligibility: (payload) =>

@@ -977,10 +977,12 @@ function AdminPanel({ onBack }) {
           <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
 
           <div className="admin-section">
-            <h3>Homepage — Free Quick-Check Panels</h3>
+            <h3>Homepage — Feature Panels</h3>
             <p className="admin-section-note">
-              Show or hide any of the 5 free homepage panels without a code change or redeploy — useful for
+              Show or hide any of these homepage panels without a code change or redeploy — useful for
               temporarily hiding a panel while sorting out an issue with it, without taking the homepage down.
+              The first 5 are free quick-checks; Property AI Advisor is a paid, tier-gated feature — hiding it
+              here only controls whether its homepage entry point is shown, not who's entitled to use it.
             </p>
             {homepagePanelVisibility ? (
               <>
@@ -991,6 +993,7 @@ function AdminPanel({ onBack }) {
                   { key: "challenge_a_friend", label: "Should I Buy This? — Challenge a Friend (Free)" },
                   { key: "price_drop_alert", label: "Price Drop Alert — Let PropertyIQ Watch For You (Free)" },
                   { key: "hottest_properties_ticker", label: "Hottest Properties ticker (below the logo)" },
+                  { key: "property_ai_advisor", label: "Property AI Advisor (feature strip — tier-gated, not free)" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`homepage-toggle-${key}`}>{label}</label>

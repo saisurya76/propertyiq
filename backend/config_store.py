@@ -40,6 +40,7 @@ DEFAULT_TIER_CONFIG = {
             "price_trends",
             "emi_calculator",
             "loan_eligibility",
+            "property_ai_advisor",
             "amortization_projector",
             "agent_intelligence",
         ],
@@ -65,6 +66,7 @@ DEFAULT_TIER_CONFIG = {
             "price_trends",
             "emi_calculator",
             "loan_eligibility",
+            "property_ai_advisor",
             "amortization_projector",
             "agent_intelligence",
         ],
@@ -92,6 +94,7 @@ DEFAULT_TIER_CONFIG = {
             "price_trends",
             "emi_calculator",
             "loan_eligibility",
+            "property_ai_advisor",
             "amortization_projector",
             "agent_intelligence",
         ],
@@ -276,6 +279,7 @@ ALL_FEATURES = [
     "amortization_projector",
     "agent_intelligence",
     "loan_eligibility",
+    "property_ai_advisor",
 ]
 
 
