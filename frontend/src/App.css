@@ -3284,3 +3284,43 @@ body {
 .ni-loan-eligibility-checks {
   margin-bottom: 10px;
 }
+
+.ai-advisor-cta {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.ai-advisor-btn {
+  padding: 12px 26px;
+  border: 2px solid #2c1f47;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: #2c1f47;
+  transition: 0.2s ease;
+}
+
+.ai-advisor-btn:hover {
+  background: #2c1f47;
+  color: white;
+}
+
+.ai-advisor-note {
+  margin: 8px 0 0;
+  max-width: 420px;
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.ai-advisor-copy-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #047857;
+}

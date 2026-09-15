@@ -243,13 +243,15 @@ function App() {
   // landing on Pricing regardless of what triggered it — that generic
   // fallback is still correct for the "manage my plan" entry point,
   // just not for a paid action that got interrupted by a 401.
-  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent"
+  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent" | "ai_advisor"
+  const [pendingAiAdvisorSummary, setPendingAiAdvisorSummary] = useState(null); // report summary text to copy, if the ai_advisor click came from a generated report rather than the homepage strip
   // Shown on the Pricing screen specifically when a paid action (not
   // the generic "manage my plan" entry point) is what actually sent
   // the visitor there — without this, landing on Pricing right after
   // signing in looks like a confusing bounce/loop rather than the
   // real, deliberate "you need an active plan for this" gate it is.
   const [pricingContextMessage, setPricingContextMessage] = useState("");
+  const [aiAdvisorCopyStatus, setAiAdvisorCopyStatus] = useState(""); // brief on-screen confirmation after a clipboard copy
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [languageReady, setLanguageReady] = useState(false);
@@ -794,20 +796,35 @@ function App() {
   // straight back here on success); a signed-in but non-entitled
   // person lands on Pricing, where this feature already shows up as a
   // real, listed feature on whichever tier includes it.
-  const handlePropertyAiAdvisor = async () => {
+  const handlePropertyAiAdvisor = async (reportSummary) => {
     const session = getSession();
     if (!session) {
       setPendingAuthAction("ai_advisor");
+      setPendingAiAdvisorSummary(reportSummary || null);
       setStudioView("auth");
       return;
     }
     try {
       const res = await studioApi.getPropertyAiAdvisorAccess();
+      if (reportSummary) {
+        try {
+          await navigator.clipboard.writeText(reportSummary);
+          setAiAdvisorCopyStatus("Report copied — paste it into the chat to get started.");
+        } catch {
+          // A real, non-fatal degradation: clipboard access can fail
+          // (permissions, insecure context, older browser) — the
+          // advisor link itself still works, so open it regardless
+          // and just tell them to copy the summary manually instead.
+          setAiAdvisorCopyStatus("Couldn't copy automatically — copy your report summary manually and paste it into the chat.");
+        }
+        setTimeout(() => setAiAdvisorCopyStatus(""), 8000);
+      }
       window.open(res.url, "_blank", "noopener,noreferrer");
     } catch (err) {
       if (err.status === 401) {
         clearSession();
         setPendingAuthAction("ai_advisor");
+        setPendingAiAdvisorSummary(reportSummary || null);
         setStudioView("auth");
       } else {
         setPricingContextMessage("Property AI Advisor requires an active Studio subscription that includes this feature.");
@@ -865,7 +882,9 @@ function App() {
     }
     if (pendingAuthAction === "ai_advisor") {
       setPendingAuthAction(null);
-      handlePropertyAiAdvisor();
+      const summary = pendingAiAdvisorSummary;
+      setPendingAiAdvisorSummary(null);
+      handlePropertyAiAdvisor(summary);
       return;
     }
     setPricingContextMessage(""); // reached auth via the generic "manage my plan" path, not a feature gate
@@ -1336,6 +1355,8 @@ function App() {
         formData={formData}
         reportId={reportId}
         onLaunchStudio={launchStudio}
+        onLaunchAiAdvisor={handlePropertyAiAdvisor}
+        aiAdvisorCopyStatus={aiAdvisorCopyStatus}
       />
 
       <Disclaimer />

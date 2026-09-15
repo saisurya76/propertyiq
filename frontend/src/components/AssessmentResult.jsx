@@ -9,7 +9,9 @@ function AssessmentResult({
   result,
   formData,
   reportId,
-  onLaunchStudio
+  onLaunchStudio,
+  onLaunchAiAdvisor,
+  aiAdvisorCopyStatus
 }) {
   const [reportLoading, setReportLoading] = useState(false);
 
@@ -25,6 +27,29 @@ function AssessmentResult({
     }
 
     return `₹${new Intl.NumberFormat("en-IN").format(value)}`;
+  };
+
+  // A real, readable text summary of THIS report — the property
+  // details plus the actual assessment numbers, not a generic
+  // placeholder — copied to the user's clipboard so they can paste it
+  // as the opening message when the AI Advisor chat opens in a new
+  // tab (no reliable way exists today to pre-fill a message into a
+  // specific custom GPT via the link itself).
+  const buildReportSummary = () => {
+    const lines = [
+      `Property: ${formData.propertyName || "Unnamed property"} (${formData.propertyType || "property"})`,
+      `Developer: ${formData.developerName || "Not specified"}`,
+      `Location: ${formData.location || ""}, ${formData.city || ""}, ${formData.stateProvince || ""}, ${formData.country || ""}`,
+      `Quoted price: ${formatIndianCurrency(Number(formData.quotedPrice) || 0)}`,
+      `Fair value (PropertyIQ estimate): ${formatIndianCurrency(result.fairValue || 0)}`,
+      `Buyer Protection Score: ${result.score}/100 (${result.rating})`,
+      `Deal quality: ${result.dealQuality} — ${result.dealQualityReason}`,
+      `Recommendation: ${result.recommendation}`,
+      `Negotiation position: ${result.negotiationPosition} — ${result.negotiationReason}`,
+      `Target price: ${formatIndianCurrency(result.targetPrice || 0)}`,
+      `Overall summary: ${result.decision?.narrative || result.findings?.overall || ""}`,
+    ];
+    return `Here is my PropertyIQ assessment report — please help me think it through:\n\n${lines.join("\n")}`;
   };
 
   const downloadReport = async () => {
@@ -1095,6 +1120,23 @@ function AssessmentResult({
             ? "Generating Report..."
             : "Download PropertyIQ Report"}
         </button>
+
+        {onLaunchAiAdvisor && (
+          <div className="ai-advisor-cta">
+            <button
+              className="ai-advisor-btn"
+              onClick={() => onLaunchAiAdvisor(buildReportSummary())}
+            >
+              🧭 Check with AI Advisor
+            </button>
+            <p className="ai-advisor-note">
+              Opens PropertyIQ's AI Advisor in a new tab and copies this report to your clipboard — just paste it in as your first message to start the conversation.
+            </p>
+            {aiAdvisorCopyStatus && (
+              <p className="ai-advisor-copy-status">{aiAdvisorCopyStatus}</p>
+            )}
+          </div>
+        )}
 
       </div>
 
