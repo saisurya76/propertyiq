@@ -47,3 +47,19 @@ def _reset_database():
     initialize_config_store()
 
     yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Runs before EVERY test (function-scoped, unlike the database
+    reset above) — the rate limiter's in-memory attempt history is
+    process-wide state that would otherwise accumulate across tests
+    regardless of which database they use, since it doesn't live in
+    Postgres at all. Without this, tests that deliberately trigger
+    auth failures (wrong admin password, wrong OTP code) could start
+    tripping the real rate limit and failing with 429 instead of the
+    403/401 they're actually testing for — a real, order-dependent
+    flakiness risk this closes rather than working around per-test."""
+    from backend.rate_limiter import _attempts
+    _attempts.clear()
+    yield

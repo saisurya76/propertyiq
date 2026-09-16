@@ -211,6 +211,7 @@ from backend.insight_store import (
     list_all_grants,
     grant_one_time_tier,
 )
+from backend.rate_limiter import check_rate_limit, reset_rate_limit
 
 from backend.similar_properties import (
     get_similar_properties,
@@ -1192,8 +1193,18 @@ class AdminAuthRequest(BaseModel):
 
 
 def _require_admin_password(password: str) -> None:
+    # A single shared secret, checked independently on every one of
+    # this app's ~15 admin endpoints with no session/lockout of its
+    # own -- rate limited by a fixed, global key (not per-IP: this is
+    # one secret, not a per-user check, so an IP-based limit could be
+    # trivially bypassed by rotating IPs) at 10 attempts per 15
+    # minutes, reset on a genuine success so a real admin's own next
+    # few actions aren't throttled by attempts that already worked.
+    if not check_rate_limit("admin_password", max_attempts=10, window_seconds=900):
+        raise HTTPException(status_code=429, detail="Too many admin login attempts. Please wait a few minutes and try again.")
     if not PROPERTYIQ_ADMIN_PASSWORD or password != PROPERTYIQ_ADMIN_PASSWORD:
         raise HTTPException(status_code=403, detail="Invalid admin password")
+    reset_rate_limit("admin_password")
 
 
 class SubscribeCheckoutRequest(BaseModel):
@@ -1211,6 +1222,9 @@ def request_otp(request: RequestOtpRequest):
     """Step 1 of email registration/login: sends a 6-digit code valid for
     10 minutes. Calling this again before the code is used invalidates the
     previous one."""
+    email_key = f"otp_request:{request.email.strip().lower()}"
+    if not check_rate_limit(email_key, max_attempts=5, window_seconds=3600):
+        raise HTTPException(status_code=429, detail="Too many code requests for this email. Please wait a while and try again.")
     if is_email_in_cooling_off(request.email):
         raise HTTPException(
             status_code=403,
@@ -1227,8 +1241,19 @@ def verify_otp_endpoint(request: VerifyOtpRequest):
     """Step 2: verifying the code registers/logs in the user and returns a
     bearer session token (30-day expiry) to use as
     'Authorization: Bearer <token>' on subsequent calls."""
+    # A real, previously-missing gap this closes: a 6-digit code (1M
+    # possibilities) with a 10-minute expiry and no rate limiting at
+    # all was genuinely brute-forceable with basic automation. Keyed
+    # by email, not IP (an attacker targeting one victim's email could
+    # rotate IPs, but not change which email they're guessing codes
+    # for), matching the code's own 10-minute window so the limit
+    # covers exactly the code's real lifetime.
+    verify_key = f"otp_verify:{request.email.strip().lower()}"
+    if not check_rate_limit(verify_key, max_attempts=10, window_seconds=600):
+        raise HTTPException(status_code=429, detail="Too many attempts for this email. Please request a new code and try again shortly.")
     if not verify_otp(request.email, request.code, request.country_code, request.country_name):
         raise HTTPException(status_code=401, detail="Invalid or expired code")
+    reset_rate_limit(verify_key)
 
     token = create_session(request.email)
     return {"session_token": token}
