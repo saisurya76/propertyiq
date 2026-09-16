@@ -25,6 +25,7 @@ import StudioTopBar from "./studio/StudioTopBar";
 import LegalFooter from "./components/LegalFooter";
 import useTermsGate from "./hooks/useTermsGate";
 import { getSession, clearSession, studioApi, saveDetectedCountry } from "./studio/studioApi";
+import { API_BASE } from "./config";
 
 
 const LANGUAGE_OPTIONS = [
@@ -180,7 +181,7 @@ function App() {
   // site from," per the explicit requirement this was built for.
   const [detectedCountryName, setDetectedCountryName] = useState(null);
   useEffect(() => {
-    fetch("https://propertyiq-api-q21y.onrender.com/api/homepage-panels/visibility")
+    fetch(`${API_BASE}/api/homepage-panels/visibility`)
       .then((res) => res.json())
       .then(setHomepagePanelVisibility)
       .catch(() => {}); // keep the all-visible default on any failure
@@ -676,7 +677,7 @@ function App() {
       setLoading(true);
       const session = getSession();
       const response = await fetch(
-        "https://propertyiq-api-q21y.onrender.com/assess",
+        `${API_BASE}/assess`,
         {
           method: "POST",
           headers: {

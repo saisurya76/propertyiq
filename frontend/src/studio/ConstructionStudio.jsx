@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
+import { API_BASE } from "../config";
 import PlotPreview from "./PlotPreview";
 import { evaluateAdjacency, ARCHITECTURAL_STYLE_LABELS } from "./adjacencyEngine";
 import ComplianceInfoIcon from "./ComplianceInfoIcon";
@@ -1058,7 +1059,7 @@ function ConstructionStudio({ onBack, onQuotaExceeded, resumePropertyId, onStart
 
   const downloadDxf = () => {
     if (!result?.design_id || !result?.dxf_available) return;
-    const url = `https://propertyiq-api-q21y.onrender.com/api/construction-studio/design/${result.design_id}/dxf`;
+    const url = `${API_BASE}/api/construction-studio/design/${result.design_id}/dxf`;
     window.open(url, "_blank", "noopener");
   };
 

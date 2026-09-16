@@ -1,4 +1,4 @@
-const API_BASE = "https://propertyiq-api-q21y.onrender.com";
+import { API_BASE } from "../config";
 
 const SESSION_KEY = "propertyiq_studio_session";
 

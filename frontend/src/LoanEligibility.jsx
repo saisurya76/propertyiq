@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { studioApi, getSession, saveSession } from "./studio/studioApi";
 import { TIER_TAGLINES } from "./studio/tierTaglines";
 
-const API_BASE = "https://propertyiq-api-q21y.onrender.com";
+import { API_BASE } from "./config";
 
 function formatCurrency(amount, currency) {
   try {

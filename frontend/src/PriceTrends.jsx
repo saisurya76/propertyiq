@@ -2,7 +2,7 @@ import { useState } from "react";
 import { studioApi, getSession, saveSession } from "./studio/studioApi";
 import { TIER_TAGLINES } from "./studio/tierTaglines";
 
-const API_BASE = "https://propertyiq-api-q21y.onrender.com";
+import { API_BASE } from "./config";
 const PERIOD_OPTIONS = [3, 5, 8, 10, 15];
 
 function formatPrice(usdAmount, currency, fxRates) {

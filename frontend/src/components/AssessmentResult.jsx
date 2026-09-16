@@ -4,6 +4,7 @@ import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
 import { getSession } from "../studio/studioApi";
+import { API_BASE } from "../config";
 
 function AssessmentResult({
   result,
@@ -61,7 +62,7 @@ function AssessmentResult({
       const session = getSession();
 
       const response = await fetch(
-        "https://propertyiq-api-q21y.onrender.com/generate-report",
+        `${API_BASE}/generate-report`,
         {
           method: "POST",
 

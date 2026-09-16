@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API_BASE = "https://propertyiq-api-q21y.onrender.com";
+import { API_BASE } from "./config";
 
 const CURRENCY_SYMBOL_BY_COUNTRY = {
   india: "₹", thailand: "฿", philippines: "₱", vietnam: "₫", indonesia: "Rp",

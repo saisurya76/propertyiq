@@ -9,7 +9,7 @@ import EmiCalculator from "./EmiCalculator";
 import LoanEligibility from "./LoanEligibility";
 import AmortizationProjector from "./AmortizationProjector";
 
-const API_BASE = "https://propertyiq-api-q21y.onrender.com";
+import { API_BASE } from "./config";
 
 // Same LocationIQ endpoints/key convention AccidentIQ's own Travel Safety
 // page uses (confirmed directly from that page's real source, shared by
