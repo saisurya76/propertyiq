@@ -422,16 +422,30 @@ function PropertyForm({
 
       </div>
 
+      {/* translate="no" plus a stable, never-changing set of child nodes
+          (spinner always mounted, just display:none'd; text lives in one
+          persistent span) — Google Translate wraps/rewrites this button's
+          DOM on translated pages, and toggling child nodes in/out on click
+          (the old {loading && <span>} + text-swap pattern) collided with
+          that, throwing a real "insertBefore ... not a child of this node"
+          crash on Thai/Vietnamese/Indonesian pages. Never mutate this
+          subtree's shape again — only the span's content/style. */}
       <button
         className="primary-btn"
         onClick={generateAssessment}
         disabled={loading}
+        translate="no"
       >
-        {loading && <span className="spinner"></span>}
+        <span
+          className="spinner"
+          style={{ display: loading ? "inline-block" : "none" }}
+        ></span>
 
-        {loading
-          ? "Analyzing..."
-          : "Generate PropertyIQ Report"}
+        <span>
+          {loading
+            ? "Analyzing..."
+            : "Generate PropertyIQ Report"}
+        </span>
       </button>
 
     </div>
