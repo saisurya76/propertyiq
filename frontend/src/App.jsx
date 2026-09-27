@@ -652,7 +652,6 @@ function App() {
     if (loading) return;
     if (
       !formData.country ||
-      !formData.stateProvince ||
       !formData.city ||
       !formData.location ||
 
