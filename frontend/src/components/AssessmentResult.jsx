@@ -1,5 +1,5 @@
 import { useState } from "react";
-import FraudIntelligenceDynamic from "./FraudIntelligenceDynamic";
+import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
 import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
@@ -1109,17 +1109,30 @@ function AssessmentResult({
           {result.findings?.overall}
         </div>
 
+        {/* Same fix as the "Generate PropertyIQ Report" button in
+            PropertyForm.jsx: stable, never-changing child nodes plus
+            translate="no", so Google Translate's own DOM rewriting on
+            translated pages can't collide with React re-rendering this
+            button when reportLoading toggles. This one crashed with no
+            React error boundary anywhere in the app to catch it, which
+            is why it took the whole page blank instead of just logging
+            a console error — the PDF still downloaded first since that
+            part is plain imperative JS, unrelated to this render. */}
         <button
           className="download-report-btn"
           onClick={downloadReport}
+          translate="no"
         >
-          {reportLoading && (
-            <span className="spinner"></span>
-          )}
+          <span
+            className="spinner"
+            style={{ display: reportLoading ? "inline-block" : "none" }}
+          ></span>
 
-          {reportLoading
-            ? "Generating Report..."
-            : "Download PropertyIQ Report"}
+          <span>
+            {reportLoading
+              ? "Generating Report..."
+              : "Download PropertyIQ Report"}
+          </span>
         </button>
 
         {onLaunchAiAdvisor && (
@@ -1159,10 +1172,7 @@ function AssessmentResult({
       </CollapsiblePanel>
 
       <CollapsiblePanel title="Fraud Intelligence" defaultOpen={false} color="red">
-        <FraudIntelligenceDynamic
-          fraudIntelligence={result.fraudIntelligence}
-          country={formData.country}
-        />
+        <FraudIntelligenceStatic />
       </CollapsiblePanel>
 
       </div>
