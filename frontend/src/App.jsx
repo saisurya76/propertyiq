@@ -696,9 +696,16 @@ function App() {
 
   const generateAssessment = async () => {
     if (loading) return;
+    // stateProvince is deliberately NOT in this required list — it has
+    // no input field anywhere in PropertyForm; it's only ever set once
+    // from COUNTRY_CODE_MAP at load and never touched again. India
+    // defaults it to "Telangana" (non-empty), which is why this bug
+    // never showed up there, but Thailand/Philippines/Vietnam/Indonesia
+    // default it to "" — making this alert fire unconditionally on
+    // /th, /ph, /vn, /id regardless of what the user actually filled
+    // in, since a field the user can never edit can never become truthy.
     if (
       !formData.country ||
-      !formData.stateProvince ||
       !formData.city ||
       !formData.location ||
 
