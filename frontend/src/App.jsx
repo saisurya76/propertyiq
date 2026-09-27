@@ -156,6 +156,31 @@ function triggerGoogleTranslation(languageCode) {
   }
 }
 
+// Dodo checkout (subscribing, or buying the Similar Property Insight
+// add-on) sends the browser away to a hosted payment page and back — a
+// full page navigation, so the whole SPA remounts and every typed form
+// field was lost, forcing a refill after a real, completed payment. This
+// is a real, deliberate draft, not a general form-autofill mechanism:
+// sessionStorage (cleared when the tab closes, unlike localStorage)
+// keyed to the country the draft was written for, so a stale Thailand
+// draft never resurfaces on an India visit in the same tab.
+const FORM_DRAFT_KEY = "piq_form_draft";
+
+function loadFormDraft(expectedCountry) {
+  try {
+    const raw = window.sessionStorage.getItem(FORM_DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (draft && draft.country === expectedCountry && draft.data) {
+      return draft.data;
+    }
+  } catch (e) {
+    // corrupted/unavailable storage (private browsing, etc.) — fall
+    // through to the normal defaults rather than blocking the page
+  }
+  return null;
+}
+
 function App() {
   const { requireTerms, TermsGateModal } = useTermsGate();
 
@@ -187,35 +212,56 @@ function App() {
       .catch(() => {}); // keep the all-visible default on any failure
   }, []);
 
-  const [formData, setFormData] = useState({
-    country: urlCountryContext ? urlCountryContext.name : "India",
-    stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
-    city: urlCountryContext ? urlCountryContext.city : "Hyderabad",
-    location: "",
-    governmentGuidance: "",
-    marketAverage: "",
-    propertyType: "Apartment",
+  const [formData, setFormData] = useState(() => {
+    const expectedCountry = urlCountryContext ? urlCountryContext.name : "India";
 
-    propertyName: "",
-    developerName: "",
+    return (
+      loadFormDraft(expectedCountry) || {
+        country: expectedCountry,
+        stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
+        city: urlCountryContext ? urlCountryContext.city : "Hyderabad",
+        location: "",
+        governmentGuidance: "",
+        marketAverage: "",
+        propertyType: "Apartment",
 
-    quotedPrice: "",
+        propertyName: "",
+        developerName: "",
 
-    areaValue: "",
-    areaUnit: urlCountryContext?.unit_system === "metric" ? "sq meter" : "sqft",
+        quotedPrice: "",
 
-    monthlyRent: "",
+        areaValue: "",
+        areaUnit: urlCountryContext?.unit_system === "metric" ? "sq meter" : "sqft",
 
-    totalUnits: "",
-    unsoldUnits: "",
+        monthlyRent: "",
 
-    projectsCompleted: "",
-    projectsDelayed: "",
-    yearsInBusiness: "",
-    regulatoryViolations: "",
+        totalUnits: "",
+        unsoldUnits: "",
 
-    additionalInformation: ""
+        projectsCompleted: "",
+        projectsDelayed: "",
+        yearsInBusiness: "",
+        regulatoryViolations: "",
+
+        additionalInformation: ""
+      }
+    );
   });
+
+  // Keep the draft current as the user types, so a checkout round-trip
+  // (or an accidental reload) can restore it. sessionStorage only, and
+  // never blocks the page if storage is unavailable.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        FORM_DRAFT_KEY,
+        JSON.stringify({ country: formData.country, data: formData })
+      );
+    } catch (e) {
+      // private browsing / storage disabled — draft persistence is a
+      // nice-to-have, never a blocker
+    }
+  }, [formData]);
 
   const [result, setResult] = useState(null);
   const [reportId, setReportId] = useState(null);
@@ -652,6 +698,7 @@ function App() {
     if (loading) return;
     if (
       !formData.country ||
+      !formData.stateProvince ||
       !formData.city ||
       !formData.location ||
 

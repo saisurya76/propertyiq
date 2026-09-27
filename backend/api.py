@@ -310,6 +310,23 @@ initialize_price_watch_store()
 DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
 FRONTEND_URL = os.getenv("PROPERTYIQ_FRONTEND_URL", "https://app.propertyiqweb.com")
+
+# Every Dodo checkout return_url was hardcoded to FRONTEND_URL's bare root,
+# so a subscriber on /th, /ph, /vn or /id who completed a real payment was
+# dropped back on the default/India site with no language/country context
+# at all after Dodo redirected them back — a real reported bug, not a
+# cosmetic one, since it also meant the SPA fully remounted on a path with
+# no country context, wiping any in-progress form state. Whitelisted
+# rather than trusting an arbitrary client-supplied path straight into a
+# redirect URL (open-redirect risk) — these 4 are the only real country
+# sub-paths this app has (see COUNTRY_CODE_MAP on the frontend).
+KNOWN_COUNTRY_RETURN_PATHS = {"/th", "/ph", "/vn", "/id"}
+
+
+def _safe_return_path(path: Optional[str]) -> str:
+    if path and path in KNOWN_COUNTRY_RETURN_PATHS:
+        return path
+    return ""
 DODO_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY", "")
 # Matches AccidentIQ's env var naming convention. Falls back to the old
 # PROPERTYIQ_ADMIN_PASSWORD name if ADMIN_DASHBOARD_PASSWORD isn't set yet,
@@ -1210,11 +1227,13 @@ def _require_admin_password(password: str) -> None:
 class SubscribeCheckoutRequest(BaseModel):
     tier_id: str
     currency: Optional[str] = None
+    return_path: Optional[str] = None
 
 
 class InsightCheckoutRequest(BaseModel):
     report_id: str
     currency: Optional[str] = None
+    return_path: Optional[str] = None
 
 
 @app.post("/api/auth/request-otp")
@@ -1942,7 +1961,7 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": request.tier_id, "user_email": user_email},
-        return_url=f"{FRONTEND_URL}/?subscribed=1",
+        return_url=f"{FRONTEND_URL.rstrip('/')}{_safe_return_path(request.return_path)}/?subscribed=1",
         **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
@@ -1995,7 +2014,7 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": "insight_addon", "report_id": request.report_id, "user_email": user_email},
-        return_url=f"{FRONTEND_URL}/?insight=1&report_id={request.report_id}",
+        return_url=f"{FRONTEND_URL.rstrip('/')}{_safe_return_path(request.return_path)}/?insight=1&report_id={request.report_id}",
         **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
