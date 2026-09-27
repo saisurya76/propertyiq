@@ -1,5 +1,5 @@
 import { useState } from "react";
-import FraudIntelligenceStatic from "./FraudIntelligenceStatic";
+import FraudIntelligenceDynamic from "./FraudIntelligenceDynamic";
 import CollapsiblePanel from "./CollapsiblePanel";
 import StudioPromoCard from "../studio/StudioPromoCard";
 import SimilarPropertiesWidget from "../studio/SimilarPropertiesWidget";
@@ -1159,7 +1159,10 @@ function AssessmentResult({
       </CollapsiblePanel>
 
       <CollapsiblePanel title="Fraud Intelligence" defaultOpen={false} color="red">
-        <FraudIntelligenceStatic />
+        <FraudIntelligenceDynamic
+          fraudIntelligence={result.fraudIntelligence}
+          country={formData.country}
+        />
       </CollapsiblePanel>
 
       </div>

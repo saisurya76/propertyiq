@@ -68,7 +68,14 @@ def build_city_assessments(evidence):
 
                 evidence_count=len(matching),
 
-                applicable=True
+                # Was hardcoded True for every fraud type regardless of
+                # whether any evidence actually ties it to the requested
+                # geography — meaning "Applicable Risk Types" always
+                # reported the full taxonomy (currently 10/10) for every
+                # country/city, India included, defeating the entire
+                # point of geo-filtering. This should track the same
+                # real signal risk_level/color already use.
+                applicable=bool(matching)
             )
         )
 
@@ -135,12 +142,12 @@ def generate_fraud_report(
     locality: str
 ) -> FraudReport:
 
-    evidence = load_evidence(
+    all_evidence = load_evidence(
         "backend/data/fraud/evidence.json"
     )
 
     evidence = search_evidence(
-        evidence,
+        all_evidence,
         country=country,
         state=state,
         city=city,
@@ -163,8 +170,15 @@ def generate_fraud_report(
         evidence
     )
 
+    # Global taxonomy is deliberately NOT geo-filtered — it's meant to
+    # show which fraud types have evidence ANYWHERE in the library, not
+    # just for the property's own country. Previously this reused the
+    # same country-filtered `evidence`, which made "global" identical to
+    # "country" for every request and meant a non-India property showed
+    # a global picture built from zero evidence, even though the library
+    # does hold real entries for other countries.
     global_assessments = build_global_assessments(
-        evidence
+        all_evidence
     )
 
     global_matrix = build_global_matrix(
