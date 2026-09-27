@@ -717,9 +717,9 @@ function NeighborhoodInsights({ countryCode }) {
           <div className="ni-form-field">
             <label>Property type</label>
             <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
-              <option>Apartment</option>
-              <option>Villa</option>
-              <option>Plot</option>
+              <option value="Apartment">Apartment</option>
+              <option value="Villa">Villa</option>
+              <option value="Plot">Plot</option>
             </select>
           </div>
         </div>

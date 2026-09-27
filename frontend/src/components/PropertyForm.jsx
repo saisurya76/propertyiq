@@ -127,14 +127,14 @@ function PropertyForm({
               onChange={handleChange}
               disabled
             >
-              <option>India</option>
-              <option>USA</option>
-              <option>UAE</option>
-              <option>Thailand</option>
-              <option>Philippines</option>
-              <option>Vietnam</option>
-              <option>Indonesia</option>
-              <option>Other</option>
+              <option value="India">India</option>
+              <option value="USA">USA</option>
+              <option value="UAE">UAE</option>
+              <option value="Thailand">Thailand</option>
+              <option value="Philippines">Philippines</option>
+              <option value="Vietnam">Vietnam</option>
+              <option value="Indonesia">Indonesia</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 
@@ -171,13 +171,13 @@ function PropertyForm({
               value={formData.propertyType}
               onChange={handleChange}
             >
-              <option>Apartment</option>
-              <option>Villa</option>
-              <option>Plot / Land</option>
-              <option>Commercial Office</option>
-              <option>Retail Shop</option>
-              <option>Warehouse</option>
-              <option>Other</option>
+              <option value="Apartment">Apartment</option>
+              <option value="Villa">Villa</option>
+              <option value="Plot / Land">Plot / Land</option>
+              <option value="Commercial Office">Commercial Office</option>
+              <option value="Retail Shop">Retail Shop</option>
+              <option value="Warehouse">Warehouse</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 
@@ -268,11 +268,11 @@ function PropertyForm({
               value={formData.areaUnit}
               onChange={handleChange}
             >
-              <option>sqft</option>
-              <option>sq yard</option>
-              <option>sq meter</option>
-              <option>acre</option>
-              <option>hectare</option>
+              <option value="sqft">sqft</option>
+              <option value="sq yard">sq yard</option>
+              <option value="sq meter">sq meter</option>
+              <option value="acre">acre</option>
+              <option value="hectare">hectare</option>
             </select>
           </div>
 
@@ -422,16 +422,30 @@ function PropertyForm({
 
       </div>
 
+      {/* translate="no" plus a stable, never-changing set of child nodes
+          (spinner always mounted, just display:none'd; text lives in one
+          persistent span) — Google Translate wraps/rewrites this button's
+          DOM on translated pages, and toggling child nodes in/out on click
+          (the old {loading && <span>} + text-swap pattern) collided with
+          that, throwing a real "insertBefore ... not a child of this node"
+          crash on Thai/Vietnamese/Indonesian pages. Never mutate this
+          subtree's shape again — only the span's content/style. */}
       <button
         className="primary-btn"
         onClick={generateAssessment}
         disabled={loading}
+        translate="no"
       >
-        {loading && <span className="spinner"></span>}
+        <span
+          className="spinner"
+          style={{ display: loading ? "inline-block" : "none" }}
+        ></span>
 
-        {loading
-          ? "Analyzing..."
-          : "Generate PropertyIQ Report"}
+        <span>
+          {loading
+            ? "Analyzing..."
+            : "Generate PropertyIQ Report"}
+        </span>
       </button>
 
     </div>
