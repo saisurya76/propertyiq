@@ -198,6 +198,7 @@ function App() {
   const [homepagePanelVisibility, setHomepagePanelVisibility] = useState({
     instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
     challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
+    construction_studio: true, agent_intelligence: true, property_ai_advisor: true,
   });
   // Captured from the same real ipapi.co lookup the language-detection
   // effect below already makes (not a second, duplicate call) — the
@@ -210,6 +211,23 @@ function App() {
       .then((res) => res.json())
       .then(setHomepagePanelVisibility)
       .catch(() => {}); // keep the all-visible default on any failure
+  }, []);
+
+  // Admin-configurable wording for each feature-strip's "excitement
+  // sticker" — defaults match what's actually shipped so the badge
+  // never briefly shows blank/wrong text before this fetch resolves.
+  // Whether a sticker is shown at all is still driven purely by its
+  // panel's own homepagePanelVisibility flag above, not by this.
+  const [featureStickerText, setFeatureStickerText] = useState({
+    construction_studio: "🔥 Save Big",
+    agent_intelligence: "💰 Earn More",
+    property_ai_advisor: "✨ New",
+  });
+  useEffect(() => {
+    fetch(`${API_BASE}/api/homepage-panels/sticker-text`)
+      .then((res) => res.json())
+      .then((data) => setFeatureStickerText((prev) => ({ ...prev, ...data })))
+      .catch(() => {}); // keep the shipped-default wording on any failure
   }, []);
 
   const [formData, setFormData] = useState(() => {
@@ -1257,27 +1275,37 @@ function App() {
         <HottestPropertiesTicker country={urlCountryContext ? urlCountryContext.name : (detectedCountryName || "India")} />
       )}
 
-      <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
-        <span className="feature-strip-sticker">🔥 Save Big</span>
-        <span className="feature-strip-icon">🏗</span>
-        <span className="feature-strip-text">
-          <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
-        </span>
-        <span className="feature-strip-arrow">→</span>
-      </div>
+      {homepagePanelVisibility.construction_studio && (
+        <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
+          {featureStickerText.construction_studio && (
+            <span className="feature-strip-sticker">{featureStickerText.construction_studio}</span>
+          )}
+          <span className="feature-strip-icon">🏗</span>
+          <span className="feature-strip-text">
+            <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
 
-      <div className="feature-strip agent-feature-strip" onClick={launchAgentWorkspace} role="button" tabIndex={0}>
-        <span className="feature-strip-sticker">💰 Earn More</span>
-        <span className="feature-strip-icon">🤝</span>
-        <span className="feature-strip-text">
-          <strong>Agent Intelligence</strong> — analyze, advise, and monetize: manage clients and properties, then generate one consolidated advisory report for each.
-        </span>
-        <span className="feature-strip-arrow">→</span>
-      </div>
+      {homepagePanelVisibility.agent_intelligence && (
+        <div className="feature-strip agent-feature-strip" onClick={launchAgentWorkspace} role="button" tabIndex={0}>
+          {featureStickerText.agent_intelligence && (
+            <span className="feature-strip-sticker">{featureStickerText.agent_intelligence}</span>
+          )}
+          <span className="feature-strip-icon">🤝</span>
+          <span className="feature-strip-text">
+            <strong>Agent Intelligence</strong> — analyze, advise, and monetize: manage clients and properties, then generate one consolidated advisory report for each.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
 
       {homepagePanelVisibility.property_ai_advisor && (
         <div className="feature-strip ai-advisor-feature-strip" onClick={handlePropertyAiAdvisor} role="button" tabIndex={0}>
-          <span className="feature-strip-sticker">✨ New</span>
+          {featureStickerText.property_ai_advisor && (
+            <span className="feature-strip-sticker">{featureStickerText.property_ai_advisor}</span>
+          )}
           <span className="feature-strip-icon">🧭</span>
           <span className="feature-strip-text">
             <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQ's own methodology, before you decide.

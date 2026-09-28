@@ -137,8 +137,8 @@ export const studioApi = {
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
 
-  adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility) =>
-    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility }) }),
+  adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility, featureStickerText) =>
+    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility, feature_sticker_text: featureStickerText }) }),
 
   agentListClients: () => apiFetch("/api/agent/clients"),
   agentGetQuotaSummary: () => apiFetch("/api/agent/quota-summary"),
