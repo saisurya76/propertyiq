@@ -1258,6 +1258,7 @@ function App() {
       )}
 
       <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
+        <span className="feature-strip-sticker">🔥 Save Big</span>
         <span className="feature-strip-icon">🏗</span>
         <span className="feature-strip-text">
           <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
@@ -1266,6 +1267,7 @@ function App() {
       </div>
 
       <div className="feature-strip agent-feature-strip" onClick={launchAgentWorkspace} role="button" tabIndex={0}>
+        <span className="feature-strip-sticker">💰 Earn More</span>
         <span className="feature-strip-icon">🤝</span>
         <span className="feature-strip-text">
           <strong>Agent Intelligence</strong> — analyze, advise, and monetize: manage clients and properties, then generate one consolidated advisory report for each.
@@ -1275,6 +1277,7 @@ function App() {
 
       {homepagePanelVisibility.property_ai_advisor && (
         <div className="feature-strip ai-advisor-feature-strip" onClick={handlePropertyAiAdvisor} role="button" tabIndex={0}>
+          <span className="feature-strip-sticker">✨ New</span>
           <span className="feature-strip-icon">🧭</span>
           <span className="feature-strip-text">
             <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQ's own methodology, before you decide.
