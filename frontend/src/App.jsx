@@ -156,6 +156,31 @@ function triggerGoogleTranslation(languageCode) {
   }
 }
 
+// Dodo checkout (subscribing, or buying the Similar Property Insight
+// add-on) sends the browser away to a hosted payment page and back — a
+// full page navigation, so the whole SPA remounts and every typed form
+// field was lost, forcing a refill after a real, completed payment. This
+// is a real, deliberate draft, not a general form-autofill mechanism:
+// sessionStorage (cleared when the tab closes, unlike localStorage)
+// keyed to the country the draft was written for, so a stale Thailand
+// draft never resurfaces on an India visit in the same tab.
+const FORM_DRAFT_KEY = "piq_form_draft";
+
+function loadFormDraft(expectedCountry) {
+  try {
+    const raw = window.sessionStorage.getItem(FORM_DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (draft && draft.country === expectedCountry && draft.data) {
+      return draft.data;
+    }
+  } catch (e) {
+    // corrupted/unavailable storage (private browsing, etc.) — fall
+    // through to the normal defaults rather than blocking the page
+  }
+  return null;
+}
+
 function App() {
   const { requireTerms, TermsGateModal } = useTermsGate();
 
@@ -173,6 +198,7 @@ function App() {
   const [homepagePanelVisibility, setHomepagePanelVisibility] = useState({
     instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
     challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
+    construction_studio: true, agent_intelligence: true, property_ai_advisor: true,
   });
   // Captured from the same real ipapi.co lookup the language-detection
   // effect below already makes (not a second, duplicate call) — the
@@ -187,35 +213,73 @@ function App() {
       .catch(() => {}); // keep the all-visible default on any failure
   }, []);
 
-  const [formData, setFormData] = useState({
-    country: urlCountryContext ? urlCountryContext.name : "India",
-    stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
-    city: urlCountryContext ? urlCountryContext.city : "Hyderabad",
-    location: "",
-    governmentGuidance: "",
-    marketAverage: "",
-    propertyType: "Apartment",
-
-    propertyName: "",
-    developerName: "",
-
-    quotedPrice: "",
-
-    areaValue: "",
-    areaUnit: urlCountryContext?.unit_system === "metric" ? "sq meter" : "sqft",
-
-    monthlyRent: "",
-
-    totalUnits: "",
-    unsoldUnits: "",
-
-    projectsCompleted: "",
-    projectsDelayed: "",
-    yearsInBusiness: "",
-    regulatoryViolations: "",
-
-    additionalInformation: ""
+  // Admin-configurable wording for each feature-strip's "excitement
+  // sticker" — defaults match what's actually shipped so the badge
+  // never briefly shows blank/wrong text before this fetch resolves.
+  // Whether a sticker is shown at all is still driven purely by its
+  // panel's own homepagePanelVisibility flag above, not by this.
+  const [featureStickerText, setFeatureStickerText] = useState({
+    construction_studio: "🔥 Save Big",
+    agent_intelligence: "💰 Earn More",
+    property_ai_advisor: "✨ New",
   });
+  useEffect(() => {
+    fetch(`${API_BASE}/api/homepage-panels/sticker-text`)
+      .then((res) => res.json())
+      .then((data) => setFeatureStickerText((prev) => ({ ...prev, ...data })))
+      .catch(() => {}); // keep the shipped-default wording on any failure
+  }, []);
+
+  const [formData, setFormData] = useState(() => {
+    const expectedCountry = urlCountryContext ? urlCountryContext.name : "India";
+
+    return (
+      loadFormDraft(expectedCountry) || {
+        country: expectedCountry,
+        stateProvince: urlCountryContext ? urlCountryContext.stateProvince : "Telangana",
+        city: urlCountryContext ? urlCountryContext.city : "Hyderabad",
+        location: "",
+        governmentGuidance: "",
+        marketAverage: "",
+        propertyType: "Apartment",
+
+        propertyName: "",
+        developerName: "",
+
+        quotedPrice: "",
+
+        areaValue: "",
+        areaUnit: urlCountryContext?.unit_system === "metric" ? "sq meter" : "sqft",
+
+        monthlyRent: "",
+
+        totalUnits: "",
+        unsoldUnits: "",
+
+        projectsCompleted: "",
+        projectsDelayed: "",
+        yearsInBusiness: "",
+        regulatoryViolations: "",
+
+        additionalInformation: ""
+      }
+    );
+  });
+
+  // Keep the draft current as the user types, so a checkout round-trip
+  // (or an accidental reload) can restore it. sessionStorage only, and
+  // never blocks the page if storage is unavailable.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        FORM_DRAFT_KEY,
+        JSON.stringify({ country: formData.country, data: formData })
+      );
+    } catch (e) {
+      // private browsing / storage disabled — draft persistence is a
+      // nice-to-have, never a blocker
+    }
+  }, [formData]);
 
   const [result, setResult] = useState(null);
   const [reportId, setReportId] = useState(null);
@@ -650,6 +714,14 @@ function App() {
 
   const generateAssessment = async () => {
     if (loading) return;
+    // stateProvince is deliberately NOT in this required list — it has
+    // no input field anywhere in PropertyForm; it's only ever set once
+    // from COUNTRY_CODE_MAP at load and never touched again. India
+    // defaults it to "Telangana" (non-empty), which is why this bug
+    // never showed up there, but Thailand/Philippines/Vietnam/Indonesia
+    // default it to "" — making this alert fire unconditionally on
+    // /th, /ph, /vn, /id regardless of what the user actually filled
+    // in, since a field the user can never edit can never become truthy.
     if (
       !formData.country ||
       !formData.city ||
@@ -1203,24 +1275,37 @@ function App() {
         <HottestPropertiesTicker country={urlCountryContext ? urlCountryContext.name : (detectedCountryName || "India")} />
       )}
 
-      <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
-        <span className="feature-strip-icon">🏗</span>
-        <span className="feature-strip-text">
-          <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
-        </span>
-        <span className="feature-strip-arrow">→</span>
-      </div>
+      {homepagePanelVisibility.construction_studio && (
+        <div className="feature-strip" onClick={launchStudio} role="button" tabIndex={0}>
+          {featureStickerText.construction_studio && (
+            <span className="feature-strip-sticker">{featureStickerText.construction_studio}</span>
+          )}
+          <span className="feature-strip-icon">🏗</span>
+          <span className="feature-strip-text">
+            <strong>Construction Studio</strong> — design your build, place rooms on a real floor plan, get live cost estimates, and export a DXF, no property report needed.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
 
-      <div className="feature-strip agent-feature-strip" onClick={launchAgentWorkspace} role="button" tabIndex={0}>
-        <span className="feature-strip-icon">🤝</span>
-        <span className="feature-strip-text">
-          <strong>Agent Intelligence</strong> — analyze, advise, and monetize: manage clients and properties, then generate one consolidated advisory report for each.
-        </span>
-        <span className="feature-strip-arrow">→</span>
-      </div>
+      {homepagePanelVisibility.agent_intelligence && (
+        <div className="feature-strip agent-feature-strip" onClick={launchAgentWorkspace} role="button" tabIndex={0}>
+          {featureStickerText.agent_intelligence && (
+            <span className="feature-strip-sticker">{featureStickerText.agent_intelligence}</span>
+          )}
+          <span className="feature-strip-icon">🤝</span>
+          <span className="feature-strip-text">
+            <strong>Agent Intelligence</strong> — analyze, advise, and monetize: manage clients and properties, then generate one consolidated advisory report for each.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
 
       {homepagePanelVisibility.property_ai_advisor && (
         <div className="feature-strip ai-advisor-feature-strip" onClick={handlePropertyAiAdvisor} role="button" tabIndex={0}>
+          {featureStickerText.property_ai_advisor && (
+            <span className="feature-strip-sticker">{featureStickerText.property_ai_advisor}</span>
+          )}
           <span className="feature-strip-icon">🧭</span>
           <span className="feature-strip-text">
             <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQ's own methodology, before you decide.

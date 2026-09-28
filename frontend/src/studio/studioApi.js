@@ -87,11 +87,16 @@ export const studioApi = {
 
   getStatus: () => apiFetch("/api/subscribe/status"),
 
+  // Dodo's return_url takes the browser back after checkout — sending the
+  // current path (e.g. "/th") lets the backend send the user back to the
+  // same country/language site they paid from, instead of always
+  // dropping them on the default/India root. See KNOWN_COUNTRY_RETURN_PATHS
+  // in backend/api.py for the whitelist this gets checked against.
   subscribeCheckout: (tierId) =>
-    apiFetch("/api/subscribe/checkout", { method: "POST", body: JSON.stringify({ tier_id: tierId }) }),
+    apiFetch("/api/subscribe/checkout", { method: "POST", body: JSON.stringify({ tier_id: tierId, return_path: window.location.pathname }) }),
 
   insightCheckout: (reportId) =>
-    apiFetch("/api/insight/checkout", { method: "POST", body: JSON.stringify({ report_id: reportId }) }),
+    apiFetch("/api/insight/checkout", { method: "POST", body: JSON.stringify({ report_id: reportId, return_path: window.location.pathname }) }),
 
   getSimilarProperties: (reportId, { city, propertyType, subjectPricePerSqft }) =>
     apiFetch(
@@ -132,8 +137,8 @@ export const studioApi = {
   adminUpdateTiers: (password, tierConfig) =>
     apiFetch("/api/admin/tiers", { method: "POST", body: JSON.stringify({ password, tier_config: tierConfig }) }),
 
-  adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility) =>
-    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility }) }),
+  adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility, featureStickerText) =>
+    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility, feature_sticker_text: featureStickerText }) }),
 
   agentListClients: () => apiFetch("/api/agent/clients"),
   agentGetQuotaSummary: () => apiFetch("/api/agent/quota-summary"),

@@ -238,6 +238,7 @@ h1, h2, h3, h4,
    feature callout, not a competing primary CTA, so it sits below the
    hero rather than inside/overlapping it. --- */
 .feature-strip {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -249,6 +250,58 @@ h1, h2, h3, h4,
   border-radius: 14px;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* Small "excitement sticker" pinned to the corner of a feature strip —
+   a playful, slightly-rotated badge (not a static label) meant to catch
+   the eye and nudge people toward trying Construction Studio / Agent
+   Intelligence / Property AI Advisor. Positioned relative to the strip
+   itself, so it stays pinned to that card's corner regardless of the
+   strip's own width/wrapping. gentle infinite pulse, no page-load
+   flash — pure CSS, so it costs nothing to render. */
+.feature-strip-sticker {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff7a45, #ff4d6d);
+  border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(255, 77, 109, 0.35);
+  transform: rotate(-6deg);
+  animation: feature-strip-sticker-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.agent-feature-strip .feature-strip-sticker {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 3px 8px rgba(22, 163, 74, 0.35);
+}
+
+.ai-advisor-feature-strip .feature-strip-sticker {
+  background: linear-gradient(135deg, #7c5cff, #5b8cff);
+  box-shadow: 0 3px 8px rgba(91, 140, 255, 0.35);
+}
+
+@keyframes feature-strip-sticker-pulse {
+  0%, 100% { transform: rotate(-6deg) scale(1); }
+  50% { transform: rotate(-6deg) scale(1.08); }
+}
+
+@media (max-width: 640px) {
+  .feature-strip-sticker {
+    top: -9px;
+    right: 10px;
+    font-size: 10px;
+    padding: 2px 8px;
+  }
 }
 
 .feature-strip:hover {

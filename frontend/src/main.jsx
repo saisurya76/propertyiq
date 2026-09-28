@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import ChallengeView from './ChallengeView.jsx'
 import NeighborhoodInsights from './NeighborhoodInsights.jsx'
+import ErrorBoundary from './ErrorBoundary.jsx'
 
 // The /challenge/{id} route is deliberately routed here, before App's
 // own routing/URL-sync logic even initializes — App actively rewrites
@@ -30,8 +31,10 @@ const neighborhoodInsightsCountryCode = countryMatch ? countryMatch[1].toLowerCa
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {challengeMatch ? <ChallengeView challengeId={challengeMatch[1]} />
-      : isNeighborhoodInsights ? <NeighborhoodInsights countryCode={neighborhoodInsightsCountryCode} />
-      : <App />}
+    <ErrorBoundary>
+      {challengeMatch ? <ChallengeView challengeId={challengeMatch[1]} />
+        : isNeighborhoodInsights ? <NeighborhoodInsights countryCode={neighborhoodInsightsCountryCode} />
+        : <App />}
+    </ErrorBoundary>
   </StrictMode>,
 )

@@ -310,6 +310,23 @@ initialize_price_watch_store()
 DODO_ENVIRONMENT = os.getenv("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
 DODO_PRODUCT_ID = os.getenv("DODO_REPORT_PRODUCT_ID", "")
 FRONTEND_URL = os.getenv("PROPERTYIQ_FRONTEND_URL", "https://app.propertyiqweb.com")
+
+# Every Dodo checkout return_url was hardcoded to FRONTEND_URL's bare root,
+# so a subscriber on /th, /ph, /vn or /id who completed a real payment was
+# dropped back on the default/India site with no language/country context
+# at all after Dodo redirected them back — a real reported bug, not a
+# cosmetic one, since it also meant the SPA fully remounted on a path with
+# no country context, wiping any in-progress form state. Whitelisted
+# rather than trusting an arbitrary client-supplied path straight into a
+# redirect URL (open-redirect risk) — these 4 are the only real country
+# sub-paths this app has (see COUNTRY_CODE_MAP on the frontend).
+KNOWN_COUNTRY_RETURN_PATHS = {"/th", "/ph", "/vn", "/id"}
+
+
+def _safe_return_path(path: Optional[str]) -> str:
+    if path and path in KNOWN_COUNTRY_RETURN_PATHS:
+        return path
+    return ""
 DODO_API_KEY = os.getenv("DODO_PAYMENTS_API_KEY", "")
 # Matches AccidentIQ's env var naming convention. Falls back to the old
 # PROPERTYIQ_ADMIN_PASSWORD name if ADMIN_DASHBOARD_PASSWORD isn't set yet,
@@ -1210,11 +1227,13 @@ def _require_admin_password(password: str) -> None:
 class SubscribeCheckoutRequest(BaseModel):
     tier_id: str
     currency: Optional[str] = None
+    return_path: Optional[str] = None
 
 
 class InsightCheckoutRequest(BaseModel):
     report_id: str
     currency: Optional[str] = None
+    return_path: Optional[str] = None
 
 
 @app.post("/api/auth/request-otp")
@@ -1322,6 +1341,8 @@ def admin_overview(request: AdminAuthRequest):
         "ni_section_visibility": get_ni_section_visibility(),
         # Same real reasoning, for the 5 free homepage quick-check panels.
         "homepage_panel_visibility": get_homepage_panel_visibility(),
+        # Current wording for each feature-strip's excitement sticker.
+        "feature_sticker_text": get_feature_sticker_text(),
         # Real usage counts per feature, real per-service configuration
         # status, and real per-country user counts (only for users who
         # signed in after location capture was added — see
@@ -1832,6 +1853,7 @@ class AdminSettingsRequest(BaseModel):
     gemini_api_key: Optional[str] = None
     ni_section_visibility: Optional[dict[str, bool]] = None
     homepage_panel_visibility: Optional[dict[str, bool]] = None
+    feature_sticker_text: Optional[dict[str, str]] = None
 
 
 @app.post("/api/admin/settings")
@@ -1870,10 +1892,23 @@ def admin_settings(request: AdminSettingsRequest):
         current_panels.update(request.homepage_panel_visibility)
         set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(current_panels))
 
+    if request.feature_sticker_text is not None:
+        # Same merge-not-overwrite reasoning — only accept known sticker
+        # panels and never persist an empty/whitespace-only override,
+        # so a blank input field can't silently blank out a sticker
+        # (leave that key untouched instead, defaulting back to its
+        # shipped wording via get_feature_sticker_text).
+        current_stickers = get_feature_sticker_text()
+        for panel, text in request.feature_sticker_text.items():
+            if panel in FEATURE_STICKER_PANELS and text and text.strip():
+                current_stickers[panel] = text.strip()
+        set_app_setting(FEATURE_STICKER_TEXT_SETTING_KEY, json.dumps(current_stickers))
+
     return {
         "gemini_api_key_configured": bool(get_gemini_api_key()),
         "ni_section_visibility": get_ni_section_visibility(),
         "homepage_panel_visibility": get_homepage_panel_visibility(),
+        "feature_sticker_text": get_feature_sticker_text(),
     }
 
 
@@ -1942,7 +1977,7 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": request.tier_id, "user_email": user_email},
-        return_url=f"{FRONTEND_URL}/?subscribed=1",
+        return_url=f"{FRONTEND_URL.rstrip('/')}{_safe_return_path(request.return_path)}/?subscribed=1",
         **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
@@ -1995,7 +2030,7 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": user_email},
         metadata={"tier_id": "insight_addon", "report_id": request.report_id, "user_email": user_email},
-        return_url=f"{FRONTEND_URL}/?insight=1&report_id={request.report_id}",
+        return_url=f"{FRONTEND_URL.rstrip('/')}{_safe_return_path(request.return_path)}/?insight=1&report_id={request.report_id}",
         **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
@@ -3678,8 +3713,22 @@ def neighborhood_section_visibility():
     return get_ni_section_visibility()
 
 
-HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor"]
+HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor", "construction_studio", "agent_intelligence"]
 HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
+
+# The 3 feature-strip panels above get a small "excitement sticker" badge
+# (e.g. "🔥 Save Big") pinned to their corner on the homepage — this is
+# the admin-configurable text for each one, independent of whether the
+# strip itself is shown (that's HOMEPAGE_PANELS/visibility, above).
+# Deliberately its own setting rather than baked into the sticker markup,
+# so wording can be tuned (or a badge retired) without a redeploy.
+FEATURE_STICKER_PANELS = ["construction_studio", "agent_intelligence", "property_ai_advisor"]
+FEATURE_STICKER_TEXT_SETTING_KEY = "feature_sticker_text"
+DEFAULT_FEATURE_STICKER_TEXT = {
+    "construction_studio": "🔥 Save Big",
+    "agent_intelligence": "💰 Earn More",
+    "property_ai_advisor": "✨ New",
+}
 
 
 def get_homepage_panel_visibility() -> dict[str, bool]:
@@ -3707,6 +3756,33 @@ def homepage_panel_visibility():
     no-redeploy-needed operational control as Neighborhood Insights'
     own section visibility."""
     return get_homepage_panel_visibility()
+
+
+def get_feature_sticker_text() -> dict[str, str]:
+    """Same real, deliberate reasoning as get_homepage_panel_visibility
+    just above: every feature-strip sticker defaults to its shipped
+    wording until an admin explicitly overrides it, so a sticker added
+    after this feature existed never comes back blank just because it
+    isn't in the saved config yet."""
+    raw = get_app_setting(FEATURE_STICKER_TEXT_SETTING_KEY)
+    saved = {}
+    if raw:
+        try:
+            saved = json.loads(raw)
+        except json.JSONDecodeError:
+            saved = {}
+    return {panel: saved.get(panel, DEFAULT_FEATURE_STICKER_TEXT[panel]) for panel in FEATURE_STICKER_PANELS}
+
+
+@app.get("/api/homepage-panels/sticker-text")
+def homepage_panel_sticker_text():
+    """Public: the current text for each feature-strip's "excitement
+    sticker" (Construction Studio, Agent Intelligence, Property AI
+    Advisor) — admin-configurable without a redeploy, same pattern as
+    homepage_panel_visibility above. Whether a sticker is shown at all
+    is still controlled by the panel's own visibility toggle; this only
+    controls its wording."""
+    return get_feature_sticker_text()
 
 
 # Every city ALL_COMPARABLES actually covers, mapped to its real

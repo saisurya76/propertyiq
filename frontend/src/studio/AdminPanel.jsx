@@ -31,7 +31,7 @@ const MENU_ITEMS = [
   { screen: "gemini", label: "Property URL Import — Gemini API Key", desc: "The LLM fallback key used when free structured-data extraction isn't enough." },
   { screen: "loan-eligibility", label: "Loan Eligibility — Thresholds", desc: "The real, configurable lending criteria (debt-to-income, loan-to-value, age cap, minimum credit rating) used for eligibility estimates." },
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
-  { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any of the 5 free homepage panels (Instant Property Score, Hidden Deal, Red Flag Hunt, Should I Buy This, Price Drop Alert)." },
+  { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any homepage panel or feature strip, and edit each feature strip's excitement-sticker wording." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
   { screen: "grants", label: "Quick Analysis Grants", desc: "Every Quick Analysis purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
@@ -63,6 +63,8 @@ function AdminPanel({ onBack }) {
   const [techStack, setTechStack] = useState([]);
   const [usersByCountry, setUsersByCountry] = useState([]);
   const [homepageVisibilitySaveMessage, setHomepageVisibilitySaveMessage] = useState("");
+  const [featureStickerText, setFeatureStickerText] = useState(null);
+  const [stickerSaveMessage, setStickerSaveMessage] = useState("");
 
   // Refunds screen state
   const [refundLookupEmail, setRefundLookupEmail] = useState("");
@@ -98,6 +100,7 @@ function AdminPanel({ onBack }) {
       setGeminiKeyConfigured(!!data.gemini_api_key_configured);
       setNiSectionVisibility(data.ni_section_visibility || null);
       setHomepagePanelVisibility(data.homepage_panel_visibility || null);
+      setFeatureStickerText(data.feature_sticker_text || null);
       setFeatureUsage(data.feature_usage || null);
       setTechStack(data.tech_stack || []);
       setUsersByCountry(data.users_by_country || []);
@@ -240,6 +243,28 @@ function AdminPanel({ onBack }) {
       setHomepageVisibilitySaveMessage("Panel visibility saved.");
     } catch (err) {
       setError(err.message || "Couldn't save panel visibility.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggling here only changes in-memory state — nothing takes effect
+  // on the live homepage until "Save" below actually persists it, same
+  // in-memory-until-saved convention as every other field on this page.
+  const updateStickerText = (panel, text) => {
+    setFeatureStickerText((prev) => ({ ...prev, [panel]: text }));
+  };
+
+  const saveFeatureStickerText = async () => {
+    setStickerSaveMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await studioApi.adminUpdateSettings(password, undefined, undefined, undefined, featureStickerText);
+      setFeatureStickerText(res.feature_sticker_text || featureStickerText);
+      setStickerSaveMessage("Sticker text saved.");
+    } catch (err) {
+      setError(err.message || "Couldn't save sticker text.");
     } finally {
       setLoading(false);
     }
@@ -981,8 +1006,10 @@ function AdminPanel({ onBack }) {
             <p className="admin-section-note">
               Show or hide any of these homepage panels without a code change or redeploy — useful for
               temporarily hiding a panel while sorting out an issue with it, without taking the homepage down.
-              The first 5 are free quick-checks; Property AI Advisor is a paid, tier-gated feature — hiding it
-              here only controls whether its homepage entry point is shown, not who's entitled to use it.
+              The first 5 are free quick-checks; Construction Studio, Agent Intelligence, and Property AI
+              Advisor are the 3 feature-strip entry points below them — Property AI Advisor is paid and
+              tier-gated. Hiding any of these here only controls whether its homepage entry point (and
+              sticker, for the feature strips) is shown, not who's actually entitled to use the feature.
             </p>
             {homepagePanelVisibility ? (
               <>
@@ -993,6 +1020,8 @@ function AdminPanel({ onBack }) {
                   { key: "challenge_a_friend", label: "Should I Buy This? — Challenge a Friend (Free)" },
                   { key: "price_drop_alert", label: "Price Drop Alert — Let PropertyIQ Watch For You (Free)" },
                   { key: "hottest_properties_ticker", label: "Hottest Properties ticker (below the logo)" },
+                  { key: "construction_studio", label: "Construction Studio (feature strip)" },
+                  { key: "agent_intelligence", label: "Agent Intelligence (feature strip)" },
                   { key: "property_ai_advisor", label: "Property AI Advisor (feature strip — tier-gated, not free)" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
@@ -1012,6 +1041,42 @@ function AdminPanel({ onBack }) {
                   {loading ? "Saving..." : "Save"}
                 </button>
                 {homepageVisibilitySaveMessage && <div className="studio-status-banner">{homepageVisibilitySaveMessage}</div>}
+              </>
+            ) : (
+              <p className="admin-empty-note">Loading...</p>
+            )}
+          </div>
+
+          <div className="admin-section">
+            <h3>Homepage — Feature Strip Stickers</h3>
+            <p className="admin-section-note">
+              The small "excitement" badge pinned to the corner of each feature strip above — wording only;
+              whether the strip (and its sticker) shows at all is still controlled by the toggles above.
+              Leaving a field blank and saving keeps its current text rather than clearing the sticker.
+            </p>
+            {featureStickerText ? (
+              <>
+                {[
+                  { key: "construction_studio", label: "Construction Studio" },
+                  { key: "agent_intelligence", label: "Agent Intelligence" },
+                  { key: "property_ai_advisor", label: "Property AI Advisor" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="admin-toggle-row">
+                    <label htmlFor={`sticker-text-${key}`}>{label}</label>
+                    <input
+                      id={`sticker-text-${key}`}
+                      type="text"
+                      value={featureStickerText[key] || ""}
+                      onChange={(e) => updateStickerText(key, e.target.value)}
+                      placeholder="e.g. 🔥 Save Big"
+                      style={{ maxWidth: 220 }}
+                    />
+                  </div>
+                ))}
+                <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveFeatureStickerText} disabled={loading}>
+                  {loading ? "Saving..." : "Save"}
+                </button>
+                {stickerSaveMessage && <div className="studio-status-banner">{stickerSaveMessage}</div>}
               </>
             ) : (
               <p className="admin-empty-note">Loading...</p>
