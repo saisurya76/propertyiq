@@ -6,40 +6,41 @@ def _reset_database():
     """Runs once before the whole test session. Ensures all tables exist,
     then truncates them so every test run starts from a clean slate —
     replaces the old per-run SQLite file isolation now that all stores
-    share one persistent Postgres database (DATABASE_URL)."""
+    share one persistent Postgres database (DATABASE_URL).
 
+    Importing backend.api (below) already runs every real store's own
+    initialize_*_store() at module level — see the block of
+    initialize_*_store() calls right after the FastAPI app is created —
+    so this fixture doesn't need its own separate, hand-maintained list
+    of stores to initialize; it only needs the tables to exist before
+    truncating them, which that same import already guarantees.
+
+    The TRUNCATE list itself is read from information_schema rather than
+    hardcoded, on purpose: a hardcoded list silently stops covering a
+    table the moment a new store adds one (this is exactly how
+    agent_clients/agent_client_properties, price_watches,
+    one_time_tier_grants, refunds/refund_requests, deleted_accounts,
+    neighborhood_comparisons, processed_webhook_events,
+    property_challenges, and user_profiles ended up NOT being cleared
+    between test-session runs — 9 real tables' worth of state quietly
+    leaking across runs on a shared persistent Postgres DB, causing
+    order-dependent failures like a client-limit test seeing leftover
+    clients from a previous run). Querying the schema for "every real
+    table" instead means a future store's table is covered automatically,
+    with nothing to remember to add here."""
+
+    import backend.api  # noqa: F401 -- import alone runs every store's initialize_*_store()
     from backend.db import get_connection
-    from backend.auth_store import initialize_auth_store
     from backend.config_store import initialize_config_store
-    from backend.subscription_store import initialize_subscription_store
-    from backend.insight_store import initialize_insight_store
-    from backend.construction_store import initialize_construction_store
-    from backend.payment_store import initialize_payment_store
-    from backend.property_store import initialize_property_store
-
-    initialize_auth_store()
-    initialize_config_store()
-    initialize_subscription_store()
-    initialize_insight_store()
-    initialize_construction_store()
-    initialize_payment_store()
-    initialize_property_store()
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
-                TRUNCATE
-                    users, otp_codes, sessions,
-                    app_config,
-                    subscriptions,
-                    insight_grants,
-                    construction_designs,
-                    report_orders,
-                    properties, property_floors
-                RESTART IDENTITY CASCADE
-                """
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
             )
+            all_tables = [row["tablename"] for row in cursor.fetchall()]
+            if all_tables:
+                cursor.execute(f"TRUNCATE {', '.join(all_tables)} RESTART IDENTITY CASCADE")
         connection.commit()
 
     # app_config was wiped along with everything else — reseed the default
