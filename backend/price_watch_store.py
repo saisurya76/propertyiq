@@ -293,7 +293,7 @@ def check_price_watch(watch_id: str, send_email_on_trigger: bool = True) -> dict
         try:
             send_email(
                 watch["email"],
-                "PropertyIQ: this property just hit your target price",
+                "PropertyIQWeb: this property just hit your target price",
                 f"<p>Good news — the property you're watching in {watch['city']} just reached "
                 f"your target price.</p>"
                 f"<p><strong>Your target:</strong> {watch['target_price']:,.0f}<br>"

@@ -40,7 +40,7 @@ def assess_recommendation_confidence(
         rating = "VERY HIGH"
 
         reason = (
-            "PropertyIQ's recommendation is supported by "
+            "PropertyIQWeb's recommendation is supported by "
             "strong and consistent evidence."
         )
 

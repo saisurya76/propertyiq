@@ -19,5 +19,5 @@ def test_generate_findings():
 
     assert (
         result.overall_finding
-        == "PropertyIQ recommendation: BUY AFTER NEGOTIATION."
+        == "PropertyIQWeb recommendation: BUY AFTER NEGOTIATION."
     )

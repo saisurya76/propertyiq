@@ -26,7 +26,7 @@ VALID_CATEGORIES = ["Price", "Area", "Builder", "Location", "Amenities", "Other"
 
 _NO_BASIS_VERDICTS = {
     "Builder": "This quick check only looks at price versus comparable listings — it has no real "
-               "data on this developer's track record. The full PropertyIQ assessment checks projects "
+               "data on this developer's track record. The full PropertyIQWeb assessment checks projects "
                "completed, delayed, and regulatory violations directly.",
     "Location": "This quick check doesn't independently verify location claims — the full assessment "
                 "looks at this more closely.",
@@ -115,7 +115,7 @@ def evaluate_red_flag_guess(
         "title": "Risk / Missing Information",
         "detail": (
             "This quick check doesn't cover the developer's track record, government guidance value "
-            "comparison, or regulatory violation history — the full PropertyIQ assessment does."
+            "comparison, or regulatory violation history — the full PropertyIQWeb assessment does."
         ),
     })
 

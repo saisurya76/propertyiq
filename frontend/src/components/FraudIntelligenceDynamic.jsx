@@ -99,7 +99,7 @@ function FraudIntelligenceDynamic({ fraudIntelligence, country }) {
         <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
 
             <div style={sectionIntroStyle}>
-                PropertyIQ Fraud Intelligence provides independent buyer awareness using
+                PropertyIQWeb Fraud Intelligence provides independent buyer awareness using
                 curated fraud intelligence compiled from public records, regulatory actions,
                 court cases and credible market investigations, cross-checked against this
                 specific property's own location.
@@ -110,13 +110,13 @@ function FraudIntelligenceDynamic({ fraudIntelligence, country }) {
                     <RiskTypeList
                         title={`City-Level Risk — ${fraudIntelligence.status?.status === "AVAILABLE" ? "evidence on file" : "limited evidence"}`}
                         assessments={fraudIntelligence.city}
-                        emptyNote="No fraud evidence currently on file for this specific city. This reflects PropertyIQ's evidence library coverage, not a guarantee the area is risk-free."
+                        emptyNote="No fraud evidence currently on file for this specific city. This reflects PropertyIQWeb's evidence library coverage, not a guarantee the area is risk-free."
                     />
 
                     <RiskTypeList
                         title="Country-Level Risk"
                         assessments={fraudIntelligence.country}
-                        emptyNote="No fraud evidence currently on file for this country yet — PropertyIQ's evidence library is actively expanding beyond its initial India coverage."
+                        emptyNote="No fraud evidence currently on file for this country yet — PropertyIQWeb's evidence library is actively expanding beyond its initial India coverage."
                     />
 
                     {fraudIntelligence.evidence?.length > 0 && (

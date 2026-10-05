@@ -64,7 +64,7 @@ def compute_instant_score(
             "score": None,
             "label": None,
             "reason": (
-                f"PropertyIQ doesn't have real comparable data for {property_type} "
+                f"PropertyIQWeb doesn't have real comparable data for {property_type} "
                 f"properties in {city} yet, so a fair, evidence-based score isn't "
                 f"possible here — run the full assessment instead for a complete picture."
             ),

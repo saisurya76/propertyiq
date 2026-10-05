@@ -68,10 +68,12 @@ dist/
 # --------------------------------------------------
 outputs/pdfs/*
 outputs/reports/*
+outputs/dxf/*
 
 # Keep folder structure
 !outputs/pdfs/.gitkeep
 !outputs/reports/.gitkeep
+!outputs/dxf/.gitkeep
 
 # --------------------------------------------------
 # Frontend (Vite)

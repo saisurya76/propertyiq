@@ -41,8 +41,8 @@ def build_payment_confirmation_html(
     return f"""
 <div style="font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #14283d;">
   <div style="text-align: center; padding: 24px 0;">
-    <img src="{LOGO_URL}" alt="PropertyIQ" width="48" height="46" style="display: inline-block;" />
-    <div style="font-weight: 700; font-size: 18px; margin-top: 8px; color: #14283d;">PropertyIQ</div>
+    <img src="{LOGO_URL}" alt="PropertyIQWeb" width="48" height="46" style="display: inline-block;" />
+    <div style="font-weight: 700; font-size: 18px; margin-top: 8px; color: #14283d;">PropertyIQWeb</div>
   </div>
 
   <div style="background: #f7f9fb; border: 1px solid #d6e4ec; border-radius: 12px; padding: 24px 28px;">
@@ -76,8 +76,8 @@ def build_payment_confirmation_html(
   </p>
 
   <div style="text-align: center; padding: 20px 0; border-top: 1px solid #e5e7eb; margin-top: 12px; color: #6b7280; font-size: 12px;">
-    <p style="margin: 4px 0;">PropertyIQ — Independent Property Intelligence</p>
-    <p style="margin: 4px 0;">© 2026 PropertyIQ</p>
+    <p style="margin: 4px 0;">PropertyIQWeb — Independent Property Intelligence</p>
+    <p style="margin: 4px 0;">© 2026 PropertyIQWeb</p>
     <p style="margin: 8px 0 0;">
       <a href="https://app.propertyiqweb.com/privacy-policy.html" style="color: #4b5563;">Privacy Policy</a>
       ·

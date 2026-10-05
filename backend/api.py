@@ -1072,13 +1072,13 @@ def create_checkout(data: ReportCheckoutRequest):
     if data.country.strip().lower() != "india":
         raise HTTPException(
             status_code=400,
-            detail="Paid PropertyIQ reports are currently available only in India."
+            detail="Paid PropertyIQWeb reports are currently available only in India."
         )
 
     if not data.termsAccepted:
         raise HTTPException(
             status_code=400,
-            detail="PropertyIQ Report Terms & Conditions must be accepted before purchase."
+            detail="PropertyIQWeb Report Terms & Conditions must be accepted before purchase."
         )
 
     order_id = f"PIQ-{uuid.uuid4().hex}"
@@ -1181,7 +1181,7 @@ def generate_report(data: PropertyRequest, user_email: str = Depends(get_current
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=PropertyIQ_Report.pdf"},
+        headers={"Content-Disposition": "attachment; filename=PropertyIQWeb_Report.pdf"},
     )
 
 class RequestOtpRequest(BaseModel):
@@ -1696,7 +1696,7 @@ def admin_approve_refund_request_via_dodo(request: AdminApproveRefundRequestDodo
     try:
         send_email(
             to_email=matched["user_email"],
-            subject="Your PropertyIQ refund has been issued",
+            subject="Your PropertyIQWeb refund has been issued",
             html=request.admin_response or "Your refund request has been approved and issued.",
         )
     except Exception as exc:
@@ -1740,7 +1740,7 @@ def admin_approve_refund_request_manually(request: AdminApproveRefundRequestManu
     try:
         send_email(
             to_email=matched["user_email"],
-            subject="Your PropertyIQ refund has been processed",
+            subject="Your PropertyIQWeb refund has been processed",
             html=request.admin_response or "Your refund request has been approved and processed.",
         )
     except Exception as exc:
@@ -1775,7 +1775,7 @@ def admin_deny_refund_request(request: AdminDenyRefundRequestRequest):
     try:
         send_email(
             to_email=matched["user_email"],
-            subject="Update on your PropertyIQ refund request",
+            subject="Update on your PropertyIQWeb refund request",
             html=f"Your refund request could not be approved: {request.admin_response}",
         )
     except Exception as exc:
@@ -1808,12 +1808,12 @@ def admin_reset_quota(request: AdminResetQuotaRequest):
     try:
         send_email(
             to_email=email,
-            subject="Your PropertyIQ design quota has been reset",
+            subject="Your PropertyIQWeb design quota has been reset",
             html=(
                 "Good news — your monthly design-generate quota has been reset, so you can "
                 "generate again right away without waiting for next month.<br><br>"
                 + (f"Note from our team: {request.admin_note}<br><br>" if request.admin_note else "")
-                + '<a href="https://app.propertyiqweb.com/">Open PropertyIQ</a>'
+                + '<a href="https://app.propertyiqweb.com/">Open PropertyIQWeb</a>'
             ),
         )
     except Exception as exc:
@@ -2349,7 +2349,7 @@ async def dodo_webhook(request: Request):
         mark_order_paid(metadata["order_id"], dodo_payment_id=dodo_payment_id)
         _send_payment_confirmation_email(
             dodo_customer_email,
-            "PropertyIQ Standard Report",
+            "PropertyIQWeb Standard Report",
             round(dodo_amount / 100, 2) if dodo_amount is not None else None,
             dodo_currency,
             dodo_payment_id,
@@ -2540,7 +2540,7 @@ def cancel_subscription(request: ProfileCancelSubscriptionRequest, user_email: s
     try:
         send_email(
             to_email=user_email,
-            subject="Your PropertyIQ subscription will not renew",
+            subject="Your PropertyIQWeb subscription will not renew",
             html="Your subscription is set to cancel at the end of your current billing period. You'll keep full access until then.",
         )
     except Exception as exc:
@@ -2587,7 +2587,7 @@ def delete_account_endpoint(request: ProfileDeleteAccountRequest, user_email: st
     try:
         send_email(
             to_email=user_email,
-            subject="Your PropertyIQ account has been deleted",
+            subject="Your PropertyIQWeb account has been deleted",
             html=(
                 "Your account and its data have been deleted, as requested. "
                 f"For security, this email address can't be used to create a new account for {COOLING_OFF_DAYS} days."
@@ -4687,7 +4687,7 @@ def download_construction_dxf(design_id: str):
     return FileResponse(
         path=design["dxf_path"],
         media_type="application/dxf",
-        filename=f"PropertyIQ_ConstructionStudio_{design_id}.dxf",
+        filename=f"PropertyIQWeb_ConstructionStudio_{design_id}.dxf",
     )
 
 
@@ -4723,7 +4723,7 @@ def download_construction_report(design_id: str, request: ConstructionReportRequ
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="PropertyIQ_ConstructionStudio_Report_{design_id}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="PropertyIQWeb_ConstructionStudio_Report_{design_id}.pdf"'},
     )
 
 

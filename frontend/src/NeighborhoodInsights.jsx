@@ -293,7 +293,7 @@ function NeighborhoodInsights({ countryCode }) {
   // never execute JS at all — those always see the static file's own,
   // neutral tags regardless of which country's URL was shared.
   useEffect(() => {
-    document.title = `Neighborhood Insights — Know Your Neighborhood Before You Buy in ${country.name} | PropertyIQ`;
+    document.title = `Neighborhood Insights — Know Your Neighborhood Before You Buy in ${country.name} | PropertyIQWeb`;
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement("meta");
@@ -667,14 +667,14 @@ function NeighborhoodInsights({ countryCode }) {
   return (
     <div className="ni-page">
       <div className="ni-top-banner">
-        🏠 Ready to buy? <a href={country.homePath} target="_blank" rel="noopener noreferrer">Get your free Instant Property Score with PropertyIQ →</a>
+        🏠 Ready to buy? <a href={country.homePath} target="_blank" rel="noopener noreferrer">Get your free Instant Property Score with PropertyIQWeb →</a>
       </div>
 
       <div className="ni-nav">
         <span className="ni-nav-brand">LivingIQ · Neighborhood Insights</span>
         <div className="ni-nav-links">
           <a href="https://livingiqweb.com" target="_blank" rel="noopener noreferrer">← Back to LivingIQ</a>
-          <a href={country.homePath} target="_blank" rel="noopener noreferrer">PropertyIQ →</a>
+          <a href={country.homePath} target="_blank" rel="noopener noreferrer">PropertyIQWeb →</a>
         </div>
       </div>
 
@@ -983,14 +983,14 @@ function NeighborhoodInsights({ countryCode }) {
 
           {sectionVisibility.cross_sell && (
           <div className="ni-cta-card">
-            <h3>📋 PropertyIQ — Instant Property Score</h3>
+            <h3>📋 PropertyIQWeb — Instant Property Score</h3>
             <p>Get a full price, location, and red-flag check on this property — free, no signup needed for the first check.</p>
             <ul>
               <li>🤖 AI-powered price and location scoring in seconds</li>
               <li>🚩 Red flags checked against real comparable listings</li>
               <li>📊 Backed by the same data shown in this report</li>
             </ul>
-            <a href={country.homePath} target="_blank" rel="noopener noreferrer" className="ni-primary-btn ni-cta-btn">Try PropertyIQ →</a>
+            <a href={country.homePath} target="_blank" rel="noopener noreferrer" className="ni-primary-btn ni-cta-btn">Try PropertyIQWeb →</a>
           </div>
           )}
 
@@ -1038,7 +1038,7 @@ function NeighborhoodInsights({ countryCode }) {
       )}
 
       <div className="ni-footer">
-        A free tool by PropertyIQ — Know Before You Buy.
+        A free tool by PropertyIQWeb — Know Before You Buy.
         <div className="legal-footer-links">
           <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
           {" · "}

@@ -145,13 +145,13 @@ def generate_decision(
     if overpricing_percent <= 5:
 
         parts.append(
-            "The asking price is broadly aligned with PropertyIQ's estimated fair value."
+            "The asking price is broadly aligned with PropertyIQWeb's estimated fair value."
         )
 
     elif overpricing_percent <= 15:
 
         parts.append(
-            f"The property is priced approximately {overpricing_percent:.2f}% above PropertyIQ's estimated fair value, suggesting scope for negotiation."
+            f"The property is priced approximately {overpricing_percent:.2f}% above PropertyIQWeb's estimated fair value, suggesting scope for negotiation."
         )
 
     elif overpricing_percent <= 30:
@@ -163,7 +163,7 @@ def generate_decision(
     else:
 
         parts.append(
-            f"The asking price is significantly above PropertyIQ's estimated fair value ({overpricing_percent:.2f}% above fair value), requiring careful justification before proceeding."
+            f"The asking price is significantly above PropertyIQWeb's estimated fair value ({overpricing_percent:.2f}% above fair value), requiring careful justification before proceeding."
         )
 
     
@@ -180,7 +180,7 @@ def generate_decision(
     elif recommendation == "BUY AFTER NEGOTIATION":
 
         advice = (
-            "PropertyIQ recommends negotiating towards the estimated fair value before proceeding."
+            "PropertyIQWeb recommends negotiating towards the estimated fair value before proceeding."
         )
 
     elif recommendation == "PROCEED WITH EXTREME CAUTION":
@@ -198,33 +198,33 @@ def generate_decision(
     else:
 
         advice = (
-            "PropertyIQ does not recommend proceeding with this purchase at the current asking price."
+            "PropertyIQWeb does not recommend proceeding with this purchase at the current asking price."
         )
 
     if property_quality == "PROJECT QUALITY NOT ASSESSED":
 
         summary = (
-            "Overall, PropertyIQ could not assess project quality because sufficient developer information was not provided. "
+            "Overall, PropertyIQWeb could not assess project quality because sufficient developer information was not provided. "
         )
 
     else:
 
         summary = (
-            f"Overall, PropertyIQ considers this to be a {property_quality.lower()}. "
+            f"Overall, PropertyIQWeb considers this to be a {property_quality.lower()}. "
         )
 
     if overpricing_percent <= 5:
 
         pricing_summary = (
             "The current asking price is broadly aligned with "
-            "PropertyIQ's estimated fair value. "
+            "PropertyIQWeb's estimated fair value. "
         )
 
     else:
 
         pricing_summary = (
             "However, the current asking price is above "
-            "PropertyIQ's estimated fair value. "
+            "PropertyIQWeb's estimated fair value. "
         )
 
     summary += (

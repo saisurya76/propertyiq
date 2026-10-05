@@ -5,7 +5,7 @@ function StudioPromoCard({ onLaunch }) {
 
       <p>
         A valuation tells you whether to buy — it doesn't tell you what to build,
-        what it'll cost, or whether your layout even works. PropertyIQ Studio picks up
+        what it'll cost, or whether your layout even works. PropertyIQWeb Studio picks up
         exactly where this report leaves off: compare this property against others like
         it, then design and budget your build before you break ground.
       </p>
@@ -34,7 +34,7 @@ function StudioPromoCard({ onLaunch }) {
       </div>
 
       <button className="studio-cta-btn" onClick={onLaunch}>
-        Explore PropertyIQ Studio →
+        Explore PropertyIQWeb Studio →
       </button>
     </div>
   );

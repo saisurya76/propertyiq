@@ -444,7 +444,7 @@ function PropertyForm({
         <span>
           {loading
             ? "Analyzing..."
-            : "Generate PropertyIQ Report"}
+            : "Generate PropertyIQWeb Report"}
         </span>
       </button>
 

@@ -13,7 +13,7 @@ function StudioTopBar({ onBackToReport, onSignOut, onManagePlan }) {
   return (
     <header className="studio-header">
       <div className="studio-header-brand">
-        <span className="studio-header-logo">PROPERTYIQ</span>
+        <span className="studio-header-logo">PROPERTYIQWEB</span>
         <span className="studio-header-divider" />
         <span className="studio-header-product">Studio</span>
       </div>

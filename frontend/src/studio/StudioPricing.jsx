@@ -138,7 +138,7 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
     <div>
       <div className="studio-pricing-header">
         <div className="studio-designs-header-row">
-          <h2>PropertyIQ Studio Plans</h2>
+          <h2>PropertyIQWeb Studio Plans</h2>
           <button
             type="button"
             className="page-refresh-btn"

@@ -90,7 +90,7 @@ function HiddenDealPanel({ country }) {
         onClick={handleSearch}
         disabled={state === "loading" || !price || !city || !areaValue}
       >
-        {state === "loading" ? "Searching..." : "What did PropertyIQ find?"}
+        {state === "loading" ? "Searching..." : "What did PropertyIQWeb find?"}
       </button>
 
       {state === "error" && <p className="hidden-deal-error">{errorMessage}</p>}
@@ -125,7 +125,7 @@ function HiddenDealPanel({ country }) {
 
           {allRevealed && (
             <p className="hidden-deal-cta">
-              That's everything this quick check found. Run the full PropertyIQ assessment above
+              That's everything this quick check found. Run the full PropertyIQWeb assessment above
               for developer track record, government value comparison, and complete fraud-risk analysis.
             </p>
           )}

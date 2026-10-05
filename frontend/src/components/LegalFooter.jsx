@@ -8,9 +8,9 @@
 function LegalFooter() {
   return (
     <footer className="footer">
-      <p>PropertyIQ v1.0.0 Beta</p>
+      <p>PropertyIQWeb v1.0.0 Beta</p>
       <p>Independent Property Intelligence</p>
-      <p>© 2026 PropertyIQ</p>
+      <p>© 2026 PropertyIQWeb</p>
       <p className="legal-footer-links">
         <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
         {" · "}

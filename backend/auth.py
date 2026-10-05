@@ -63,18 +63,18 @@ def send_otp_email(to_email: str, code: str, purpose: str = "sign_in") -> bool:
     already signed in)."""
 
     if purpose == "unlock_design":
-        subject = "Confirm unlocking your PropertyIQ design"
+        subject = "Confirm unlocking your PropertyIQWeb design"
         html = (
-            f"<p>Someone requested to unlock a locked PropertyIQ design on your account. "
+            f"<p>Someone requested to unlock a locked PropertyIQWeb design on your account. "
             f"Enter this code to confirm:</p>"
             f"<h2>{code}</h2>"
             f"<p>This code expires in 10 minutes. If you didn't request this, your design stays locked "
             f"and you can ignore this email.</p>"
         )
     else:
-        subject = "Your PropertyIQ verification code"
+        subject = "Your PropertyIQWeb verification code"
         html = (
-            f"<p>Your PropertyIQ verification code is:</p>"
+            f"<p>Your PropertyIQWeb verification code is:</p>"
             f"<h2>{code}</h2>"
             f"<p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>"
         )

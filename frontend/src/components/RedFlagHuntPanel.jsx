@@ -130,7 +130,7 @@ function RedFlagHuntPanel({ country }) {
           {result.additional_findings.length > 0 && (
             <>
               <p className="red-flag-hunt-more-heading">
-                PropertyIQ found {result.additional_findings.length} more thing{result.additional_findings.length === 1 ? "" : "s"} you should investigate:
+                PropertyIQWeb found {result.additional_findings.length} more thing{result.additional_findings.length === 1 ? "" : "s"} you should investigate:
               </p>
               {result.additional_findings.map((finding, i) => (
                 <div key={i} className="red-flag-hunt-finding">
@@ -142,7 +142,7 @@ function RedFlagHuntPanel({ country }) {
           )}
 
           <p className="red-flag-hunt-cta">
-            Run the full PropertyIQ assessment above for complete developer track record, government
+            Run the full PropertyIQWeb assessment above for complete developer track record, government
             value comparison, and real fraud-risk analysis.
           </p>
         </div>

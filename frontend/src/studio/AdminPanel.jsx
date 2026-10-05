@@ -548,7 +548,7 @@ function AdminPanel({ onBack }) {
     <div className="admin-dashboard">
       <div className="admin-dashboard-header">
         <div>
-          <div className="admin-dashboard-eyebrow">PropertyIQ Studio</div>
+          <div className="admin-dashboard-eyebrow">PropertyIQWeb Studio</div>
           <h2>{screen === "menu" ? "Admin Dashboard" : MENU_ITEMS.find((i) => i.screen === screen)?.label}</h2>
         </div>
         <span className="admin-refresh-btn" onClick={refresh}>⟳ Refresh</span>
@@ -969,7 +969,7 @@ function AdminPanel({ onBack }) {
                   { key: "amortization_projector", label: "Amortization projector (paid feature)" },
                   { key: "checklist", label: "Buyer's due-diligence checklist" },
                   { key: "authority_contacts", label: "Local authority contacts" },
-                  { key: "cross_sell", label: "PropertyIQ cross-sell card" },
+                  { key: "cross_sell", label: "PropertyIQWeb cross-sell card" },
                   { key: "share", label: "Share this report" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
@@ -1015,10 +1015,10 @@ function AdminPanel({ onBack }) {
               <>
                 {[
                   { key: "instant_property_score", label: "Instant Property Score (Free, No Signup)" },
-                  { key: "hidden_deal", label: "Hidden Deal — What Did PropertyIQ Find? (Free)" },
+                  { key: "hidden_deal", label: "Hidden Deal — What Did PropertyIQWeb Find? (Free)" },
                   { key: "red_flag_hunt", label: "Red Flag Hunt — Can You Spot the Red Flags? (Free)" },
                   { key: "challenge_a_friend", label: "Should I Buy This? — Challenge a Friend (Free)" },
-                  { key: "price_drop_alert", label: "Price Drop Alert — Let PropertyIQ Watch For You (Free)" },
+                  { key: "price_drop_alert", label: "Price Drop Alert — Let PropertyIQWeb Watch For You (Free)" },
                   { key: "hottest_properties_ticker", label: "Hottest Properties ticker (below the logo)" },
                   { key: "construction_studio", label: "Construction Studio (feature strip)" },
                   { key: "agent_intelligence", label: "Agent Intelligence (feature strip)" },

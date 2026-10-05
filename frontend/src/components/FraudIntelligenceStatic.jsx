@@ -28,7 +28,7 @@ function FraudIntelligenceStatic() {
                     marginBottom: "30px"
                 }}
             >
-                PropertyIQ Fraud Intelligence provides independent buyer awareness
+                PropertyIQWeb Fraud Intelligence provides independent buyer awareness
                 using curated fraud intelligence compiled from public records,
                 regulatory actions, court cases and credible market investigations.
                 The following visual atlases summarize common real estate fraud

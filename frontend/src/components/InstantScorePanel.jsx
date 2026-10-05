@@ -110,7 +110,7 @@ function InstantScorePanel({ country }) {
               <p className="instant-score-reason">{result.reason}</p>
               <p className="instant-score-cta">
                 Want the full picture — developer track record, government value comparison, and
-                real fraud-risk analysis? Run the full PropertyIQ assessment above.
+                real fraud-risk analysis? Run the full PropertyIQWeb assessment above.
               </p>
             </>
           )}
