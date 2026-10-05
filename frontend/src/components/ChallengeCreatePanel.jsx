@@ -53,7 +53,7 @@ function ChallengeCreatePanel({ country }) {
     <div className="challenge-create-panel">
       <p className="challenge-create-intro">
         Create a shareable link for any property — friends guess the price with no account
-        needed, then see how close they got to PropertyIQ's real fair value.
+        needed, then see how close they got to PropertyIQWeb's real fair value.
       </p>
 
       {state !== "done" && (

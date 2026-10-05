@@ -4,7 +4,7 @@ function Disclaimer() {
       <h3>Important Disclaimer</h3>
 
       <p>
-        PropertyIQ provides independent property intelligence,
+        PropertyIQWeb provides independent property intelligence,
         assessment, and AI-assisted decision support.
       </p>
 
@@ -15,7 +15,7 @@ function Disclaimer() {
       </p>
 
       <p>
-        PropertyIQ does not provide legal, financial,
+        PropertyIQWeb does not provide legal, financial,
         investment, tax, engineering, valuation, regulatory,
         or professional advice.
       </p>

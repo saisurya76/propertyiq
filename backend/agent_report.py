@@ -182,7 +182,7 @@ class _AgentReportCanvas(Canvas):
         # replaces the default -- real, deliberate branding on
         # something handed to their own client, not PropertyIQ's own
         # boilerplate crowding it out.
-        default_line = "PropertyIQ Agent Intelligence — for internal advisory use by the preparing agent"
+        default_line = "PropertyIQWeb Agent Intelligence — for internal advisory use by the preparing agent"
         self.drawCentredString(width / 2, 0.45 * inch, self._custom_footer_text or default_line)
 
 
@@ -612,7 +612,7 @@ def _section_construction(story: list, ctx: dict[str, Any]) -> None:
 def _section_disclaimer(story: list, ctx: dict[str, Any]) -> None:
     story.append(Spacer(1, 20))
     story.append(Paragraph(
-        "This report consolidates PropertyIQ's own independent, evidence-based analysis tools for internal advisory "
+        "This report consolidates PropertyIQWeb's own independent, evidence-based analysis tools for internal advisory "
         "use by the preparing agent. It does not constitute a financial, legal, or investment recommendation.",
         ctx["styles"]["muted"],
     ))
@@ -630,7 +630,7 @@ REPORT_TYPES: dict[str, dict[str, Any]] = {
     "quick": {
         "label": "Quick Report",
         "title": "PROPERTY ADVISORY REPORT",
-        "subtitle": "Independent, evidence-based analysis — prepared using PropertyIQ Agent Intelligence",
+        "subtitle": "Independent, evidence-based analysis — prepared using PropertyIQWeb Agent Intelligence",
         "sections": [_section_assessment, _section_neighborhood, _section_price_trends, _section_area_comparison, _section_financing, _section_amortization, _section_cost_of_living, _section_due_diligence],
     },
     "property_intelligence": {

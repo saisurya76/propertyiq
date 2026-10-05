@@ -84,7 +84,7 @@ function StudioDesigns({ onStartNew, onResume, urlCountryContext }) {
       await studioApi.importProperty(parsed);
       await fetchProperties();
     } catch (err) {
-      setError(err.message || "Couldn't import that file — make sure it's a design exported from PropertyIQ.");
+      setError(err.message || "Couldn't import that file — make sure it's a design exported from PropertyIQWeb.");
     } finally {
       setImporting(false);
     }

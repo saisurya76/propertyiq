@@ -8,7 +8,7 @@ def negotiation_guidance(
     if difference <= 0:
 
         return (
-            "The quoted price is already at or below PropertyIQ's estimated fair value. There may be limited scope for further price negotiation."
+            "The quoted price is already at or below PropertyIQWeb's estimated fair value. There may be limited scope for further price negotiation."
         )
 
     return (

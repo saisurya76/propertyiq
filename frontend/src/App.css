@@ -252,6 +252,12 @@ h1, h2, h3, h4,
   transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease;
 }
 
+/* A strip carrying a sticker gets extra top padding so the badge (which
+   hangs over the strip's top edge) never covers the first line of text. */
+.feature-strip:has(.feature-strip-sticker) {
+  padding-top: 24px;
+}
+
 /* Small "excitement sticker" pinned to the corner of a feature strip —
    a playful, slightly-rotated badge (not a static label) meant to catch
    the eye and nudge people toward trying Construction Studio / Agent
@@ -296,6 +302,9 @@ h1, h2, h3, h4,
 }
 
 @media (max-width: 640px) {
+  .feature-strip:has(.feature-strip-sticker) {
+    padding-top: 22px;
+  }
   .feature-strip-sticker {
     top: -9px;
     right: 10px;

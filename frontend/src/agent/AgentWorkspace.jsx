@@ -514,7 +514,7 @@ function AgentWorkspace({ onBack, currency, urlCountryContext }) {
     <div className="agent-workspace">
       <div className="agent-hero">
         <div className="agent-hero-inner">
-          <button type="button" className="agent-back-link" onClick={onBack}>← Back to PropertyIQ</button>
+          <button type="button" className="agent-back-link" onClick={onBack}>← Back to PropertyIQWeb</button>
           <h1>Agent Intelligence</h1>
           <p className="agent-hero-tagline">Analyze <span className="agent-arrow">→</span> Advise <span className="agent-arrow">→</span> Monetize</p>
         </div>

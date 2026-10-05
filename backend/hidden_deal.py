@@ -26,7 +26,7 @@ _MISSING_INFO_FINDING = {
     "detail": (
         "This quick check doesn't cover the developer's track record, government "
         "guidance value comparison, or regulatory violation history — the full "
-        "PropertyIQ assessment checks all of these independently."
+        "PropertyIQWeb assessment checks all of these independently."
     ),
 }
 

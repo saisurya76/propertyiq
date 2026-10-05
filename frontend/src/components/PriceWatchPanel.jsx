@@ -84,7 +84,7 @@ function PriceWatchPanel({ country, onLaunchStudio }) {
   return (
     <div className="price-watch-panel">
       <p className="price-watch-intro">
-        Don't chase property prices — let PropertyIQ watch for you. We'll email you when a
+        Don't chase property prices — let PropertyIQWeb watch for you. We'll email you when a
         property hits your target price.
       </p>
 
@@ -183,7 +183,7 @@ function PriceWatchPanel({ country, onLaunchStudio }) {
             <p className="price-watch-location">📍 {watch.location}, {watch.city}</p>
           )}
           <p className="price-watch-success">
-            ✅ PropertyIQ is watching this property for you — we'll email {watch.email} at {watch.target_price.toLocaleString()} or below.
+            ✅ PropertyIQWeb is watching this property for you — we'll email {watch.email} at {watch.target_price.toLocaleString()} or below.
           </p>
 
           {!watch.url && (

@@ -232,7 +232,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            'PROPERTYIQ&nbsp;&nbsp;&nbsp;'
+            'PROPERTYIQWEB&nbsp;&nbsp;&nbsp;'
             '<font backcolor="#FBBF24" color="#111827"><b>&nbsp;BETA&nbsp;</b></font>',
             brand_style
         )
@@ -303,7 +303,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "PROPERTYIQ DECISION",
+            "PROPERTYIQWEB DECISION",
             score_heading_style
         )
     )
@@ -325,7 +325,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "Independent recommendation generated using all available PropertyIQ assessment models.",
+            "Independent recommendation generated using all available PropertyIQWeb assessment models.",
             recommendation_text_style
         )
     )
@@ -777,7 +777,7 @@ def generate_pdf(
 
         story.append(
             Paragraph(
-                "PropertyIQ Fair Value is derived using the user-provided market average together with applicable valuation models such as rental yield when sufficient evidence is available. Government Guidance is reported separately as regulatory reference information and is not used to determine Fair Value.",
+                "PropertyIQWeb Fair Value is derived using the user-provided market average together with applicable valuation models such as rental yield when sufficient evidence is available. Government Guidance is reported separately as regulatory reference information and is not used to determine Fair Value.",
                 styles["BodyText"]
             )
         )
@@ -799,7 +799,7 @@ def generate_pdf(
 
     story.append(
     Paragraph(
-        "HOW PROPERTYIQ WORKS",
+        "HOW PROPERTYIQWEB WORKS",
         section_style
     )
     )
@@ -863,7 +863,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "PropertyIQ automatically adjusts the Buyer Protection Score using all available assessment models. When inventory or developer information is unavailable, the score is calculated using the remaining available evidence.",
+            "PropertyIQWeb automatically adjusts the Buyer Protection Score using all available assessment models. When inventory or developer information is unavailable, the score is calculated using the remaining available evidence.",
             styles["BodyText"]
         )
     )
@@ -1087,7 +1087,7 @@ def generate_pdf(
 
     story.append(
         Paragraph(
-            "PropertyIQ provides informational decision-support analysis only. This report should not be considered legal, financial, tax, engineering, investment, or regulatory advice. Users should independently verify all information before making property decisions.",
+            "PropertyIQWeb provides informational decision-support analysis only. This report should not be considered legal, financial, tax, engineering, investment, or regulatory advice. Users should independently verify all information before making property decisions.",
             styles["BodyText"]
         )
     )

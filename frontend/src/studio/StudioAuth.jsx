@@ -45,7 +45,7 @@ function StudioAuth({ onAuthenticated, onBack }) {
       <>
         <StudioTopBar onBackToReport={onBack} />
         <div className="studio-panel">
-          <h2>Sign in to PropertyIQ Studio</h2>
+          <h2>Sign in to PropertyIQWeb Studio</h2>
           <p className="studio-subtext">
             We'll email you a 6-digit code — no password needed.
           </p>

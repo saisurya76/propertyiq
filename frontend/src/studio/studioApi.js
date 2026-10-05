@@ -350,7 +350,7 @@ export const studioApi = {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `PropertyIQ_ConstructionStudio_Report_${designId}.pdf`;
+    link.download = `PropertyIQWeb_ConstructionStudio_Report_${designId}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

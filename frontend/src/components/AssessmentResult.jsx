@@ -159,7 +159,7 @@ function AssessmentResult({
       link.href = url;
 
       link.download =
-        "PropertyIQ_Report.pdf";
+        "PropertyIQWeb_Report.pdf";
 
       document.body.appendChild(link);
 
@@ -173,7 +173,7 @@ function AssessmentResult({
 
       console.error(error);
 
-      alert("Failed to generate PropertyIQ report.");
+      alert("Failed to generate PropertyIQWeb report.");
     }
     finally {
         setReportLoading(false);
@@ -205,7 +205,7 @@ function AssessmentResult({
               fontWeight: "700"
             }}
           >
-            PROPERTYIQ DECISION SUMMARY
+            PROPERTYIQWEB DECISION SUMMARY
           </div>
 
           <div
@@ -373,7 +373,7 @@ function AssessmentResult({
           </div>
 
           <div className="finding-item">
-            <strong>PropertyIQ Fair Value</strong>
+            <strong>PropertyIQWeb Fair Value</strong>
             <p>{formatIndianCurrency(result.fairValue)}</p>
           </div>
 
@@ -409,7 +409,7 @@ function AssessmentResult({
               fontSize: "14px"
             }}
           >
-            <strong>PropertyIQ Insight</strong>
+            <strong>PropertyIQWeb Insight</strong>
 
             <br /><br />
 
@@ -554,7 +554,7 @@ function AssessmentResult({
             fontSize: "14px"
           }}
         >
-          <strong>PropertyIQ Insight</strong>
+          <strong>PropertyIQWeb Insight</strong>
 
           <br /><br />
 
@@ -932,7 +932,7 @@ function AssessmentResult({
     }}
   >
 
-    PropertyIQ Fair Value is derived using the user-provided market average together with 
+    PropertyIQWeb Fair Value is derived using the user-provided market average together with 
     applicable valuation models such as rental yield when sufficient 
     evidence is available. Government Guidance is reported separately as regulatory 
     reference information and is not used to determine Fair Value.
@@ -947,7 +947,7 @@ function AssessmentResult({
 
 </CollapsiblePanel>
 
-<CollapsiblePanel title="How PropertyIQ Works" defaultOpen={false} color="neutral">
+<CollapsiblePanel title="How PropertyIQWeb Works" defaultOpen={false} color="neutral">
   <div className="finding-item">
 
     <strong>
@@ -1054,7 +1054,7 @@ function AssessmentResult({
     }}
   >
     These weights represent the current
-    PropertyIQ assessment methodology
+    PropertyIQWeb assessment methodology
     and may evolve as additional market
     intelligence and performance data
     become available.
@@ -1131,7 +1131,7 @@ function AssessmentResult({
           <span>
             {reportLoading
               ? "Generating Report..."
-              : "Download PropertyIQ Report"}
+              : "Download PropertyIQWeb Report"}
           </span>
         </button>
 
@@ -1144,7 +1144,7 @@ function AssessmentResult({
               🧭 Check with AI Advisor
             </button>
             <p className="ai-advisor-note">
-              Opens PropertyIQ's AI Advisor in a new tab and copies this report to your clipboard — just paste it in as your first message to start the conversation.
+              Opens PropertyIQWeb's AI Advisor in a new tab and copies this report to your clipboard — just paste it in as your first message to start the conversation.
             </p>
             {aiAdvisorCopyStatus && (
               <p className="ai-advisor-copy-status">{aiAdvisorCopyStatus}</p>
@@ -1167,7 +1167,7 @@ function AssessmentResult({
         />
       </CollapsiblePanel>
 
-      <CollapsiblePanel title="PropertyIQ Studio" defaultOpen={false} color="purple">
+      <CollapsiblePanel title="PropertyIQWeb Studio" defaultOpen={false} color="purple">
         <StudioPromoCard onLaunch={onLaunchStudio} />
       </CollapsiblePanel>
 

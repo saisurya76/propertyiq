@@ -791,7 +791,7 @@ function App() {
       console.error(error);
 
       alert(
-        "Failed to connect to PropertyIQ API"
+        "Failed to connect to PropertyIQWeb API"
       );
     }
     finally{
@@ -1247,7 +1247,7 @@ function App() {
         </svg>
 
         <div className="hero-brand">
-          PROPERTYIQ
+          PROPERTYIQWEB
         </div>
 
         <span className="beta-badge">
@@ -1308,7 +1308,7 @@ function App() {
           )}
           <span className="feature-strip-icon">🧭</span>
           <span className="feature-strip-text">
-            <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQ's own methodology, before you decide.
+            <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQWeb's own methodology, before you decide.
           </span>
           <span className="feature-strip-arrow">→</span>
         </div>
@@ -1318,7 +1318,7 @@ function App() {
         <div className="mission-content">
           {formData.country === "India" ? (
             <>
-              <h2>Why PropertyIQ exists</h2>
+              <h2>Why PropertyIQWeb exists</h2>
               <p>
                 Real estate in India runs on trust that's rarely earned. Builders routinely inflate carpet
                 area against sanctioned plans, quote per-square-foot rates with no defensible basis, and bury
@@ -1337,7 +1337,7 @@ function App() {
                 no independent way to catch any of this before money changes hands.
               </p>
               <p>
-                PropertyIQ exists to close that information gap. Every assessment cross-references public
+                PropertyIQWeb exists to close that information gap. Every assessment cross-references public
                 government records, fraud-pattern databases, and comparable transaction data — the same kind
                 of scrutiny a careful lawyer or engineer would apply, made accessible before you commit, not
                 after a dispute. Construction Studio goes a step further: instead of trusting a builder's
@@ -1347,7 +1347,7 @@ function App() {
             </>
           ) : (
             <>
-              <h2>Why PropertyIQ exists</h2>
+              <h2>Why PropertyIQWeb exists</h2>
               <p>
                 Buying property runs on trust that's rarely earned back. Developers routinely quote areas
                 and per-unit rates with no defensible basis, describe the same living space very differently
@@ -1366,7 +1366,7 @@ function App() {
                 independent way to catch any of this before money changes hands.
               </p>
               <p>
-                PropertyIQ exists to close that information gap. Every assessment cross-references public
+                PropertyIQWeb exists to close that information gap. Every assessment cross-references public
                 government records, fraud-pattern databases, and comparable transaction data for your
                 property's country — the same kind of scrutiny a careful lawyer or engineer would apply,
                 made accessible before you commit, not after a dispute. Construction Studio goes a step
@@ -1392,7 +1392,7 @@ function App() {
 
       {homepagePanelVisibility.hidden_deal && (
       <div className="property-assessment-wrap">
-        <CollapsiblePanel title="🔍 Hidden Deal — What Did PropertyIQ Find? (Free)" defaultOpen={false} color="blue">
+        <CollapsiblePanel title="🔍 Hidden Deal — What Did PropertyIQWeb Find? (Free)" defaultOpen={false} color="blue">
           <HiddenDealPanel country={formData.country} />
         </CollapsiblePanel>
       </div>
@@ -1416,7 +1416,7 @@ function App() {
 
       {homepagePanelVisibility.price_drop_alert && (
       <div className="property-assessment-wrap">
-        <CollapsiblePanel title="💰 Price Drop Alert — Let PropertyIQ Watch For You (Free)" defaultOpen={false} color="blue">
+        <CollapsiblePanel title="💰 Price Drop Alert — Let PropertyIQWeb Watch For You (Free)" defaultOpen={false} color="blue">
           <PriceWatchPanel country={formData.country} onLaunchStudio={launchStudio} />
         </CollapsiblePanel>
       </div>

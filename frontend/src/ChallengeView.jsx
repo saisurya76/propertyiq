@@ -172,7 +172,7 @@ function ChallengeView({ challengeId }) {
     return (
       <div className="challenge-view-wrap">
         <p className="challenge-view-status">This challenge doesn't exist or may have expired.</p>
-        <a href="/" className="challenge-view-home-link">Go to PropertyIQ</a>
+        <a href="/" className="challenge-view-home-link">Go to PropertyIQWeb</a>
       </div>
     );
   }
@@ -232,7 +232,7 @@ function ChallengeView({ challengeId }) {
                 <strong>{reveal.guessed_price.toLocaleString()}</strong>
               </div>
               <div className="challenge-view-reveal-row">
-                <span>PropertyIQ Fair Value</span>
+                <span>PropertyIQWeb Fair Value</span>
                 <strong>{reveal.fair_value.toLocaleString()}</strong>
               </div>
               <div className="challenge-view-reveal-row">
@@ -255,9 +255,9 @@ function ChallengeView({ challengeId }) {
           )}
 
           <p className="challenge-view-cta">
-            Want the full picture on any property? Run a complete PropertyIQ assessment.
+            Want the full picture on any property? Run a complete PropertyIQWeb assessment.
           </p>
-          <a href="/" className="challenge-view-home-link">Try PropertyIQ</a>
+          <a href="/" className="challenge-view-home-link">Try PropertyIQWeb</a>
         </div>
       )}
       <LegalFooter />
