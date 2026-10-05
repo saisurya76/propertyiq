@@ -14,7 +14,7 @@ LIVINGIQ_AUTH_BASE_URL = os.getenv("LIVINGIQ_AUTH_BASE_URL", "").rstrip("/")
 INTERNAL_APP_API_KEY = os.getenv("INTERNAL_APP_API_KEY", "")
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "PropertyIQ <noreply@propertyiqweb.com>")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "PropertyIQWeb <noreply@propertyiqweb.com>")
 
 
 def send_email(to_email: str, subject: str, html: str) -> bool:
