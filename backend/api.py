@@ -1981,12 +1981,19 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         **({"billing_currency": billing_currency} if billing_currency else {}),
     )
 
-    upsert_subscription(
-        email=user_email,
-        tier_id=request.tier_id,
-        status="pending_payment",
-        dodo_checkout_session_id=session.id if hasattr(session, "id") else None,
-    )
+    # Only record a pending row for someone who doesn't already have an
+    # active plan. subscriptions is one row per email, so upserting
+    # "pending_payment" over an active subscriber's row would drop their
+    # plan the moment they merely opened (or abandoned) a checkout. The
+    # webhook activates the tier from the checkout metadata, not from this
+    # row, so skipping it for active subscribers loses nothing.
+    if get_active_tier(user_email) is None:
+        upsert_subscription(
+            email=user_email,
+            tier_id=request.tier_id,
+            status="pending_payment",
+            dodo_checkout_session_id=session.id if hasattr(session, "id") else None,
+        )
 
     return {"checkout_url": session.checkout_url if hasattr(session, "checkout_url") else session}
 

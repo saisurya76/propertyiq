@@ -427,3 +427,31 @@ def test_subscribe_checkout_ignores_an_unsupported_currency():
     assert r.status_code == 200
     call_kwargs = mock_get_client.return_value.checkout_sessions.create.call_args.kwargs
     assert "billing_currency" not in call_kwargs
+
+
+def test_subscribe_checkout_does_not_downgrade_an_active_subscriber():
+    """Opening (or abandoning) a checkout must never drop an existing
+    active plan to pending_payment -- the row is one-per-email."""
+    from backend.auth_store import create_otp
+    from backend.subscription_store import upsert_subscription, get_subscription
+
+    email = "activekeeps@example.com"
+    code = create_otp(email)
+    verify_r = client.post("/api/auth/verify-otp", json={"email": email, "code": code})
+    headers = {"Authorization": f"Bearer {verify_r.json()['session_token']}"}
+    upsert_subscription(email=email, tier_id="studio_unlimited", status="active", dodo_subscription_id="sub_keep")
+
+    fake_session = MagicMock()
+    fake_session.checkout_url = "https://checkout.dodopayments.com/fake"
+    fake_session.id = "cs_keep_test"
+
+    with patch("backend.api.PROPERTYIQ_BETA_BYPASS_PAYMENTS", False), \
+         patch("backend.api.TIER_DODO_PRODUCT_IDS", {"studio_pro": "prod_pro_keep_test"}), \
+         patch("backend.api.get_dodo_client") as mock_get_client:
+        mock_get_client.return_value.checkout_sessions.create.return_value = fake_session
+        r = client.post("/api/subscribe/checkout", headers=headers, json={"tier_id": "studio_pro"})
+
+    assert r.status_code == 200
+    sub = get_subscription(email)
+    assert sub["status"] == "active"
+    assert sub["tier_id"] == "studio_unlimited"
