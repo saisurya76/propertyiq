@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -12,6 +13,8 @@ from backend.auth_store import get_session_email
 # breaks an environment that isn't wired to livingiq-auth yet.
 LIVINGIQ_AUTH_BASE_URL = os.getenv("LIVINGIQ_AUTH_BASE_URL", "").rstrip("/")
 INTERNAL_APP_API_KEY = os.getenv("INTERNAL_APP_API_KEY", "")
+
+logger = logging.getLogger(__name__)
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "PropertyIQWeb <noreply@propertyiqweb.com>")
@@ -31,6 +34,8 @@ def send_email(to_email: str, subject: str, html: str) -> bool:
             json={"to": to_email, "subject": subject, "html": html},
             timeout=10,
         )
+        if response.status_code >= 300:
+            logger.error("Email relay failed: HTTP %s %s", response.status_code, response.text[:300])
         return response.status_code < 300
 
     if RESEND_API_KEY:
@@ -40,6 +45,8 @@ def send_email(to_email: str, subject: str, html: str) -> bool:
             json={"from": RESEND_FROM_EMAIL, "to": [to_email], "subject": subject, "html": html},
             timeout=10,
         )
+        if response.status_code >= 300:
+            logger.error("Resend email failed: HTTP %s %s", response.status_code, response.text[:300])
         return response.status_code < 300
 
     raise HTTPException(
