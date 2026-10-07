@@ -176,7 +176,7 @@ function AdminPanel({ onBack }) {
   const toggleLaunchMode = async () => {
     const turningOn = !launchMode.active;
     const msg = turningOn
-      ? "Turn ON Quick Analysis-only launch mode?\n\nThis stops NEW subscriptions and nothing else. Immediately, for everyone:\n• Studio Starter, Pro and Unlimited show as COMING SOON and can't be bought\n• The property assessment becomes FREE for signed-in users\n• The Construction Studio, Agent Intelligence and AI Advisor strips on the home page are hidden from people who don't already have them\n\nPeople who already have a plan keep all their features, limits and renewals, and still see those strips."
+      ? "Turn ON Quick Analysis-only launch mode?\n\nThis stops NEW subscriptions and nothing else. Immediately, for everyone:\n• Studio Starter, Pro and Unlimited show as COMING SOON and can't be bought\n• The property assessment becomes FREE for signed-in users\n• Every Studio-linked panel (Construction Studio, Agent Intelligence, AI Advisor, Price Drop Alert, and the Neighborhood Insights tools like EMI, price trends, cost of living) is hidden from people who don't already have it\n\nPeople who already have a plan keep all their features, limits, renewals and panels.\n\nWhile it is ON, a safety monitor refuses any admin change that would open new subscriptions or take something away from a subscriber."
       : "Turn OFF launch mode?\n\nWhat it changed is undone: the Studio tiers become buyable again (if they were before), the assessment stops being free (if it wasn't before), and the home page strips return for everyone. Anything else you changed in the meantime is left alone.";
     if (!window.confirm(msg)) return;
     setLaunchModeMessage("");
@@ -794,8 +794,9 @@ function AdminPanel({ onBack }) {
             <p className="admin-section-note" style={{ marginTop: -8 }}>
               One switch for a launch where only Quick Analysis is for sale. It stops NEW subscriptions
               and nothing else. ON: Studio tiers become Coming soon, the property assessment becomes free
-              for signed-in users, and the three Studio strips on the home page are hidden from people who
-              don't already have them. Existing subscribers keep everything. OFF: all of that is undone.
+              for signed-in users, and every Studio-linked panel is hidden from people who don't already have it.
+              Existing subscribers keep everything. A safety monitor refuses any change made while it is ON that would
+              open new subscriptions or take something from a subscriber. OFF: all of that is undone.
             </p>
             <label className="admin-feature-checkbox" style={{ fontWeight: 600 }}>
               <input type="checkbox" checked={launchMode.active} onChange={toggleLaunchMode} disabled={loading} />
@@ -806,6 +807,18 @@ function AdminPanel({ onBack }) {
               <div key={w} className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>⚠ {w}</div>
             ))}
             {launchModeMessage && <div className="studio-status-banner">{launchModeMessage}</div>}
+            {(launchMode.safety_events || []).length > 0 && (
+              <details style={{ marginTop: 8 }}>
+                <summary>Safety monitor log ({launchMode.safety_events.length} recent)</summary>
+                <ul style={{ fontSize: 13, margin: "6px 0 0 16px" }}>
+                  {launchMode.safety_events.map((e) => (
+                    <li key={e.at + e.detail}>
+                      {new Date(e.at).toLocaleString()} — <strong>{e.kind}</strong>: {e.detail}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
 
           <div className="admin-section admin-section-purple">

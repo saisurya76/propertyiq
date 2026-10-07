@@ -162,7 +162,9 @@ from backend.webhook_store import (
     try_claim_webhook_event,
 )
 
+from backend import safety_monitor
 from backend.config_store import (
+    DEFAULT_TIER_CONFIG,
     initialize_config_store,
     get_tier_config,
     set_tier_config,
@@ -182,6 +184,7 @@ from backend.config_store import (
 from backend.subscription_store import (
     initialize_subscription_store,
     upsert_subscription,
+    count_active_by_tier,
     get_subscription,
     set_status_by_dodo_id,
     get_active_tier,
@@ -271,6 +274,7 @@ from backend.renderers.pdf_renderer import (
 
 _price_watch_task = None
 _neighborhood_comparison_task = None
+_safety_monitor_task = None
 
 
 @asynccontextmanager
@@ -282,10 +286,13 @@ async def _lifespan(app: FastAPI):
     service) is the real, working choice given Render's standard
     web-service tier. Same reasoning, same pattern, for the hourly
     neighborhood-comparison refresher."""
-    global _price_watch_task, _neighborhood_comparison_task
+    global _price_watch_task, _neighborhood_comparison_task, _safety_monitor_task
     _price_watch_task = asyncio.create_task(price_watch_check_loop())
     _neighborhood_comparison_task = asyncio.create_task(neighborhood_comparison_refresh_loop())
+    _safety_monitor_task = asyncio.create_task(safety_monitor_loop())
     yield
+    if _safety_monitor_task is not None:
+        _safety_monitor_task.cancel()
     if _price_watch_task is not None:
         _price_watch_task.cancel()
     if _neighborhood_comparison_task is not None:
@@ -1315,6 +1322,7 @@ def update_tiers(request: AdminTierConfigRequest):
         if isinstance(tier, dict) and "coming_soon" in tier:
             tier["coming_soon"] = tier["coming_soon"] is True
 
+    guard_tier_save(request.tier_config)
     set_tier_config(request.tier_config)
     return {"status": "updated", "tier_config": request.tier_config}
 
@@ -1884,6 +1892,7 @@ def admin_settings(request: AdminSettingsRequest):
     hide-able from here, without a code change or redeploy for what's
     fundamentally an operational decision, not a code one."""
     _require_admin_password(request.password)
+    guard_settings_save(request)
 
     if request.gemini_api_key is not None:
         set_app_setting("gemini_api_key", request.gemini_api_key.strip())
@@ -1988,6 +1997,7 @@ def get_launch_mode_status() -> dict:
         "active": snap is not None,
         "active_since": snap.get("active_since") if snap else None,
         "warnings": warnings,
+        "safety_events": get_safety_events()[:10],
     }
 
 
@@ -2000,6 +2010,14 @@ def set_launch_mode(enabled: bool) -> dict:
 
         tiers_now = get_all_tiers_merged()
         free_now = get_free_features()
+
+        insight_now = tiers_now.get("insight_addon", {})
+        if insight_now.get("coming_soon") or insight_now.get("mode") == "free":
+            raise HTTPException(
+                status_code=409,
+                detail="Can't switch launch mode on: Quick Analysis is marked Coming soon or Free, "
+                       "so nothing would be for sale. Fix that first.",
+            )
 
         # Record ONLY what this switch is about to change. If anything below
         # fails part-way, turning the mode off still undoes it.
@@ -2019,6 +2037,7 @@ def set_launch_mode(enabled: bool) -> dict:
         set_tier_config(persisted)
 
         set_free_features(sorted(set(free_now) | set(LAUNCH_MODE_FREE_FEATURES)))
+        _safety_log("info", "Launch mode switched on.")
     else:
         if snap is None:
             return get_launch_mode_status()  # already off: nothing to undo
@@ -2034,6 +2053,7 @@ def set_launch_mode(enabled: bool) -> dict:
 
         # Cleared last, so an interrupted undo can simply be run again.
         set_app_setting(LAUNCH_MODE_SETTING_KEY, "")
+        _safety_log("info", "Launch mode switched off; previous state restored.")
 
     return get_launch_mode_status()
 
@@ -2055,6 +2075,115 @@ def admin_launch_mode(request: AdminLaunchModeRequest):
     """Admin-only master switch for the Quick Analysis-only launch."""
     _require_admin_password(request.password)
     return set_launch_mode(request.enabled)
+
+
+# ---------------------------------------------------------------------------
+# Safety monitor (rules live in backend/safety_monitor.py)
+#
+# Active only while launch mode is ON. guard_* run before an admin write and
+# refuse it (409) if it would break a rule; run_safety_check is the
+# background drift check that repairs what is safe to repair and records the
+# rest. Everything it does is written to a short log the admin can see.
+# ---------------------------------------------------------------------------
+SAFETY_LOG_SETTING_KEY = "safety_monitor_log"
+SAFETY_CHECK_INTERVAL_SECONDS = 60
+_SUBSCRIPTION_TIER_IDS = [t for t, cfg in DEFAULT_TIER_CONFIG.items() if cfg.get("billing") == "subscription"]
+
+
+def get_safety_events() -> list[dict]:
+    raw = get_app_setting(SAFETY_LOG_SETTING_KEY)
+    if not raw:
+        return []
+    try:
+        events = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return events if isinstance(events, list) else []
+
+
+def _safety_log(kind: str, detail: str) -> None:
+    """kind: info | blocked | repaired | alert. Newest first, capped."""
+    try:
+        events = get_safety_events()
+        events.insert(0, {"at": datetime.now(timezone.utc).isoformat(), "kind": kind, "detail": detail})
+        set_app_setting(SAFETY_LOG_SETTING_KEY, json.dumps(events[:50]))
+    except Exception as exc:  # the log must never break the action it describes
+        logger.error(f"safety log write failed: {exc}")
+
+
+def _refuse(problems: list[str], what: str) -> None:
+    _safety_log("blocked", f"{what}: " + " ".join(problems))
+    raise HTTPException(
+        status_code=409,
+        detail="Blocked by the safety monitor (launch mode is on): " + " ".join(problems)
+        + " Switch launch mode off first if you really mean to do this.",
+    )
+
+
+def guard_tier_save(tier_config: dict) -> None:
+    if not is_launch_mode_active():
+        return
+    current = get_all_tiers_merged()
+    proposed = {
+        tier_id: {**default_tier, **(tier_config.get(tier_id) or {})}
+        for tier_id, default_tier in DEFAULT_TIER_CONFIG.items()
+    }
+    problems = safety_monitor.check_tier_config(
+        current, proposed, count_active_by_tier(), _SUBSCRIPTION_TIER_IDS
+    )
+    if problems:
+        _refuse(problems, "Tier save")
+
+
+def guard_settings_save(request) -> None:
+    if not is_launch_mode_active():
+        return
+    problems = safety_monitor.check_settings_change(
+        request.free_features,
+        request.homepage_panel_visibility or {},
+        request.ni_section_visibility or {},
+        get_all_tiers_merged(),
+        count_active_by_tier(),
+    )
+    if problems:
+        _refuse(problems, "Settings save")
+
+
+def run_safety_check() -> list[str]:
+    """One drift check. Returns the problems found (after any repair)."""
+    if not is_launch_mode_active():
+        return []
+    tiers = get_all_tiers_merged()
+    free = get_free_features()
+    problems = safety_monitor.check_live_state(tiers, free, _SUBSCRIPTION_TIER_IDS)
+    remaining = []
+    for problem in problems:
+        parts = problem.split(":")
+        if parts[0] == "tier" and parts[2] == "open":
+            persisted = get_tier_config() or {}
+            persisted.setdefault(parts[1], {})["coming_soon"] = True
+            set_tier_config(persisted)
+            _safety_log("repaired", f"{parts[1]} had been reopened for purchase; locked again.")
+        elif parts[0] == "free":
+            set_free_features(sorted(set(free) | {parts[1]}))
+            _safety_log("repaired", f"'{parts[1]}' had stopped being free; restored.")
+        else:
+            remaining.append(problem)
+            _safety_log("alert", f"Needs attention: {problem}")
+    if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
+        _safety_log("alert", "PROPERTYIQ_BETA_BYPASS_PAYMENTS is on: payments are being skipped.")
+    return remaining
+
+
+async def safety_monitor_loop():
+    while True:
+        try:
+            await asyncio.to_thread(run_safety_check)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error(f"safety monitor check failed: {exc}")
+        await asyncio.sleep(SAFETY_CHECK_INTERVAL_SECONDS)
 
 
 # The real, previously-missing link between what a visitor sees on the

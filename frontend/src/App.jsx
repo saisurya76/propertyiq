@@ -24,11 +24,11 @@ import SessionBar from "./studio/SessionBar";
 import StudioTopBar from "./studio/StudioTopBar";
 import LegalFooter from "./components/LegalFooter";
 import useTermsGate from "./hooks/useTermsGate";
+import useLaunchGate from "./hooks/useLaunchGate";
 import { getSession, clearSession, studioApi, saveDetectedCountry } from "./studio/studioApi";
 import { API_BASE } from "./config";
 import { loadCachedVisibility, saveCachedVisibility } from "./visibilityCache";
 
-const LAUNCH_MODE_CACHE_KEY = "piq_launch_mode_v1";
 const HOMEPAGE_PANELS_CACHE_KEY = "piq_homepage_panels_v1";
 const HOMEPAGE_PANELS_ALL_VISIBLE = {
   instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
@@ -234,29 +234,6 @@ function App() {
       });
   }, []);
 
-  // Quick Analysis-only launch mode (see the admin switch): while it is on,
-  // the three Studio strips are shown ONLY to people who already have access
-  // to them, so existing subscribers keep their way in and everyone else
-  // isn't pointed at plans that can't be bought. null = not known yet, in
-  // which case the strips wait rather than flash.
-  const [launchMode, setLaunchMode] = useState(() => {
-    const cached = loadCachedVisibility(LAUNCH_MODE_CACHE_KEY);
-    return cached && typeof cached.active === "boolean" ? cached.active : null;
-  });
-  useEffect(() => {
-    fetch(`${API_BASE}/api/launch-mode`)
-      .then((res) => res.json())
-      .then((data) => {
-        setLaunchMode(!!data.active);
-        saveCachedVisibility(LAUNCH_MODE_CACHE_KEY, { active: !!data.active });
-      })
-      .catch(() => {
-        // Unknown: behave as if the mode is off, so nobody who should see a
-        // strip loses it because of a network blip.
-        setLaunchMode((prev) => (prev === null ? false : prev));
-      });
-  }, []);
-
   // Admin-configurable wording for each feature-strip's "excitement
   // sticker" — defaults match what's actually shipped so the badge
   // never briefly shows blank/wrong text before this fetch resolves.
@@ -361,30 +338,12 @@ function App() {
   // real, deliberate "you need an active plan for this" gate it is.
   const [pricingContextMessage, setPricingContextMessage] = useState("");
 
-  // What the signed-in visitor can already use, remembered together with the
-  // email it was loaded for so a sign-out or account switch never reuses
-  // someone else's answer. A failed lookup counts as "has access" so a
-  // subscriber is never locked out of a strip by a network error — a
-  // non-subscriber who taps it just lands on the pricing page, as before.
-  const [myAccess, setMyAccess] = useState(null);
-  const sessionEmail = getSession()?.email || null;
-  useEffect(() => {
-    if (!sessionEmail || studioView !== "main") return;
-    studioApi
-      .getStatus()
-      .then((st) => setMyAccess({ email: sessionEmail, hasPlan: !!st.tier_id, features: st.features || [] }))
-      .catch(() => setMyAccess({ email: sessionEmail, failedOpen: true, hasPlan: true, features: [] }));
-  }, [sessionEmail, studioView]);
-  const stripShown = (key) => {
-    if (!homepagePanelVisibility[key]) return false;
-    if (launchMode === false) return true;
-    if (launchMode === null) return false;
-    // launch mode is ON: only people who already have access
-    if (!myAccess || myAccess.email !== sessionEmail) return false;
-    if (myAccess.failedOpen) return true;
-    if (key === "construction_studio") return myAccess.hasPlan;
-    return myAccess.features.includes(key);
-  };
+  // Quick Analysis-only launch mode: Studio-tied panels show only to people
+  // who already have access (see hooks/useLaunchGate.js).
+  const { canSee } = useLaunchGate({ enabled: studioView === "main", refreshKey: studioView });
+  const stripShown = (key) =>
+    homepagePanelVisibility[key] &&
+    canSee(key === "construction_studio" ? null : key);
 
   const [aiAdvisorCopyStatus, setAiAdvisorCopyStatus] = useState(""); // brief on-screen confirmation after a clipboard copy
   const [loading, setLoading] = useState(false);
@@ -1484,7 +1443,7 @@ function App() {
       </div>
       )}
 
-      {homepagePanelVisibility.price_drop_alert && (
+      {stripShown("price_drop_alert") && (
       <div className="property-assessment-wrap">
         <CollapsiblePanel title="💰 Price Drop Alert — Let PropertyIQWeb Watch For You (Free)" defaultOpen={false} color="blue">
           <PriceWatchPanel country={formData.country} onLaunchStudio={launchStudio} />

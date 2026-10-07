@@ -95,6 +95,18 @@ def get_active_tier(email: str) -> Optional[str]:
     return None
 
 
+def count_active_by_tier() -> dict[str, int]:
+    """{tier_id: number of ACTIVE subscribers}. Used by the launch-mode safety
+    monitor to know which tiers have people relying on them."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT tier_id, COUNT(*) AS n FROM subscriptions WHERE status = 'active' GROUP BY tier_id"
+            )
+            rows = cursor.fetchall()
+    return {row["tier_id"]: int(row["n"]) for row in rows}
+
+
 def list_all_subscriptions() -> list[dict[str, Any]]:
     """For the admin overview panel — all subscriptions regardless of status,
     most recently updated first."""

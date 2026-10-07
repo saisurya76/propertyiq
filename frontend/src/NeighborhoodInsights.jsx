@@ -1,3 +1,4 @@
+import useLaunchGate from "./hooks/useLaunchGate";
 import { useState, useRef, useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -279,6 +280,10 @@ function NeighborhoodInsights({ countryCode }) {
   // admin has hidden never flashes on screen before the real setting loads.
   // If the fetch fails and nothing is remembered, show everything — a
   // network blip must never hide a section nobody asked to hide.
+  // Quick Analysis-only launch mode: the Studio-subscriber sections below show
+  // only to people whose plan includes them (see hooks/useLaunchGate.js).
+  const { canSee } = useLaunchGate();
+
   const [sectionVisibility, setSectionVisibility] = useState(
     () => loadCachedVisibility(NI_SECTIONS_CACHE_KEY) || NI_SECTIONS_ALL_HIDDEN
   );
@@ -974,7 +979,7 @@ function NeighborhoodInsights({ countryCode }) {
           </div>
           )}
 
-          {sectionVisibility.cost_of_living && (
+          {sectionVisibility.cost_of_living && canSee("cost_of_living") && (
           <div className="ni-card">
             <CostOfLiving lat={selectedPlace?.lat} lon={selectedPlace?.lon} locality={selectedPlace?.label || city} currency={country.currency} />
           </div>
@@ -1026,31 +1031,31 @@ function NeighborhoodInsights({ countryCode }) {
         </>
       )}
 
-      {sectionVisibility.comparison && (
+      {sectionVisibility.comparison && canSee("area_comparison") && (
         <div className="ni-card">
           <NeighborhoodComparison currency={country.currency} />
         </div>
       )}
 
-      {sectionVisibility.price_trends && (
+      {sectionVisibility.price_trends && canSee("price_trends") && (
         <div className="ni-card">
           <PriceTrends country={country.name} currency={country.currency} />
         </div>
       )}
 
-      {sectionVisibility.emi_calculator && (
+      {sectionVisibility.emi_calculator && canSee("emi_calculator") && (
         <div className="ni-card">
           <EmiCalculator currency={country.currency} />
         </div>
       )}
 
-      {sectionVisibility.amortization_projector && (
+      {sectionVisibility.amortization_projector && canSee("amortization_projector") && (
         <div className="ni-card">
           <AmortizationProjector currency={country.currency} />
         </div>
       )}
 
-      {sectionVisibility.loan_eligibility && (
+      {sectionVisibility.loan_eligibility && canSee("loan_eligibility") && (
         <div className="ni-card">
           <LoanEligibility currency={country.currency} />
         </div>

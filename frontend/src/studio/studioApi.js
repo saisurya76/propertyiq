@@ -13,10 +13,22 @@ export function getSession() {
 
 export function saveSession(token, email) {
   localStorage.setItem(SESSION_KEY, JSON.stringify({ token, email }));
+  announceSessionChange();
+}
+
+// Lets parts of the page that depend on who is signed in (launch-mode gating)
+// re-check without a reload, even when sign-in happens inside another widget.
+function announceSessionChange() {
+  try {
+    window.dispatchEvent(new Event("piq-session-changed"));
+  } catch {
+    /* non-browser environment */
+  }
 }
 
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+  announceSessionChange();
 }
 
 const DETECTED_COUNTRY_KEY = "propertyiq_detected_country";
