@@ -332,6 +332,40 @@ def get_granting_tier_id(user_email: str, feature: str) -> str | None:
     return None
 
 
+FREE_FEATURES_SETTING_KEY = "free_features"
+
+# Features an admin may open up to every signed-in user without a purchase.
+# Excludes the two features whose endpoints read quota fields off the
+# granting tier itself (price_drop_alert, agent_intelligence): they have no
+# tier to read limits from when nothing was purchased, so a free pass for
+# them would not work.
+FREE_ELIGIBLE_FEATURES = [
+    f for f in ALL_FEATURES if f not in ("price_drop_alert", "agent_intelligence")
+]
+
+
+def get_free_features() -> list[str]:
+    """Features currently free for every signed-in user. Default: none."""
+    raw = get_app_setting(FREE_FEATURES_SETTING_KEY)
+    if not raw:
+        return []
+    try:
+        stored = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(stored, list):
+        return []
+    return [f for f in stored if f in FREE_ELIGIBLE_FEATURES]
+
+
+def set_free_features(features: list[str]) -> list[str]:
+    """Replaces the free list. Unknown or ineligible names are dropped, never
+    stored, so a typo can't silently grant anything."""
+    cleaned = [f for f in FREE_ELIGIBLE_FEATURES if f in set(features)]
+    set_app_setting(FREE_FEATURES_SETTING_KEY, json.dumps(cleaned))
+    return cleaned
+
+
 def user_has_feature(user_email: str, feature: str) -> bool:
     """The real, single place to check "can this person use X" — every
     endpoint that gates on a feature should call THIS, not the plain
@@ -350,5 +384,7 @@ def user_has_feature(user_email: str, feature: str) -> bool:
     subscription, because this function only ever reads from
     `subscriptions`, never writes to it, and the one-time grant lives
     in a completely separate table."""
+    if user_email and feature in get_free_features():
+        return True
     return get_granting_tier_id(user_email, feature) is not None
 

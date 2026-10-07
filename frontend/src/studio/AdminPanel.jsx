@@ -51,6 +51,9 @@ function AdminPanel({ onBack }) {
   const [grants, setGrants] = useState([]);
   const [saveMessage, setSaveMessage] = useState("");
   const [allFeatures, setAllFeatures] = useState([]);
+  const [freeFeatures, setFreeFeatures] = useState([]);
+  const [freeEligible, setFreeEligible] = useState([]);
+  const [freeMessage, setFreeMessage] = useState("");
   const [geminiKeyConfigured, setGeminiKeyConfigured] = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
   const [geminiSaveMessage, setGeminiSaveMessage] = useState("");
@@ -97,6 +100,8 @@ function AdminPanel({ onBack }) {
       setSubscriptions(data.subscriptions);
       setGrants(data.insight_grants);
       setAllFeatures(data.all_features || []);
+      setFreeFeatures(data.free_features || []);
+      setFreeEligible(data.free_eligible_features || []);
       setGeminiKeyConfigured(!!data.gemini_api_key_configured);
       setNiSectionVisibility(data.ni_section_visibility || null);
       setHomepagePanelVisibility(data.homepage_panel_visibility || null);
@@ -135,6 +140,29 @@ function AdminPanel({ onBack }) {
       : `Make "${name}" AVAILABLE TO BUY?\n\nCustomers will be able to purchase it (and be charged real money) as soon as you click Save Changes.`;
     if (!window.confirm(msg)) return;
     updateTierField(tierId, "coming_soon", turningOn);
+  };
+
+  // Opens a feature to every signed-in user with no purchase (or closes it
+  // again). Saved immediately, behind a confirmation, because it changes
+  // what the public can do the moment it's confirmed — it is NOT part of
+  // the "Save Changes" tier batch below.
+  const toggleFreeFeature = async (feature) => {
+    const turningOn = !freeFeatures.includes(feature);
+    const label = feature.replace(/_/g, " ");
+    const msg = turningOn
+      ? `Make "${label}" FREE for every signed-in user?\n\nAnyone with an account will be able to use it without buying anything. This takes effect immediately.`
+      : `Stop giving "${label}" away for free?\n\nIt goes back to requiring a purchase or a subscription that includes it. This takes effect immediately.`;
+    if (!window.confirm(msg)) return;
+    const next = turningOn ? [...freeFeatures, feature] : freeFeatures.filter((f) => f !== feature);
+    setFreeMessage("");
+    setError("");
+    try {
+      const res = await studioApi.adminUpdateSettings(password, undefined, undefined, undefined, undefined, next);
+      setFreeFeatures(res.free_features || next);
+      setFreeMessage(`${label} is now ${turningOn ? "free for all signed-in users" : "back to paid-only"}.`);
+    } catch (err) {
+      setError(err.message || "Couldn't update free features.");
+    }
   };
 
   const toggleTierFeature = (tierId, feature) => {
@@ -865,6 +893,20 @@ function AdminPanel({ onBack }) {
                 </Fragment>
               );
             })}
+            <div className="admin-tier-features-row" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--grey-200, #d6e4ec)" }} title="Features ticked here are available to every signed-in user with no purchase. Takes effect immediately (with a confirmation) — not part of Save Changes.">
+              <span className="admin-tier-features-label">Free for all signed-in users:</span>
+              {freeEligible.map((feature) => (
+                <label key={feature} className="admin-feature-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={freeFeatures.includes(feature)}
+                    onChange={() => toggleFreeFeature(feature)}
+                  />
+                  {feature}
+                </label>
+              ))}
+            </div>
+            {freeMessage && <div className="studio-status-banner">{freeMessage}</div>}
             <div className="admin-tier-features-row" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--grey-200, #d6e4ec)" }}>
               <span className="admin-tier-features-label">Hide from main page (all tiers):</span>
               {allFeatures.map((feature) => (

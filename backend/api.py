@@ -171,6 +171,9 @@ from backend.config_store import (
     has_feature,
     user_has_feature,
     get_granting_tier_id,
+    get_free_features,
+    set_free_features,
+    FREE_ELIGIBLE_FEATURES,
     ALL_FEATURES,
     set_app_setting,
     get_app_setting,
@@ -1349,6 +1352,8 @@ def admin_overview(request: AdminAuthRequest):
         "homepage_panel_visibility": get_homepage_panel_visibility(),
         # Current wording for each feature-strip's excitement sticker.
         "feature_sticker_text": get_feature_sticker_text(),
+        "free_features": get_free_features(),
+        "free_eligible_features": FREE_ELIGIBLE_FEATURES,
         # Real usage counts per feature, real per-service configuration
         # status, and real per-country user counts (only for users who
         # signed in after location capture was added — see
@@ -1860,6 +1865,7 @@ class AdminSettingsRequest(BaseModel):
     ni_section_visibility: Optional[dict[str, bool]] = None
     homepage_panel_visibility: Optional[dict[str, bool]] = None
     feature_sticker_text: Optional[dict[str, str]] = None
+    free_features: Optional[list[str]] = None
 
 
 @app.post("/api/admin/settings")
@@ -1898,6 +1904,11 @@ def admin_settings(request: AdminSettingsRequest):
         current_panels.update(request.homepage_panel_visibility)
         set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(current_panels))
 
+    if request.free_features is not None:
+        # Replaces the whole list (it's one switch per feature, not a merge);
+        # set_free_features drops anything unknown or ineligible.
+        set_free_features(request.free_features)
+
     if request.feature_sticker_text is not None:
         # Same merge-not-overwrite reasoning — only accept known sticker
         # panels and never persist an empty/whitespace-only override,
@@ -1915,6 +1926,7 @@ def admin_settings(request: AdminSettingsRequest):
         "ni_section_visibility": get_ni_section_visibility(),
         "homepage_panel_visibility": get_homepage_panel_visibility(),
         "feature_sticker_text": get_feature_sticker_text(),
+        "free_features": get_free_features(),
     }
 
 
