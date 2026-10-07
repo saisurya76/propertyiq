@@ -3024,8 +3024,3 @@
 .studio-tier-coming-soon {
   opacity: 0.75;
 }
-
-@media print {
-  .admin-manual input, .admin-manual button, .admin-manual nav, .admin-subscreen-back, .admin-refresh-btn { display: none !important; }
-  .admin-manual .admin-section { break-inside: avoid; }
-}

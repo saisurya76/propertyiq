@@ -164,7 +164,7 @@ from backend.webhook_store import (
 )
 
 from backend import safety_monitor, wind_down_store, wind_down_email
-from backend.admin_manual import MANUAL as ADMIN_MANUAL
+from backend.admin_manual import MANUAL as ADMIN_MANUAL, QUICK as ADMIN_MANUAL_QUICK
 from backend.wind_down_store import initialize_wind_down_store
 from backend.config_store import (
     DEFAULT_TIER_CONFIG,
@@ -1319,7 +1319,7 @@ def admin_manual(request: AdminAuthRequest):
     """Admin-only user manual. Password-gated like every admin call, and
     deliberately served from here rather than bundled into the public site."""
     _require_admin_password(request.password)
-    return {"sections": ADMIN_MANUAL}
+    return {"sections": ADMIN_MANUAL, "quick": ADMIN_MANUAL_QUICK}
 
 
 @app.post("/api/admin/tiers")

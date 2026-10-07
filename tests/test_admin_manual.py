@@ -9,7 +9,7 @@ os.environ.setdefault("ADMIN_DASHBOARD_PASSWORD", "test-admin-pw")
 
 from fastapi.testclient import TestClient  # noqa: E402
 from backend.api import app  # noqa: E402
-from backend.admin_manual import MANUAL  # noqa: E402
+from backend.admin_manual import MANUAL, QUICK  # noqa: E402
 
 client = TestClient(app)
 ROOT = Path(__file__).resolve().parent.parent
@@ -70,3 +70,10 @@ def test_every_admin_menu_screen_is_covered():
     for label in labels:
         key = first_words.get(label, label)
         assert key in text or label == "User Manual", label
+
+
+def test_quick_links_point_at_real_chapters_and_the_api_returns_them():
+    ids = {s["id"] for s in MANUAL}
+    assert QUICK and all(q["target"] in ids for q in QUICK)
+    r = client.post("/api/admin/manual", json={"password": "test-admin-pw"}).json()
+    assert r["quick"] == QUICK

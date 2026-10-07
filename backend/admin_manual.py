@@ -233,3 +233,15 @@ MANUAL = [
         ],
     },
 ]
+
+
+# The "find a fix fast" row at the top of the page: (what the admin is trying
+# to do, chapter id). Every target must be a real chapter id (tested).
+QUICK = [
+    {"label": "A customer paid but has no plan", "target": "runbook"},
+    {"label": "Issue a refund", "target": "refunds"},
+    {"label": "Stop new subscriptions", "target": "launch"},
+    {"label": "Take the site down", "target": "winddown"},
+    {"label": "Change a plan, price or limit", "target": "tiers"},
+    {"label": "Login codes aren't arriving", "target": "env"},
+]
