@@ -26,6 +26,17 @@ import LegalFooter from "./components/LegalFooter";
 import useTermsGate from "./hooks/useTermsGate";
 import { getSession, clearSession, studioApi, saveDetectedCountry } from "./studio/studioApi";
 import { API_BASE } from "./config";
+import { loadCachedVisibility, saveCachedVisibility } from "./visibilityCache";
+
+const HOMEPAGE_PANELS_CACHE_KEY = "piq_homepage_panels_v1";
+const HOMEPAGE_PANELS_ALL_VISIBLE = {
+  instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
+  challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
+  construction_studio: true, agent_intelligence: true, property_ai_advisor: true,
+};
+const HOMEPAGE_PANELS_ALL_HIDDEN = Object.fromEntries(
+  Object.keys(HOMEPAGE_PANELS_ALL_VISIBLE).map((k) => [k, false])
+);
 
 
 const LANGUAGE_OPTIONS = [
@@ -191,15 +202,15 @@ function App() {
   // underlying URL/pathname never actually changes during a session.
   const urlCountryContext = useMemo(() => detectCountryCodeFromUrl(), []);
 
-  // Defaults to everything visible so the panels render immediately on
-  // first paint rather than waiting on a fetch — matches Neighborhood
-  // Insights' own section-visibility pattern (same reasoning: an admin
-  // controls this operationally, without a redeploy).
-  const [homepagePanelVisibility, setHomepagePanelVisibility] = useState({
-    instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
-    challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
-    construction_studio: true, agent_intelligence: true, property_ai_advisor: true,
-  });
+  // Starts HIDDEN (or from the last value this browser saw), not visible.
+  // Admin-hidden panels used to render from an all-visible default and then
+  // disappear once the real setting arrived — a visible flash of features
+  // that were meant to be off. If the fetch fails outright and there's no
+  // remembered value, fall back to all visible so a network blip can't
+  // silently hide features nobody asked to hide.
+  const [homepagePanelVisibility, setHomepagePanelVisibility] = useState(
+    () => loadCachedVisibility(HOMEPAGE_PANELS_CACHE_KEY) || HOMEPAGE_PANELS_ALL_HIDDEN
+  );
   // Captured from the same real ipapi.co lookup the language-detection
   // effect below already makes (not a second, duplicate call) — the
   // one real signal the hottest-properties ticker needs for "if it's
@@ -209,8 +220,17 @@ function App() {
   useEffect(() => {
     fetch(`${API_BASE}/api/homepage-panels/visibility`)
       .then((res) => res.json())
-      .then(setHomepagePanelVisibility)
-      .catch(() => {}); // keep the all-visible default on any failure
+      .then((data) => {
+        setHomepagePanelVisibility(data);
+        saveCachedVisibility(HOMEPAGE_PANELS_CACHE_KEY, data);
+      })
+      .catch(() => {
+        // No fresh value: keep a remembered one if there is one, otherwise
+        // show everything rather than hide features by accident.
+        setHomepagePanelVisibility((prev) =>
+          loadCachedVisibility(HOMEPAGE_PANELS_CACHE_KEY) ? prev : HOMEPAGE_PANELS_ALL_VISIBLE
+        );
+      });
   }, []);
 
   // Admin-configurable wording for each feature-strip's "excitement
