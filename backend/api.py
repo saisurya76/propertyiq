@@ -9,6 +9,7 @@ import re
 import json
 import uuid
 import asyncio
+import time
 import logging
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
@@ -162,7 +163,8 @@ from backend.webhook_store import (
     try_claim_webhook_event,
 )
 
-from backend import safety_monitor
+from backend import safety_monitor, wind_down_store, wind_down_email
+from backend.wind_down_store import initialize_wind_down_store
 from backend.config_store import (
     DEFAULT_TIER_CONFIG,
     initialize_config_store,
@@ -309,6 +311,7 @@ initialize_auth_store()
 initialize_config_store()
 initialize_subscription_store()
 initialize_refund_store()
+initialize_wind_down_store()
 initialize_profile_store()
 initialize_webhook_store()
 initialize_neighborhood_comparison_store()
@@ -2121,7 +2124,8 @@ def _refuse(problems: list[str], what: str) -> None:
 
 
 def guard_tier_save(tier_config: dict) -> None:
-    if not is_launch_mode_active():
+    launch = is_launch_mode_active()
+    if not launch and get_wind_down_state() is None:
         return
     current = get_all_tiers_merged()
     proposed = {
@@ -2129,7 +2133,7 @@ def guard_tier_save(tier_config: dict) -> None:
         for tier_id, default_tier in DEFAULT_TIER_CONFIG.items()
     }
     problems = safety_monitor.check_tier_config(
-        current, proposed, count_active_by_tier(), _SUBSCRIPTION_TIER_IDS
+        current, proposed, count_active_by_tier(), _SUBSCRIPTION_TIER_IDS, require_sellable=launch
     )
     if problems:
         _refuse(problems, "Tier save")
@@ -2151,11 +2155,12 @@ def guard_settings_save(request) -> None:
 
 def run_safety_check() -> list[str]:
     """One drift check. Returns the problems found (after any repair)."""
-    if not is_launch_mode_active():
+    launch = is_launch_mode_active()
+    if not launch and get_wind_down_state() is None:
         return []
     tiers = get_all_tiers_merged()
     free = get_free_features()
-    problems = safety_monitor.check_live_state(tiers, free, _SUBSCRIPTION_TIER_IDS)
+    problems = safety_monitor.check_live_state(tiers, free, _SUBSCRIPTION_TIER_IDS, launch_active=launch)
     remaining = []
     for problem in problems:
         parts = problem.split(":")
@@ -2184,6 +2189,297 @@ async def safety_monitor_loop():
         except Exception as exc:
             logger.error(f"safety monitor check failed: {exc}")
         await asyncio.sleep(SAFETY_CHECK_INTERVAL_SECONDS)
+
+
+# ---------------------------------------------------------------------------
+# Service wind-down: stop all future renewals on Dodo, in batches
+#
+# For when the admin takes the site down (for a while or for good). Nothing
+# is ever deleted: users, subscriptions, designs and reports all stay.
+#
+#   period_end  Each subscription is set to NOT renew (Dodo
+#               cancel_at_next_billing_date). Customers keep access to the end
+#               of the period they paid for; Dodo then ends it and our webhook
+#               marks it cancelled. No refund (Refund Policy section 6).
+#   immediate   For a shutdown today: refund the latest payment in full, then
+#               cancel the subscription right away (Terms 9.1, Refund Policy 6).
+#
+# Both modes also close every subscription tier to new buyers; immediate also
+# closes Quick Analysis. Every subscriber gets one email. A period_end
+# wind-down can be reversed per customer until their period ends (resume);
+# reopen restores the tiers it closed. Rules: one row per subscriber in
+# wind_down_items, so a batch can be re-run safely and shows what failed.
+# ---------------------------------------------------------------------------
+WIND_DOWN_STATE_KEY = "wind_down_state"
+WIND_DOWN_CONFIRM_PHRASE = "WIND DOWN"
+WIND_DOWN_PAUSE_SECONDS = 0.25  # between Dodo calls, to stay under rate limits
+
+
+def get_wind_down_state() -> Optional[dict]:
+    raw = get_app_setting(WIND_DOWN_STATE_KEY)
+    if not raw:
+        return None
+    try:
+        state = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return state if isinstance(state, dict) and state.get("mode") else None
+
+
+def _wind_down_summary() -> dict:
+    state = get_wind_down_state()
+    counts = wind_down_store.counts()
+    return {
+        "state": state,
+        "counts": counts,
+        "remaining": counts.get("pending", 0) + counts.get("failed", 0),
+        "items": wind_down_store.list_items(),
+    }
+
+
+class AdminWindDownStartRequest(BaseModel):
+    password: str
+    mode: str  # "period_end" | "immediate"
+    confirm: str
+    message: Optional[str] = None  # optional note added to every customer email
+
+
+class AdminWindDownBatchRequest(BaseModel):
+    password: str
+    batch_size: int = 10
+
+
+class AdminWindDownResumeRequest(BaseModel):
+    password: str
+    email: Optional[str] = None  # None = everyone still scheduled
+
+
+@app.get("/api/site-notice")
+def site_notice():
+    """Public: lets the site tell visitors it is paused or closing."""
+    state = get_wind_down_state()
+    if not state:
+        return {"active": False}
+    return {"active": True, "mode": state["mode"], "message": state.get("message") or ""}
+
+
+@app.post("/api/admin/wind-down/status")
+def admin_wind_down_status(request: AdminAuthRequest):
+    _require_admin_password(request.password)
+    summary = _wind_down_summary()
+    summary["active_subscribers"] = count_active_by_tier()
+    return summary
+
+
+@app.post("/api/admin/wind-down/start")
+def admin_wind_down_start(request: AdminWindDownStartRequest):
+    """Closes the tiers to new buyers and lists every active subscriber as
+    pending. Calls nothing on Dodo yet: that happens batch by batch."""
+    _require_admin_password(request.password)
+    if request.mode not in ("period_end", "immediate"):
+        raise HTTPException(status_code=400, detail="mode must be 'period_end' or 'immediate'.")
+    if request.confirm.strip() != WIND_DOWN_CONFIRM_PHRASE:
+        raise HTTPException(status_code=400, detail=f"Type {WIND_DOWN_CONFIRM_PHRASE} to confirm.")
+    if get_wind_down_state() is not None:
+        raise HTTPException(status_code=409, detail="A wind-down is already in progress. Reopen first to start another.")
+    if request.mode == "immediate" and is_launch_mode_active():
+        raise HTTPException(
+            status_code=409,
+            detail="Switch Quick Analysis-only launch mode off first: an immediate shutdown closes Quick Analysis too.",
+        )
+
+    to_close = list(_SUBSCRIPTION_TIER_IDS) + (["insight_addon"] if request.mode == "immediate" else [])
+    tiers_now = get_all_tiers_merged()
+    newly_closed = [t for t in to_close if not tiers_now.get(t, {}).get("coming_soon")]
+    state = {
+        "mode": request.mode,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "message": (request.message or "").strip()[:500],
+        "tiers_closed": newly_closed,
+    }
+    # State first, so a half-finished start can still be reopened.
+    set_app_setting(WIND_DOWN_STATE_KEY, json.dumps(state))
+    persisted = get_tier_config() or {}
+    for tier_id in newly_closed:
+        persisted.setdefault(tier_id, {})["coming_soon"] = True
+    set_tier_config(persisted)
+
+    for row in list_all_subscriptions():
+        if row.get("status") == "active":
+            wind_down_store.add_item(row["email"], row["tier_id"], row.get("dodo_subscription_id"), request.mode)
+    _safety_log("info", f"Wind-down started ({request.mode}).")
+    return _wind_down_summary()
+
+
+def _latest_subscription_payment_id(client, dodo_subscription_id: str) -> Optional[str]:
+    page = client.payments.list(subscription_id=dodo_subscription_id, status="succeeded", page_size=1)
+    items = getattr(page, "items", None)
+    if items is None:
+        items = list(page)
+    return getattr(items[0], "payment_id", None) if items else None
+
+
+def _wind_down_one(client, item: dict, state: dict) -> None:
+    email = item["email"]
+    mode = item["mode"]
+    sub = get_subscription(email)
+    if not sub or sub.get("status") != "active":
+        wind_down_store.update_item(email, status="skipped", error=None)
+        return
+    tier = get_tier(sub["tier_id"]) or {}
+    plan = tier.get("label", sub["tier_id"])
+    dodo_id = sub.get("dodo_subscription_id")
+    local_only = not dodo_id or str(dodo_id).startswith("beta_dummy_")
+    note = state.get("message") or None
+
+    if mode == "period_end":
+        access_until = None
+        if not local_only:
+            current = client.subscriptions.retrieve(dodo_id)
+            nbd = getattr(current, "next_billing_date", None)
+            access_until = nbd.strftime("%d %B %Y") if hasattr(nbd, "strftime") else (str(nbd) if nbd else None)
+            if not getattr(current, "cancel_at_next_billing_date", False):
+                client.subscriptions.update(
+                    dodo_id,
+                    cancel_at_next_billing_date=True,
+                    cancel_reason="cancelled_by_merchant",
+                    cancellation_comment=note or "Service wind-down",
+                )
+        wind_down_store.update_item(email, status="scheduled", access_until=access_until, error=None)
+        subject, html = wind_down_email.period_end_subject(), wind_down_email.build_period_end_email(
+            plan=plan, access_until=access_until, message=note
+        )
+    else:
+        refund_text = None
+        if not local_only:
+            if item.get("refund_status") != "issued":
+                payment_id = _latest_subscription_payment_id(client, dodo_id)
+                if payment_id:
+                    refund = client.refunds.create(payment_id=payment_id, reason="Service closed by merchant")
+                    amount = round(refund.amount / 100, 2) if getattr(refund, "amount", None) is not None else None
+                    currency = getattr(refund, "currency", None)
+                    # Marked issued the moment Dodo accepts it, before anything
+                    # that could fail, so a retry can never refund twice.
+                    wind_down_store.update_item(
+                        email, refund_status="issued", refund_amount=amount, refund_currency=currency
+                    )
+                    try:
+                        record_dodo_refund(
+                            dodo_refund_id=refund.refund_id, dodo_payment_id=payment_id, user_email=email,
+                            amount_usd=amount, currency=currency, reason="Service closed by merchant",
+                            status=getattr(refund, "status", None) or "pending",
+                        )
+                    except Exception as exc:
+                        logger.error(f"wind-down: refund {refund.refund_id!r} issued but not recorded: {exc}")
+                    item = {**item, "refund_amount": amount, "refund_currency": currency}
+            client.subscriptions.update(
+                dodo_id, status="cancelled", cancel_reason="cancelled_by_merchant",
+                cancellation_comment=note or "Service closed",
+            )
+        set_status_by_dodo_id(dodo_id, "cancelled") if dodo_id else upsert_subscription(
+            email=email, tier_id=sub["tier_id"], status="cancelled"
+        )
+        if item.get("refund_amount") is not None:
+            refund_text = f"{(item.get('refund_currency') or 'USD')} {item['refund_amount']:,.2f}"
+        wind_down_store.update_item(email, status="cancelled", error=None)
+        subject, html = wind_down_email.immediate_subject(), wind_down_email.build_immediate_email(
+            plan=plan, refund_text=refund_text, message=note
+        )
+
+    try:
+        send_email(to_email=email, subject=subject, html=html)
+        wind_down_store.update_item(email, notified=True)
+    except Exception as exc:
+        logger.error(f"wind-down: email failed for {email!r}: {exc}")
+
+
+@app.post("/api/admin/wind-down/run-batch")
+def admin_wind_down_run_batch(request: AdminWindDownBatchRequest):
+    """Processes up to batch_size subscribers that are pending or failed
+    last time. Safe to call repeatedly until remaining is 0."""
+    _require_admin_password(request.password)
+    state = get_wind_down_state()
+    if state is None:
+        raise HTTPException(status_code=409, detail="No wind-down in progress.")
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+    batch = wind_down_store.todo_items(max(1, min(request.batch_size, 50)))
+    client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+    for item in batch:
+        try:
+            _wind_down_one(client, item, state)
+        except Exception as exc:
+            logger.error(f"wind-down: {item['email']!r} failed: {exc}")
+            wind_down_store.update_item(item["email"], status="failed", error=str(exc)[:500])
+        time.sleep(WIND_DOWN_PAUSE_SECONDS)
+    summary = _wind_down_summary()
+    summary["processed"] = len(batch)
+    return summary
+
+
+@app.post("/api/admin/wind-down/resume")
+def admin_wind_down_resume(request: AdminWindDownResumeRequest):
+    """Undoes the non-renewal for customers whose period has not ended yet
+    (period_end mode only). Immediate cancellations cannot be undone: those
+    customers subscribe again once plans reopen."""
+    _require_admin_password(request.password)
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+    client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+    items = [
+        i for i in wind_down_store.list_items()
+        if i["status"] == "scheduled" and i["mode"] == "period_end"
+        and (request.email is None or i["email"] == request.email.strip().lower())
+    ]
+    resumed, failed = 0, 0
+    for item in items:
+        sub = get_subscription(item["email"])
+        try:
+            if not sub or sub.get("status") != "active":
+                wind_down_store.update_item(item["email"], status="skipped")
+                continue
+            dodo_id = sub.get("dodo_subscription_id")
+            if dodo_id and not str(dodo_id).startswith("beta_dummy_"):
+                client.subscriptions.update(dodo_id, cancel_at_next_billing_date=False)
+            wind_down_store.update_item(item["email"], status="resumed", error=None)
+            resumed += 1
+            tier = get_tier(sub["tier_id"]) or {}
+            try:
+                send_email(
+                    to_email=item["email"], subject=wind_down_email.resumed_subject(),
+                    html=wind_down_email.build_resumed_email(plan=tier.get("label", sub["tier_id"])),
+                )
+            except Exception as exc:
+                logger.error(f"wind-down resume: email failed for {item['email']!r}: {exc}")
+        except Exception as exc:
+            failed += 1
+            wind_down_store.update_item(item["email"], error=str(exc)[:500])
+        time.sleep(WIND_DOWN_PAUSE_SECONDS)
+    summary = _wind_down_summary()
+    summary.update(resumed=resumed, resume_failed=failed)
+    return summary
+
+
+@app.post("/api/admin/wind-down/reopen")
+def admin_wind_down_reopen(request: AdminAuthRequest):
+    """Ends the wind-down state: reopens the tiers it closed (unless launch
+    mode is keeping them closed) and clears the site notice. History rows are
+    kept. Customers already cancelled subscribe again from the pricing page."""
+    _require_admin_password(request.password)
+    state = get_wind_down_state()
+    if state is None:
+        raise HTTPException(status_code=409, detail="No wind-down in progress.")
+    launch = is_launch_mode_active()
+    persisted = get_tier_config() or {}
+    for tier_id in state.get("tiers_closed") or []:
+        if launch and tier_id in LAUNCH_MODE_STUDIO_TIERS:
+            continue  # launch mode owns these and reopens them when it switches off
+        if persisted.get(tier_id, {}).get("coming_soon"):
+            persisted[tier_id]["coming_soon"] = False
+    set_tier_config(persisted)
+    set_app_setting(WIND_DOWN_STATE_KEY, "")
+    _safety_log("info", "Wind-down ended; tiers it closed were reopened.")
+    return _wind_down_summary()
 
 
 # The real, previously-missing link between what a visitor sees on the

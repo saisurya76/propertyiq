@@ -345,6 +345,15 @@ function App() {
     homepagePanelVisibility[key] &&
     canSee(key === "construction_studio" ? null : key);
 
+  // Public notice while the service is paused or closing (admin wind-down).
+  const [siteNotice, setSiteNotice] = useState(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/site-notice`)
+      .then((res) => res.json())
+      .then((data) => setSiteNotice(data && data.active ? data : null))
+      .catch(() => {});
+  }, []);
+
   const [aiAdvisorCopyStatus, setAiAdvisorCopyStatus] = useState(""); // brief on-screen confirmation after a clipboard copy
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
@@ -1175,6 +1184,16 @@ function App() {
     <div className="app">
 
       <SessionBar onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
+
+      {siteNotice && (
+        <div className="payment-return-banner payment-return-banner-neutral" role="status">
+          {siteNotice.mode === "immediate"
+            ? "PropertyIQWeb is closed for now. Subscriptions have ended and been refunded. Your data is safe."
+            : "Subscriptions are paused. Existing plans will not renew and stay active until the end of the period already paid. Your data is safe."}
+          {siteNotice.message ? ` ${siteNotice.message}` : ""}
+          {" "}<a href="/terms-of-service.html">Terms</a> · <a href="/refund-policy.html">Refund Policy</a>
+        </div>
+      )}
 
       {paymentReturnMessage && (
         <div

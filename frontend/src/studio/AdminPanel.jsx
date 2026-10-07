@@ -1,3 +1,4 @@
+import WindDownPanel from "./WindDownPanel";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { studioApi } from "./studioApi";
 import WorldUsersMap from "./WorldUsersMap";
@@ -820,6 +821,8 @@ function AdminPanel({ onBack }) {
               </details>
             )}
           </div>
+
+          <WindDownPanel password={password} />
 
           <div className="admin-section admin-section-purple">
             <h3>Tier Configuration</h3>

@@ -78,7 +78,8 @@ def _holders_of(feature: Optional[str], tiers: dict, subscribers_by_tier: dict) 
 
 
 def check_tier_config(
-    current: dict, proposed: dict, subscribers_by_tier: dict, subscription_tier_ids: list[str]
+    current: dict, proposed: dict, subscribers_by_tier: dict, subscription_tier_ids: list[str],
+    require_sellable: bool = True,
 ) -> list[str]:
     """Rules for an admin tier save. `current` and `proposed` are fully merged
     tier configs (defaults under persisted)."""
@@ -94,10 +95,11 @@ def check_tier_config(
             )
 
     # 2. the one thing for sale stays sellable
+    # (not enforced during a wind-down on its own, where closing everything is the point)
     sellable = proposed.get(SELLABLE_TIER, {})
-    if sellable.get("coming_soon"):
+    if require_sellable and sellable.get("coming_soon"):
         problems.append("Quick Analysis would be marked Coming soon, leaving nothing for sale.")
-    if sellable.get("mode") == "free":
+    if require_sellable and sellable.get("mode") == "free":
         problems.append("Quick Analysis would be set to Free, leaving nothing to buy.")
 
     # 3. subscribers keep everything that is theirs
@@ -157,12 +159,16 @@ def check_settings_change(
     return problems
 
 
-def check_live_state(tiers: dict, free_features: list[str], subscription_tier_ids: list[str]) -> list[str]:
+def check_live_state(
+    tiers: dict, free_features: list[str], subscription_tier_ids: list[str], launch_active: bool = True
+) -> list[str]:
     """Drift check on what is stored right now (not a proposed change)."""
     problems = []
     for tier_id in subscription_tier_ids:
         if not tiers.get(tier_id, {}).get("coming_soon"):
             problems.append(f"tier:{tier_id}:open")
+    if not launch_active:
+        return problems  # wind-down alone: only "no new subscriptions" applies
     sellable = tiers.get(SELLABLE_TIER, {})
     if sellable.get("coming_soon"):
         problems.append("tier:insight_addon:coming_soon")

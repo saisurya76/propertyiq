@@ -155,6 +155,17 @@ export const studioApi = {
   adminSetLaunchMode: (password, enabled) =>
     apiFetch("/api/admin/launch-mode", { method: "POST", body: JSON.stringify({ password, enabled }) }),
 
+  adminWindDownStatus: (password) =>
+    apiFetch("/api/admin/wind-down/status", { method: "POST", body: JSON.stringify({ password }) }),
+  adminWindDownStart: (password, mode, confirm, message) =>
+    apiFetch("/api/admin/wind-down/start", { method: "POST", body: JSON.stringify({ password, mode, confirm, message }) }),
+  adminWindDownRunBatch: (password, batchSize = 10) =>
+    apiFetch("/api/admin/wind-down/run-batch", { method: "POST", body: JSON.stringify({ password, batch_size: batchSize }) }),
+  adminWindDownResume: (password, email = null) =>
+    apiFetch("/api/admin/wind-down/resume", { method: "POST", body: JSON.stringify({ password, email }) }),
+  adminWindDownReopen: (password) =>
+    apiFetch("/api/admin/wind-down/reopen", { method: "POST", body: JSON.stringify({ password }) }),
+
   agentListClients: () => apiFetch("/api/agent/clients"),
   agentGetQuotaSummary: () => apiFetch("/api/agent/quota-summary"),
   agentCreateClient: (clientName, clientContact) =>
