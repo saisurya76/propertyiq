@@ -3019,3 +3019,8 @@
   font-size: 13.5px;
   font-family: inherit;
 }
+
+/* Tier marked "Coming soon" by the admin: still listed, visibly muted. */
+.studio-tier-coming-soon {
+  opacity: 0.75;
+}

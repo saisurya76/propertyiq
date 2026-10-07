@@ -1306,6 +1306,12 @@ def update_tiers(request: AdminTierConfigRequest):
     Password-gated via ADMIN_DASHBOARD_PASSWORD."""
     _require_admin_password(request.password)
 
+    # coming_soon is a strict on/off switch: coerce whatever the client sent
+    # to a real bool so a stray string like "false" can never read as truthy.
+    for tier in request.tier_config.values():
+        if isinstance(tier, dict) and "coming_soon" in tier:
+            tier["coming_soon"] = tier["coming_soon"] is True
+
     set_tier_config(request.tier_config)
     return {"status": "updated", "tier_config": request.tier_config}
 
@@ -1945,6 +1951,11 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         raise HTTPException(status_code=404, detail=f"Unknown tier: {request.tier_id}")
     if tier.get("billing") != "subscription":
         raise HTTPException(status_code=400, detail=f"Tier '{request.tier_id}' is not a subscription tier")
+    if tier.get("coming_soon"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{tier.get('label', request.tier_id)} is coming soon and can't be purchased yet.",
+        )
 
     if PROPERTYIQ_BETA_BYPASS_PAYMENTS:
         dummy_subscription_id = f"beta_dummy_{uuid.uuid4()}"
@@ -2011,6 +2022,12 @@ def insight_checkout(request: InsightCheckoutRequest, user_email: str = Depends(
         raise HTTPException(
             status_code=400,
             detail="Similar property suggestions are currently free for everyone — there's nothing to buy."
+        )
+
+    if insight_tier and insight_tier.get("coming_soon"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"{insight_tier.get('label', 'Quick Analysis')} is coming soon and can't be purchased yet.",
         )
 
     if PROPERTYIQ_BETA_BYPASS_PAYMENTS:

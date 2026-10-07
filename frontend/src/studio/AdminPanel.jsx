@@ -122,6 +122,21 @@ function AdminPanel({ onBack }) {
   // Toggling here only changes in-memory state — nothing takes effect
   // system-wide until "Save Changes" below actually persists it via
   // adminUpdateTiers, same as every other tier field on this page.
+  // "Coming soon" disables buying a tier (pricing-page button AND the
+  // server-side checkout). Always confirmed with a pop-up, in both
+  // directions, since it changes what the public can buy the moment the
+  // admin saves. Existing buyers/subscribers keep access either way.
+  const toggleComingSoon = (tierId) => {
+    const tier = tierConfig[tierId];
+    const turningOn = !tier.coming_soon;
+    const name = tier.label || tierId;
+    const msg = turningOn
+      ? `Mark "${name}" as COMING SOON?\n\nCustomers will no longer be able to buy it — the button turns into a disabled "Coming soon". People who already have it keep their access, and existing subscriptions keep renewing.\n\nThis takes effect for everyone once you click Save Changes.`
+      : `Make "${name}" AVAILABLE TO BUY?\n\nCustomers will be able to purchase it (and be charged real money) as soon as you click Save Changes.`;
+    if (!window.confirm(msg)) return;
+    updateTierField(tierId, "coming_soon", turningOn);
+  };
+
   const toggleTierFeature = (tierId, feature) => {
     setTierConfig((cfg) => {
       const current = cfg[tierId].features || [];
@@ -812,6 +827,17 @@ function AdminPanel({ onBack }) {
                         {feature}
                       </label>
                     ))}
+                  </div>
+                  <div className="admin-tier-features-row" title="Coming soon: the tier stays listed on the pricing page but can't be bought — the button is disabled and the server rejects checkout. Existing buyers and subscribers are not affected.">
+                    <span className="admin-tier-features-label">Availability:</span>
+                    <label className="admin-feature-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={tier.coming_soon === true}
+                        onChange={() => toggleComingSoon(tierId)}
+                      />
+                      Coming soon (purchases disabled)
+                    </label>
                   </div>
                   {tierId === "insight_addon" && (
                     <div className="admin-tier-features-row" title="Free: similar-property suggestions are available to everyone, no purchase — the buy button disappears. Paid: the current behavior — a purchase or active subscription is required, and the panel stays hidden until unlocked.">

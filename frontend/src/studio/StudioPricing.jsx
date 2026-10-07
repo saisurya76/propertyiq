@@ -192,7 +192,7 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
           const isFeatured = tierId === "studio_pro";
 
           return (
-            <div key={tierId} className={`studio-tier-card ${isFeatured ? "studio-tier-featured" : ""}`}>
+            <div key={tierId} className={`studio-tier-card ${isFeatured ? "studio-tier-featured" : ""} ${tier.coming_soon ? "studio-tier-coming-soon" : ""}`}>
               <div className="studio-tier-name tier-name-tooltip" data-tooltip={TIER_TAGLINES[tierId] || ""} tabIndex={0}>{tier.label}</div>
               <div className="studio-tier-price">
                 {formatPrice(tier.price_usd, currency, fxRates)}
@@ -209,11 +209,13 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
               {isInsight ? (
                 <button
                   className="studio-tier-btn"
-                  disabled={!reportId || loadingTierId === tierId || insightUnlocked}
+                  disabled={tier.coming_soon || !reportId || loadingTierId === tierId || insightUnlocked}
                   onClick={() => requireTerms(handleInsightBuy)}
                   title={!reportId ? "View a report first to unlock this for that report" : undefined}
                 >
-                  {insightUnlocked
+                  {tier.coming_soon
+                    ? "Coming soon"
+                    : insightUnlocked
                     ? "Unlocked ✓"
                     : loadingTierId === tierId
                     ? "Processing..."
@@ -224,10 +226,10 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
               ) : (
                 <button
                   className="studio-tier-btn"
-                  disabled={isCurrent || loadingTierId === tierId}
+                  disabled={isCurrent || loadingTierId === tierId || (tier.coming_soon && !isCurrent)}
                   onClick={() => requireTerms(() => handleSubscribe(tierId))}
                 >
-                  {isCurrent ? "Current plan" : loadingTierId === tierId ? "Processing..." : "Subscribe"}
+                  {isCurrent ? "Current plan" : tier.coming_soon ? "Coming soon" : loadingTierId === tierId ? "Processing..." : "Subscribe"}
                 </button>
               )}
             </div>

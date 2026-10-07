@@ -23,10 +23,15 @@ DEFAULT_TIER_CONFIG = {
         # switch for the whole product rather than something that
         # differs by subscription tier.
         "mode": "paid",
+        # Admin-toggleable "Coming soon": purchases are blocked (button
+        # disabled on the pricing page AND rejected server-side) while the
+        # tier stays listed. Existing buyers/subscribers are unaffected.
+        "coming_soon": False,
     },
     "studio_starter": {
         "label": "Studio Starter",
         "billing": "subscription",
+        "coming_soon": False,
         "price_usd": 9,
         "features": [
             "similar_property_suggestions",
@@ -53,6 +58,7 @@ DEFAULT_TIER_CONFIG = {
     "studio_pro": {
         "label": "Studio Pro",
         "billing": "subscription",
+        "coming_soon": False,
         "price_usd": 29,
         "features": [
             "similar_property_suggestions",
@@ -79,6 +85,7 @@ DEFAULT_TIER_CONFIG = {
     "studio_unlimited": {
         "label": "Studio Unlimited",
         "billing": "subscription",
+        "coming_soon": False,
         "price_usd": 79,
         "features": [
             "similar_property_suggestions",
