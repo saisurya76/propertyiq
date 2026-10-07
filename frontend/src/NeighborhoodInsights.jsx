@@ -10,6 +10,16 @@ import LoanEligibility from "./LoanEligibility";
 import AmortizationProjector from "./AmortizationProjector";
 
 import { API_BASE } from "./config";
+import { loadCachedVisibility, saveCachedVisibility } from "./visibilityCache";
+
+const NI_SECTIONS_CACHE_KEY = "piq_ni_sections_v1";
+const NI_SECTIONS_ALL_VISIBLE = {
+  map: true, flood_risk: true, infrastructure: true, resale_signal: true,
+  checklist: true, authority_contacts: true, cross_sell: true, share: true,
+};
+const NI_SECTIONS_ALL_HIDDEN = Object.fromEntries(
+  Object.keys(NI_SECTIONS_ALL_VISIBLE).map((k) => [k, false])
+);
 
 // Same LocationIQ endpoints/key convention AccidentIQ's own Travel Safety
 // page uses (confirmed directly from that page's real source, shared by
@@ -265,20 +275,29 @@ function NeighborhoodInsights({ countryCode }) {
   const [resaleState, setResaleState] = useState("idle"); // "idle" | "loading" | "done" | "error"
   const [validationError, setValidationError] = useState("");
 
-  // Defaults to everything visible so the page renders normally even
-  // before this loads (or if the fetch fails) — an admin-configured
-  // hide is an explicit, positive action, so a slow/failed fetch must
-  // never accidentally hide a section nobody asked to hide.
-  const [sectionVisibility, setSectionVisibility] = useState({
-    map: true, flood_risk: true, infrastructure: true, resale_signal: true,
-    checklist: true, authority_contacts: true, cross_sell: true, share: true,
-  });
+  // Starts hidden (or from the last value this browser saw) so a section an
+  // admin has hidden never flashes on screen before the real setting loads.
+  // If the fetch fails and nothing is remembered, show everything — a
+  // network blip must never hide a section nobody asked to hide.
+  const [sectionVisibility, setSectionVisibility] = useState(
+    () => loadCachedVisibility(NI_SECTIONS_CACHE_KEY) || NI_SECTIONS_ALL_HIDDEN
+  );
 
   useEffect(() => {
     fetch(`${API_BASE}/api/neighborhood-insights/section-visibility`)
       .then((res) => res.json())
-      .then((data) => setSectionVisibility((prev) => ({ ...prev, ...data })))
-      .catch(() => {}); // keep the safe, all-visible default on any failure
+      .then((data) => {
+        setSectionVisibility((prev) => {
+          const next = { ...prev, ...data };
+          saveCachedVisibility(NI_SECTIONS_CACHE_KEY, next);
+          return next;
+        });
+      })
+      .catch(() => {
+        setSectionVisibility((prev) =>
+          loadCachedVisibility(NI_SECTIONS_CACHE_KEY) ? prev : NI_SECTIONS_ALL_VISIBLE
+        );
+      });
   }, []);
 
   // Updates the real <title> and meta description client-side for the
