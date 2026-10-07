@@ -1354,6 +1354,7 @@ def admin_overview(request: AdminAuthRequest):
         "feature_sticker_text": get_feature_sticker_text(),
         "free_features": get_free_features(),
         "free_eligible_features": FREE_ELIGIBLE_FEATURES,
+        "launch_mode": get_launch_mode_status(),
         # Real usage counts per feature, real per-service configuration
         # status, and real per-country user counts (only for users who
         # signed in after location capture was added — see
@@ -1928,6 +1929,125 @@ def admin_settings(request: AdminSettingsRequest):
         "feature_sticker_text": get_feature_sticker_text(),
         "free_features": get_free_features(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Quick Analysis-only launch mode
+#
+# One master switch that applies, together, everything an "only Quick
+# Analysis is for sale" launch needs, and later puts every touched setting
+# back exactly as it was. It remembers the prior state in a snapshot stored
+# before anything is changed, so a half-finished apply can still be undone.
+#
+# ON:  the three Studio subscription tiers become "coming soon", the
+#      property assessment becomes free for signed-in users (it is the
+#      only way to get a report to buy Quick Analysis from), and the three
+#      Studio feature strips on the home page are hidden.
+# OFF: those same settings are restored to the values saved at ON time.
+# ---------------------------------------------------------------------------
+LAUNCH_MODE_SETTING_KEY = "launch_mode_snapshot"
+LAUNCH_MODE_STUDIO_TIERS = ["studio_starter", "studio_pro", "studio_unlimited"]
+LAUNCH_MODE_FREE_FEATURES = ["property_assessment"]
+LAUNCH_MODE_HIDDEN_STRIPS = ["construction_studio", "agent_intelligence", "property_ai_advisor"]
+
+
+def _get_launch_mode_snapshot() -> Optional[dict]:
+    raw = get_app_setting(LAUNCH_MODE_SETTING_KEY)
+    if not raw:
+        return None
+    try:
+        snap = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return snap if isinstance(snap, dict) and snap.get("active") else None
+
+
+def get_launch_mode_status() -> dict:
+    """Whether the mode is on, since when, and anything that would stop the
+    one thing still for sale (Quick Analysis) from actually being sellable."""
+    snap = _get_launch_mode_snapshot()
+    tiers = get_all_tiers_merged()
+    insight = tiers.get("insight_addon", {})
+    warnings = []
+    if insight.get("coming_soon"):
+        warnings.append("Quick Analysis is marked Coming soon — nothing would be for sale.")
+    if insight.get("mode") == "free":
+        warnings.append("Quick Analysis is set to Free — there is nothing to buy.")
+    if not TIER_DODO_PRODUCT_IDS.get("insight_addon"):
+        warnings.append("DODO_PRODUCT_ID_INSIGHT_ADDON is not set — Quick Analysis checkout would fail.")
+    return {
+        "active": snap is not None,
+        "active_since": snap.get("active_since") if snap else None,
+        "warnings": warnings,
+    }
+
+
+def set_launch_mode(enabled: bool) -> dict:
+    snap = _get_launch_mode_snapshot()
+
+    if enabled:
+        if snap is not None:
+            return get_launch_mode_status()  # already on: never overwrite the saved original state
+
+        tiers_now = get_all_tiers_merged()
+        panels_now = get_homepage_panel_visibility()
+        free_now = get_free_features()
+
+        # Snapshot FIRST. If anything below fails part-way, turning the mode
+        # off still restores everything.
+        snapshot = {
+            "active": True,
+            "active_since": datetime.now(timezone.utc).isoformat(),
+            "tiers_coming_soon": {t: bool(tiers_now.get(t, {}).get("coming_soon")) for t in LAUNCH_MODE_STUDIO_TIERS},
+            "free_features": list(free_now),
+            "homepage_panels": {k: bool(panels_now.get(k, True)) for k in LAUNCH_MODE_HIDDEN_STRIPS},
+        }
+        set_app_setting(LAUNCH_MODE_SETTING_KEY, json.dumps(snapshot))
+
+        persisted = get_tier_config() or {}
+        for tier_id in LAUNCH_MODE_STUDIO_TIERS:
+            persisted.setdefault(tier_id, {})["coming_soon"] = True
+        set_tier_config(persisted)
+
+        set_free_features(sorted(set(free_now) | set(LAUNCH_MODE_FREE_FEATURES)))
+
+        panels = get_homepage_panel_visibility()
+        panels.update({k: False for k in LAUNCH_MODE_HIDDEN_STRIPS})
+        set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(panels))
+    else:
+        if snap is None:
+            return get_launch_mode_status()  # already off: nothing to restore
+
+        persisted = get_tier_config() or {}
+        for tier_id, was in (snap.get("tiers_coming_soon") or {}).items():
+            if tier_id in LAUNCH_MODE_STUDIO_TIERS:
+                persisted.setdefault(tier_id, {})["coming_soon"] = bool(was)
+        set_tier_config(persisted)
+
+        set_free_features(list(snap.get("free_features") or []))
+
+        panels = get_homepage_panel_visibility()
+        for k, was in (snap.get("homepage_panels") or {}).items():
+            if k in LAUNCH_MODE_HIDDEN_STRIPS:
+                panels[k] = bool(was)
+        set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(panels))
+
+        # Cleared last, so an interrupted restore can simply be run again.
+        set_app_setting(LAUNCH_MODE_SETTING_KEY, "")
+
+    return get_launch_mode_status()
+
+
+class AdminLaunchModeRequest(BaseModel):
+    password: str
+    enabled: bool
+
+
+@app.post("/api/admin/launch-mode")
+def admin_launch_mode(request: AdminLaunchModeRequest):
+    """Admin-only master switch for the Quick Analysis-only launch."""
+    _require_admin_password(request.password)
+    return set_launch_mode(request.enabled)
 
 
 # The real, previously-missing link between what a visitor sees on the

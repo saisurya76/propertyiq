@@ -52,6 +52,8 @@ function AdminPanel({ onBack }) {
   const [saveMessage, setSaveMessage] = useState("");
   const [allFeatures, setAllFeatures] = useState([]);
   const [freeFeatures, setFreeFeatures] = useState([]);
+  const [launchMode, setLaunchMode] = useState({ active: false, active_since: null, warnings: [] });
+  const [launchModeMessage, setLaunchModeMessage] = useState("");
   const [freeEligible, setFreeEligible] = useState([]);
   const [freeMessage, setFreeMessage] = useState("");
   const [geminiKeyConfigured, setGeminiKeyConfigured] = useState(false);
@@ -101,6 +103,7 @@ function AdminPanel({ onBack }) {
       setGrants(data.insight_grants);
       setAllFeatures(data.all_features || []);
       setFreeFeatures(data.free_features || []);
+      setLaunchMode(data.launch_mode || { active: false, active_since: null, warnings: [] });
       setFreeEligible(data.free_eligible_features || []);
       setGeminiKeyConfigured(!!data.gemini_api_key_configured);
       setNiSectionVisibility(data.ni_section_visibility || null);
@@ -162,6 +165,35 @@ function AdminPanel({ onBack }) {
       setFreeMessage(`${label} is now ${turningOn ? "free for all signed-in users" : "back to paid-only"}.`);
     } catch (err) {
       setError(err.message || "Couldn't update free features.");
+    }
+  };
+
+  // Master switch for a launch where only Quick Analysis is for sale. The
+  // server applies (or restores) every related setting together and keeps
+  // the previous state, so nothing is left to do by hand. After it runs,
+  // everything on this page is re-read from the server so the screens show
+  // the real current state.
+  const toggleLaunchMode = async () => {
+    const turningOn = !launchMode.active;
+    const msg = turningOn
+      ? "Turn ON Quick Analysis-only launch mode?\n\nThis will, for everyone, immediately:\n• Mark Studio Starter, Pro and Unlimited as COMING SOON (can't be bought)\n• Make the property assessment FREE for signed-in users\n• Hide the Construction Studio, Agent Intelligence and AI Advisor strips on the home page\n\nYour current settings are remembered. People who already have a plan keep it."
+      : "Turn OFF launch mode?\n\nEvery setting it changed goes back exactly to what it was when you turned it on (tier availability, free features and the home page strips). Anything else you changed in the meantime is left alone.";
+    if (!window.confirm(msg)) return;
+    setLaunchModeMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const status = await studioApi.adminSetLaunchMode(password, turningOn);
+      const data = await studioApi.adminOverview(password);
+      setTierConfig(data.tier_config);
+      setFreeFeatures(data.free_features || []);
+      setHomepagePanelVisibility(data.homepage_panel_visibility || null);
+      setLaunchMode(data.launch_mode || status);
+      setLaunchModeMessage(turningOn ? "Launch mode is ON." : "Launch mode is OFF — previous settings restored.");
+    } catch (err) {
+      setError(err.message || "Couldn't change launch mode.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -756,6 +788,24 @@ function AdminPanel({ onBack }) {
       {screen === "tiers" && (
         <>
           <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+
+          <div className="admin-section admin-section-purple">
+            <h3>Quick Analysis-only launch mode</h3>
+            <p className="admin-section-note" style={{ marginTop: -8 }}>
+              One switch for a launch where only Quick Analysis is for sale. ON: Studio tiers become
+              Coming soon, the property assessment becomes free for signed-in users, and the three
+              Studio strips on the home page are hidden. OFF: all of that goes back exactly as it was.
+            </p>
+            <label className="admin-feature-checkbox" style={{ fontWeight: 600 }}>
+              <input type="checkbox" checked={launchMode.active} onChange={toggleLaunchMode} disabled={loading} />
+              Quick Analysis-only launch mode is {launchMode.active ? "ON" : "OFF"}
+              {launchMode.active && launchMode.active_since ? ` (since ${new Date(launchMode.active_since).toLocaleString()})` : ""}
+            </label>
+            {(launchMode.warnings || []).map((w) => (
+              <div key={w} className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>⚠ {w}</div>
+            ))}
+            {launchModeMessage && <div className="studio-status-banner">{launchModeMessage}</div>}
+          </div>
 
           <div className="admin-section admin-section-purple">
             <h3>Tier Configuration</h3>

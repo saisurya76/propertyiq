@@ -140,6 +140,9 @@ export const studioApi = {
   adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility, featureStickerText, freeFeatures) =>
     apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility, feature_sticker_text: featureStickerText, free_features: freeFeatures }) }),
 
+  adminSetLaunchMode: (password, enabled) =>
+    apiFetch("/api/admin/launch-mode", { method: "POST", body: JSON.stringify({ password, enabled }) }),
+
   agentListClients: () => apiFetch("/api/agent/clients"),
   agentGetQuotaSummary: () => apiFetch("/api/agent/quota-summary"),
   agentCreateClient: (clientName, clientContact) =>
