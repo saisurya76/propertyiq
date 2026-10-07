@@ -51,13 +51,13 @@ def test_on_applies_everything():
     assert all(tiers[t]["coming_soon"] is True for t in STUDIO)
     assert tiers["insight_addon"]["coming_soon"] is False  # the one thing for sale
     assert "property_assessment" in get_free_features()
+    # the admin's own show/hide settings are never touched by the mode
     panels = get_homepage_panel_visibility()
-    assert all(panels[k] is False for k in STRIPS)
-    # unrelated panels untouched
-    assert panels["instant_property_score"] is True
+    assert all(panels[k] is True for k in STRIPS)
+    assert client.get("/api/launch-mode").json() == {"active": True}
 
 
-def test_off_restores_the_exact_previous_state():
+def test_off_undoes_exactly_what_on_did():
     # a deliberately mixed starting state
     cfg = copy.deepcopy(DEFAULT_TIER_CONFIG)
     cfg["studio_pro"]["coming_soon"] = True          # already coming soon before
@@ -76,9 +76,16 @@ def test_off_restores_the_exact_previous_state():
     assert tiers["studio_unlimited"]["coming_soon"] is False
     assert get_free_features() == ["emi_calculator"]       # assessment gone, emi kept
     panels = get_homepage_panel_visibility()
+    assert panels["agent_intelligence"] is False            # the admin's own hide is untouched
     assert panels["construction_studio"] is True
-    assert panels["agent_intelligence"] is False            # stays hidden as before
-    assert panels["property_ai_advisor"] is True
+    assert client.get("/api/launch-mode").json() == {"active": False}
+
+
+def test_a_feature_that_was_already_free_stays_free_after_off():
+    set_free_features(["property_assessment"])
+    _mode(True)
+    _mode(False)
+    assert get_free_features() == ["property_assessment"]
 
 
 def test_turning_on_twice_keeps_the_original_snapshot():
@@ -87,7 +94,6 @@ def test_turning_on_twice_keeps_the_original_snapshot():
     _mode(False)
     assert all(get_all_tiers_merged()[t]["coming_soon"] is False for t in STUDIO)
     assert get_free_features() == []
-    assert all(get_homepage_panel_visibility()[k] is True for k in STRIPS)
 
 
 def test_turning_off_when_off_changes_nothing():
@@ -97,19 +103,21 @@ def test_turning_off_when_off_changes_nothing():
     assert get_free_features() == ["emi_calculator"]
 
 
-def test_other_changes_made_while_on_survive_the_restore():
+def test_other_changes_made_while_on_survive_the_undo():
     _mode(True)
-    # admin hides another panel and edits a tier label while the mode is on
+    # while the mode is on the admin hides a panel, edits a label and frees another feature
     panels = get_homepage_panel_visibility()
     panels["hidden_deal"] = False
     set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(panels))
     cfg = get_tier_config()
     cfg["studio_pro"]["label"] = "Pro Plus"
     set_tier_config(cfg)
+    set_free_features(get_free_features() + ["cost_of_living"])
 
     _mode(False)
     assert get_homepage_panel_visibility()["hidden_deal"] is False
     assert get_all_tiers_merged()["studio_pro"]["label"] == "Pro Plus"
+    assert get_free_features() == ["cost_of_living"]  # only the mode's own addition was removed
 
 
 def test_overview_reports_status_and_warns_when_quick_analysis_cannot_sell():
@@ -138,13 +146,11 @@ def test_active_subscribers_keep_access_while_on():
 
 def test_public_endpoints_reflect_the_mode_both_ways():
     _mode(True)
-    vis = client.get("/api/homepage-panels/visibility").json()
-    assert all(vis[k] is False for k in STRIPS)
+    assert client.get("/api/launch-mode").json() == {"active": True}
     tiers = client.get("/api/tiers").json()
     assert all(tiers[t]["coming_soon"] is True for t in STUDIO)
     assert tiers["insight_addon"]["coming_soon"] is False
     _mode(False)
-    vis = client.get("/api/homepage-panels/visibility").json()
-    assert all(vis[k] is True for k in STRIPS)
+    assert client.get("/api/launch-mode").json() == {"active": False}
     tiers = client.get("/api/tiers").json()
     assert all(tiers[t]["coming_soon"] is False for t in STUDIO)

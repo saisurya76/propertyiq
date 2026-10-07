@@ -167,6 +167,13 @@ function StudioPricing({ reportId, currency = "USD", onBack, onLaunchConstructio
       )}
       {error && <div className="studio-status-banner" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#991b1b" }}>{error}</div>}
 
+      {Object.values(tiers).some((t) => t.billing === "subscription" && t.coming_soon) && (
+        <div className="studio-status-banner">
+          New Studio subscriptions are launching soon. Existing subscribers are not affected — plans,
+          features and renewals continue as usual.
+        </div>
+      )}
+
       {status?.tier_id && (
         <div className="studio-status-banner">
           Current plan: <strong>{tiers[status.tier_id]?.label || status.tier_id}</strong>

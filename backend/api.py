@@ -1934,21 +1934,26 @@ def admin_settings(request: AdminSettingsRequest):
 # ---------------------------------------------------------------------------
 # Quick Analysis-only launch mode
 #
-# One master switch that applies, together, everything an "only Quick
-# Analysis is for sale" launch needs, and later puts every touched setting
-# back exactly as it was. It remembers the prior state in a snapshot stored
-# before anything is changed, so a half-finished apply can still be undone.
+# One master switch for a launch where only Quick Analysis is for sale. The
+# rule it must keep, above all: it stops NEW subscriptions and nothing else.
+# Anyone who already has a plan keeps every feature, every quota and every
+# renewal exactly as before.
 #
-# ON:  the three Studio subscription tiers become "coming soon", the
-#      property assessment becomes free for signed-in users (it is the
-#      only way to get a report to buy Quick Analysis from), and the three
-#      Studio feature strips on the home page are hidden.
-# OFF: those same settings are restored to the values saved at ON time.
+# ON:  the three Studio subscription tiers become "coming soon" (new
+#      purchases blocked), and the property assessment becomes free for
+#      signed-in users (the only way to get a report to buy Quick Analysis
+#      from). The three Studio strips on the home page are hidden by the
+#      front end for people WITHOUT access only — it reads launch_mode from
+#      /api/launch-mode, and never touches the admin's own show/hide
+#      settings, so there is nothing to restore for them.
+# OFF: undoes exactly what ON did, and leaves everything else alone.
+#
+# It records what it changed (not a copy of everything) before changing
+# anything, so a half-finished apply can still be undone.
 # ---------------------------------------------------------------------------
 LAUNCH_MODE_SETTING_KEY = "launch_mode_snapshot"
 LAUNCH_MODE_STUDIO_TIERS = ["studio_starter", "studio_pro", "studio_unlimited"]
 LAUNCH_MODE_FREE_FEATURES = ["property_assessment"]
-LAUNCH_MODE_HIDDEN_STRIPS = ["construction_studio", "agent_intelligence", "property_ai_advisor"]
 
 
 def _get_launch_mode_snapshot() -> Optional[dict]:
@@ -1960,6 +1965,10 @@ def _get_launch_mode_snapshot() -> Optional[dict]:
     except json.JSONDecodeError:
         return None
     return snap if isinstance(snap, dict) and snap.get("active") else None
+
+
+def is_launch_mode_active() -> bool:
+    return _get_launch_mode_snapshot() is not None
 
 
 def get_launch_mode_status() -> dict:
@@ -1987,55 +1996,53 @@ def set_launch_mode(enabled: bool) -> dict:
 
     if enabled:
         if snap is not None:
-            return get_launch_mode_status()  # already on: never overwrite the saved original state
+            return get_launch_mode_status()  # already on: never overwrite what was recorded
 
         tiers_now = get_all_tiers_merged()
-        panels_now = get_homepage_panel_visibility()
         free_now = get_free_features()
 
-        # Snapshot FIRST. If anything below fails part-way, turning the mode
-        # off still restores everything.
+        # Record ONLY what this switch is about to change. If anything below
+        # fails part-way, turning the mode off still undoes it.
         snapshot = {
             "active": True,
             "active_since": datetime.now(timezone.utc).isoformat(),
-            "tiers_coming_soon": {t: bool(tiers_now.get(t, {}).get("coming_soon")) for t in LAUNCH_MODE_STUDIO_TIERS},
-            "free_features": list(free_now),
-            "homepage_panels": {k: bool(panels_now.get(k, True)) for k in LAUNCH_MODE_HIDDEN_STRIPS},
+            "tiers_set_coming_soon": [
+                t for t in LAUNCH_MODE_STUDIO_TIERS if not tiers_now.get(t, {}).get("coming_soon")
+            ],
+            "free_features_added": [f for f in LAUNCH_MODE_FREE_FEATURES if f not in free_now],
         }
         set_app_setting(LAUNCH_MODE_SETTING_KEY, json.dumps(snapshot))
 
         persisted = get_tier_config() or {}
-        for tier_id in LAUNCH_MODE_STUDIO_TIERS:
+        for tier_id in snapshot["tiers_set_coming_soon"]:
             persisted.setdefault(tier_id, {})["coming_soon"] = True
         set_tier_config(persisted)
 
         set_free_features(sorted(set(free_now) | set(LAUNCH_MODE_FREE_FEATURES)))
-
-        panels = get_homepage_panel_visibility()
-        panels.update({k: False for k in LAUNCH_MODE_HIDDEN_STRIPS})
-        set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(panels))
     else:
         if snap is None:
-            return get_launch_mode_status()  # already off: nothing to restore
+            return get_launch_mode_status()  # already off: nothing to undo
 
         persisted = get_tier_config() or {}
-        for tier_id, was in (snap.get("tiers_coming_soon") or {}).items():
-            if tier_id in LAUNCH_MODE_STUDIO_TIERS:
-                persisted.setdefault(tier_id, {})["coming_soon"] = bool(was)
+        for tier_id in snap.get("tiers_set_coming_soon") or []:
+            if tier_id in LAUNCH_MODE_STUDIO_TIERS and persisted.get(tier_id, {}).get("coming_soon"):
+                persisted[tier_id]["coming_soon"] = False
         set_tier_config(persisted)
 
-        set_free_features(list(snap.get("free_features") or []))
+        added = set(snap.get("free_features_added") or [])
+        set_free_features([f for f in get_free_features() if f not in added])
 
-        panels = get_homepage_panel_visibility()
-        for k, was in (snap.get("homepage_panels") or {}).items():
-            if k in LAUNCH_MODE_HIDDEN_STRIPS:
-                panels[k] = bool(was)
-        set_app_setting(HOMEPAGE_VISIBILITY_SETTING_KEY, json.dumps(panels))
-
-        # Cleared last, so an interrupted restore can simply be run again.
+        # Cleared last, so an interrupted undo can simply be run again.
         set_app_setting(LAUNCH_MODE_SETTING_KEY, "")
 
     return get_launch_mode_status()
+
+
+@app.get("/api/launch-mode")
+def public_launch_mode():
+    """Public: lets the home page know the Quick Analysis-only launch is on,
+    so it can hide the Studio strips for people who don't have access."""
+    return {"active": is_launch_mode_active()}
 
 
 class AdminLaunchModeRequest(BaseModel):
@@ -2551,8 +2558,13 @@ def subscribe_status(user_email: str = Depends(get_current_user_email)):
     sub = get_subscription(user_email)
     tier_id = get_active_tier(user_email)
 
+    # Every feature this person can actually use right now (subscription,
+    # one-time purchase or admin free list) — lets the front end show the
+    # right doors to the right people.
+    features = [f for f in ALL_FEATURES if user_has_feature(user_email, f)]
+
     if not tier_id:
-        return {"tier_id": None, "status": sub["status"] if sub else "none", "design_quota_per_month": 0, "designs_used_this_month": 0}
+        return {"tier_id": None, "status": sub["status"] if sub else "none", "design_quota_per_month": 0, "designs_used_this_month": 0, "features": features}
 
     tier = get_tier(tier_id)
     quota = tier.get("design_quota_per_month", 0) if tier else 0
@@ -2564,6 +2576,7 @@ def subscribe_status(user_email: str = Depends(get_current_user_email)):
         "design_quota_per_month": quota,
         "designs_used_this_month": used,
         "designs_remaining": None if quota is None else max(0, quota - used),
+        "features": features,
     }
 
 

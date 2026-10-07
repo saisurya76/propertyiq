@@ -176,8 +176,8 @@ function AdminPanel({ onBack }) {
   const toggleLaunchMode = async () => {
     const turningOn = !launchMode.active;
     const msg = turningOn
-      ? "Turn ON Quick Analysis-only launch mode?\n\nThis will, for everyone, immediately:\n• Mark Studio Starter, Pro and Unlimited as COMING SOON (can't be bought)\n• Make the property assessment FREE for signed-in users\n• Hide the Construction Studio, Agent Intelligence and AI Advisor strips on the home page\n\nYour current settings are remembered. People who already have a plan keep it."
-      : "Turn OFF launch mode?\n\nEvery setting it changed goes back exactly to what it was when you turned it on (tier availability, free features and the home page strips). Anything else you changed in the meantime is left alone.";
+      ? "Turn ON Quick Analysis-only launch mode?\n\nThis stops NEW subscriptions and nothing else. Immediately, for everyone:\n• Studio Starter, Pro and Unlimited show as COMING SOON and can't be bought\n• The property assessment becomes FREE for signed-in users\n• The Construction Studio, Agent Intelligence and AI Advisor strips on the home page are hidden from people who don't already have them\n\nPeople who already have a plan keep all their features, limits and renewals, and still see those strips."
+      : "Turn OFF launch mode?\n\nWhat it changed is undone: the Studio tiers become buyable again (if they were before), the assessment stops being free (if it wasn't before), and the home page strips return for everyone. Anything else you changed in the meantime is left alone.";
     if (!window.confirm(msg)) return;
     setLaunchModeMessage("");
     setError("");
@@ -792,9 +792,10 @@ function AdminPanel({ onBack }) {
           <div className="admin-section admin-section-purple">
             <h3>Quick Analysis-only launch mode</h3>
             <p className="admin-section-note" style={{ marginTop: -8 }}>
-              One switch for a launch where only Quick Analysis is for sale. ON: Studio tiers become
-              Coming soon, the property assessment becomes free for signed-in users, and the three
-              Studio strips on the home page are hidden. OFF: all of that goes back exactly as it was.
+              One switch for a launch where only Quick Analysis is for sale. It stops NEW subscriptions
+              and nothing else. ON: Studio tiers become Coming soon, the property assessment becomes free
+              for signed-in users, and the three Studio strips on the home page are hidden from people who
+              don't already have them. Existing subscribers keep everything. OFF: all of that is undone.
             </p>
             <label className="admin-feature-checkbox" style={{ fontWeight: 600 }}>
               <input type="checkbox" checked={launchMode.active} onChange={toggleLaunchMode} disabled={loading} />
