@@ -11,7 +11,7 @@ const MODE_TEXT = {
     "Immediate closure: refund each customer's latest payment in full and cancel now. Needs funds in your Dodo wallet. Also closes Quick Analysis.",
 };
 
-export default function WindDownPanel({ password }) {
+export default function WindDownPanel({ password, refreshTick = 0 }) {
   const [summary, setSummary] = useState(null);
   const [mode, setMode] = useState("period_end");
   const [message, setMessage] = useState("");
@@ -33,7 +33,7 @@ export default function WindDownPanel({ password }) {
       .adminWindDownStatus(password)
       .then(setSummary)
       .catch((err) => setError(err.message || "Couldn't load wind-down status."));
-  }, [password]);
+  }, [password, refreshTick]);
 
   const run = async (fn, doneNote) => {
     setBusy(true); setError(""); setNote("");

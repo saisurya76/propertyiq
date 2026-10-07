@@ -53,6 +53,8 @@ function AdminPanel({ onBack }) {
   const [subscriptions, setSubscriptions] = useState([]);
   const [grants, setGrants] = useState([]);
   const [saveMessage, setSaveMessage] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [allFeatures, setAllFeatures] = useState([]);
   const [freeFeatures, setFreeFeatures] = useState([]);
   const [launchMode, setLaunchMode] = useState({ active: false, active_since: null, warnings: [] });
@@ -95,26 +97,32 @@ function AdminPanel({ onBack }) {
   const [quotaResetNote, setQuotaResetNote] = useState("");
   const [quotaMessage, setQuotaMessage] = useState("");
 
+  // Everything the overview call returns, in one place, so login and Refresh
+  // can never drift apart (Refresh used to update only some of it).
+  const applyOverview = (data) => {
+    setTierConfig(data.tier_config);
+    setSubscriptions(data.subscriptions);
+    setGrants(data.insight_grants);
+    setAllFeatures(data.all_features || []);
+    setFreeFeatures(data.free_features || []);
+    setLaunchMode(data.launch_mode || { active: false, active_since: null, warnings: [] });
+    setFreeEligible(data.free_eligible_features || []);
+    setGeminiKeyConfigured(!!data.gemini_api_key_configured);
+    setNiSectionVisibility(data.ni_section_visibility || null);
+    setHomepagePanelVisibility(data.homepage_panel_visibility || null);
+    setFeatureStickerText(data.feature_sticker_text || null);
+    setFeatureUsage(data.feature_usage || null);
+    setTechStack(data.tech_stack || []);
+    setUsersByCountry(data.users_by_country || []);
+  };
+
   const login = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       const data = await studioApi.adminOverview(password);
-      setTierConfig(data.tier_config);
-      setSubscriptions(data.subscriptions);
-      setGrants(data.insight_grants);
-      setAllFeatures(data.all_features || []);
-      setFreeFeatures(data.free_features || []);
-      setLaunchMode(data.launch_mode || { active: false, active_since: null, warnings: [] });
-      setFreeEligible(data.free_eligible_features || []);
-      setGeminiKeyConfigured(!!data.gemini_api_key_configured);
-      setNiSectionVisibility(data.ni_section_visibility || null);
-      setHomepagePanelVisibility(data.homepage_panel_visibility || null);
-      setFeatureStickerText(data.feature_sticker_text || null);
-      setFeatureUsage(data.feature_usage || null);
-      setTechStack(data.tech_stack || []);
-      setUsersByCountry(data.users_by_country || []);
+      applyOverview(data);
       setAuthed(true);
     } catch (err) {
       setError(err.message || "Incorrect password.");
@@ -543,22 +551,28 @@ function AdminPanel({ onBack }) {
     }
   };
 
+  // Re-reads everything on the current screen from the server and says so.
+  // (It used to update only part of the data and show nothing, so it looked
+  // dead.) Anything typed but not yet saved on the tier screen is replaced
+  // by what the server has, which is what a refresh means.
   const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setError("");
+    setSaveMessage("");
     try {
-      // true: the admin's own "Refresh" button is exactly the moment a
-      // real, live Dodo price is most wanted — right after checking or
-      // changing something in Dodo's own dashboard — so this bypasses
-      // the 15-minute price cache rather than potentially showing
-      // whatever was cached from just before that change.
-      const data = await studioApi.adminOverview(password, true);
-      setTierConfig(data.tier_config);
-      setSubscriptions(data.subscriptions);
-      setGrants(data.insight_grants);
-      setFeatureUsage(data.feature_usage || null);
-      setTechStack(data.tech_stack || []);
-      setUsersByCountry(data.users_by_country || []);
+      // true: bypasses the 15-minute Dodo price cache, since Refresh is the
+      // moment a just-changed Dodo price is most wanted.
+      applyOverview(await studioApi.adminOverview(password, true));
+      if (screen === "refunds") await loadRefundHistory();
+      if (screen === "refund-requests") await loadRefundRequests(refundRequestsFilter);
+      if (screen === "loan-eligibility") setLoanEligibilitySettings(await studioApi.getLoanEligibilitySettings());
+      setRefreshTick((n) => n + 1);
+      setSaveMessage(`Refreshed at ${new Date().toLocaleTimeString()}.`);
     } catch (err) {
       setError(err.message || "Couldn't refresh.");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -629,7 +643,7 @@ function AdminPanel({ onBack }) {
           <div className="admin-dashboard-eyebrow">PropertyIQWeb Studio</div>
           <h2>{screen === "menu" ? "Admin Dashboard" : MENU_ITEMS.find((i) => i.screen === screen)?.label}</h2>
         </div>
-        <span className="admin-refresh-btn" onClick={refresh}>⟳ Refresh</span>
+        <button type="button" className="page-refresh-btn admin-refresh-btn" onClick={refresh} disabled={refreshing}>{refreshing ? "Refreshing…" : "⟳ Refresh"}</button>
       </div>
 
       {error && (
@@ -824,7 +838,7 @@ function AdminPanel({ onBack }) {
             )}
           </div>
 
-          <WindDownPanel password={password} />
+          <WindDownPanel password={password} refreshTick={refreshTick} />
 
           <div className="admin-section admin-section-purple">
             <h3>Tier Configuration</h3>
