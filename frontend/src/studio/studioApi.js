@@ -155,6 +155,8 @@ export const studioApi = {
   adminSetLaunchMode: (password, enabled) =>
     apiFetch("/api/admin/launch-mode", { method: "POST", body: JSON.stringify({ password, enabled }) }),
 
+  adminManual: (password) =>
+    apiFetch("/api/admin/manual", { method: "POST", body: JSON.stringify({ password }) }),
   adminWindDownStatus: (password) =>
     apiFetch("/api/admin/wind-down/status", { method: "POST", body: JSON.stringify({ password }) }),
   adminWindDownStart: (password, mode, confirm, message) =>

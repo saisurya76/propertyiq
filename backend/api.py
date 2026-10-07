@@ -164,6 +164,7 @@ from backend.webhook_store import (
 )
 
 from backend import safety_monitor, wind_down_store, wind_down_email
+from backend.admin_manual import MANUAL as ADMIN_MANUAL
 from backend.wind_down_store import initialize_wind_down_store
 from backend.config_store import (
     DEFAULT_TIER_CONFIG,
@@ -1311,6 +1312,14 @@ def fx_rates():
     """USD-based FX table for converting displayed prices (tier pricing,
     Construction Studio estimates) to the visitor's local currency."""
     return get_fx_rates()
+
+
+@app.post("/api/admin/manual")
+def admin_manual(request: AdminAuthRequest):
+    """Admin-only user manual. Password-gated like every admin call, and
+    deliberately served from here rather than bundled into the public site."""
+    _require_admin_password(request.password)
+    return {"sections": ADMIN_MANUAL}
 
 
 @app.post("/api/admin/tiers")

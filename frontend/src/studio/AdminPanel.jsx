@@ -1,4 +1,5 @@
 import WindDownPanel from "./WindDownPanel";
+import AdminManual from "./AdminManual";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { studioApi } from "./studioApi";
 import WorldUsersMap from "./WorldUsersMap";
@@ -37,6 +38,7 @@ const MENU_ITEMS = [
   { screen: "grants", label: "Quick Analysis Grants", desc: "Every Quick Analysis purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
   { screen: "refund-requests", label: "Refund Requests", desc: "Review and act on refund requests customers have actually submitted." },
+  { screen: "manual", label: "User Manual", desc: "How every admin screen works, step-by-step runbooks (refunds, launch mode, wind-down, Dodo) and what to do when something goes wrong." },
   { screen: "reset-quota", label: "Reset User Quota", desc: "Give a user a fresh monthly design quota without waiting for the month to roll over." },
 ];
 
@@ -1530,6 +1532,13 @@ function AdminPanel({ onBack }) {
               })
             )}
           </div>
+        </>
+      )}
+
+      {screen === "manual" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+          <AdminManual password={password} />
         </>
       )}
 
