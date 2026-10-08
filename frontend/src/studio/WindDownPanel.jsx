@@ -98,7 +98,7 @@ export default function WindDownPanel({ password, refreshTick = 0 }) {
       {!state && (
         <>
           {Object.entries(MODE_TEXT).map(([key, text]) => (
-            <label key={key} className="admin-feature-checkbox" style={{ display: "block", margin: "6px 0" }}>
+            <label key={key} className="admin-radio-option">
               <input type="radio" name="wind-mode" checked={mode === key} onChange={() => setMode(key)} /> {text}
             </label>
           ))}
