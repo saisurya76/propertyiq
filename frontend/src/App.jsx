@@ -1190,11 +1190,6 @@ function App() {
   return (
     <div className="app">
 
-      <SessionBar
-        onSignOut={() => handleSignOut("main")}
-        onManagePlan={goToPricing}
-        onSignIn={() => requireTerms(() => { setPendingAuthAction("signin"); setStudioView("auth"); })}
-      />
 
       {siteNotice && (
         <div className="payment-return-banner payment-return-banner-neutral" role="status">
@@ -1215,6 +1210,12 @@ function App() {
         </div>
       )}
 
+      <div className="top-controls">
+      <SessionBar
+        onSignOut={() => handleSignOut("main")}
+        onManagePlan={goToPricing}
+        onSignIn={() => requireTerms(() => { setPendingAuthAction("signin"); setStudioView("auth"); })}
+      />
       <div className="language-bar" aria-label="Language selection">
         <label htmlFor="propertyiq-language">Language</label>
         <select
@@ -1227,6 +1228,7 @@ function App() {
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
+      </div>
       </div>
 
       <div className="site-switch-bar" aria-label="Country site selection" title="Switching sites changes currency, materials catalog, and units for THIS session going forward — it does not affect your existing saved designs from other countries">

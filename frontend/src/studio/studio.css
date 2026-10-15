@@ -3223,3 +3223,22 @@
   cursor: pointer;
 }
 .session-sign-in-btn:hover { background: #f3ebff; }
+
+/* Home page top row: Sign in / session info sits level with Language */
+.top-controls {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px 18px;
+}
+.top-controls .session-bar { margin: 0; max-width: none; }
+.top-controls .language-bar { margin-bottom: 0; }
+.top-controls .session-bar.session-bar-signed-out {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
