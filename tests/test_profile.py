@@ -214,3 +214,62 @@ def test_delete_account_still_deletes_data_even_if_dodo_cancellation_fails():
 
     assert r.status_code == 200
     assert is_email_in_cooling_off(email) is True
+
+
+def test_cancel_subscription_is_remembered_and_shown_in_profile():
+    import datetime
+    email = "cancelshown@example.com"
+    headers = _authed_headers(email)
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_cancel_shown")
+
+    before = client.get("/api/profile", headers=headers).json()["tier"]
+    assert before["cancel_scheduled"] is False
+
+    sent = []
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email", side_effect=lambda **kw: sent.append(kw)):
+        mock_client_cls.return_value.subscriptions.retrieve.return_value = MagicMock(
+            next_billing_date=datetime.datetime(2026, 11, 12)
+        )
+        r = client.post("/api/profile/cancel-subscription", headers=headers, json={})
+        again = client.post("/api/profile/cancel-subscription", headers=headers, json={})
+
+    assert r.status_code == 200 and r.json()["access_until"] == "12 November 2026"
+    # second click is answered from memory: one Dodo update, one email
+    assert again.status_code == 200 and again.json().get("already") is True
+    assert mock_client_cls.return_value.subscriptions.update.call_count == 1
+    assert len(sent) == 1
+    assert "12 November 2026" in sent[0]["html"] and "Studio" in sent[0]["html"]
+
+    after = client.get("/api/profile", headers=headers).json()["tier"]
+    assert after["status"] == "active"  # still has access
+    assert after["cancel_scheduled"] is True
+    assert after["access_until"] == "12 November 2026"
+
+
+def test_cancel_still_works_when_billing_date_lookup_fails():
+    email = "cancelnodate@example.com"
+    headers = _authed_headers(email)
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_cancel_nodate")
+    with patch("backend.api.DODO_API_KEY", "fake_key"), \
+         patch("backend.api.DodoPayments") as mock_client_cls, \
+         patch("backend.api.send_email"):
+        mock_client_cls.return_value.subscriptions.retrieve.side_effect = RuntimeError("boom")
+        r = client.post("/api/profile/cancel-subscription", headers=headers, json={})
+    assert r.status_code == 200 and r.json()["access_until"] is None
+    assert client.get("/api/profile", headers=headers).json()["tier"]["cancel_scheduled"] is True
+
+
+def test_a_new_purchase_clears_the_not_renewing_flag():
+    from backend.subscription_store import set_cancellation, get_subscription
+    email = "resub@example.com"
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_old")
+    set_cancellation(email, True, "1 January 2027")
+    # same subscription id (e.g. a webhook update): flag stays
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_old")
+    assert get_subscription(email)["cancel_scheduled"] is True
+    # a brand-new subscription id: flag cleared
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_new")
+    s = get_subscription(email)
+    assert s["cancel_scheduled"] is False and s["access_until"] is None

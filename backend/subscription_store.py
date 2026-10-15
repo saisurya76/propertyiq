@@ -20,6 +20,24 @@ def initialize_subscription_store() -> None:
                 )
                 """
             )
+            # Customer-requested "do not renew" (or a wind-down's). Status stays
+            # 'active' until the period really ends, so these two columns are
+            # what lets the app show "Ends on <date>".
+            cursor.execute("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_scheduled BOOLEAN NOT NULL DEFAULT FALSE")
+            cursor.execute("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS access_until TEXT")
+        connection.commit()
+
+
+def set_cancellation(email: str, scheduled: bool, access_until: Optional[str] = None) -> None:
+    """Record (or clear) that a subscription will not renew. access_until is
+    a display date string; clearing also clears it."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE subscriptions SET cancel_scheduled = %s, access_until = %s, updated_at = %s WHERE email = %s",
+                (bool(scheduled), access_until if scheduled else None, now, email.strip().lower()),
+            )
         connection.commit()
 
 
@@ -46,6 +64,13 @@ def upsert_subscription(
                     status = excluded.status,
                     dodo_subscription_id = COALESCE(excluded.dodo_subscription_id, subscriptions.dodo_subscription_id),
                     dodo_checkout_session_id = COALESCE(excluded.dodo_checkout_session_id, subscriptions.dodo_checkout_session_id),
+                    -- a brand-new Dodo subscription id means a fresh purchase: drop any old "not renewing" flag
+                    cancel_scheduled = CASE WHEN excluded.dodo_subscription_id IS NOT NULL
+                        AND excluded.dodo_subscription_id IS DISTINCT FROM subscriptions.dodo_subscription_id
+                        THEN FALSE ELSE subscriptions.cancel_scheduled END,
+                    access_until = CASE WHEN excluded.dodo_subscription_id IS NOT NULL
+                        AND excluded.dodo_subscription_id IS DISTINCT FROM subscriptions.dodo_subscription_id
+                        THEN NULL ELSE subscriptions.access_until END,
                     updated_at = excluded.updated_at
                 """,
                 (email, tier_id, status, dodo_subscription_id, dodo_checkout_session_id, now, now),

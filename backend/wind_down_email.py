@@ -93,3 +93,25 @@ def build_resumed_email(*, plan: str) -> str:
         f"<strong>{plan}</strong> plan. It will renew as normal on your next billing date and nothing changes "
         f"for you. You can still cancel any time from your profile.</p>{_terms_line('section 9.1')}",
     )
+
+
+def self_cancel_subject() -> str:
+    return "Your PropertyIQWeb subscription will not renew"
+
+
+def build_self_cancel_email(*, plan: str, access_until: Optional[str]) -> str:
+    """Sent when a customer cancels their own plan from their profile."""
+    until = f"until <strong>{access_until}</strong>" if access_until else "until the end of your current billing period"
+    return _wrap(
+        "Your subscription will not renew",
+        f"<p>As you asked, your <strong>{plan}</strong> plan is set <strong>not to renew</strong>. "
+        f"You will not be charged again.</p>"
+        f"<p>You keep full access to your plan {until}. The current period is not refunded, as it is already "
+        f"delivered.</p>"
+        f"<p>Your account and saved designs are <strong>not deleted</strong>. You can subscribe again from the "
+        f"pricing page whenever you like.</p>"
+        f'<p style="font-size:13px;color:#5b6f7c;">This follows our '
+        f'<a href="{SITE}/refund-policy.html">Refund Policy</a> and '
+        f'<a href="{SITE}/terms-of-service.html">Terms of Service</a>. '
+        f'Questions: <a href="mailto:{SUPPORT}">{SUPPORT}</a>.</p>',
+    )

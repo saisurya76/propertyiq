@@ -11,7 +11,7 @@ import uuid
 import asyncio
 import time
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, date, timezone, timedelta
 from contextlib import asynccontextmanager
 import requests
 
@@ -187,6 +187,7 @@ from backend.config_store import (
 from backend.subscription_store import (
     initialize_subscription_store,
     upsert_subscription,
+    set_cancellation,
     count_active_by_tier,
     get_subscription,
     set_status_by_dodo_id,
@@ -2354,6 +2355,8 @@ def _wind_down_one(client, item: dict, state: dict) -> None:
                     cancel_reason="cancelled_by_merchant",
                     cancellation_comment=note or "Service wind-down",
                 )
+        if not local_only:
+            set_cancellation(email, True, access_until)
         wind_down_store.update_item(email, status="scheduled", access_until=access_until, error=None)
         subject, html = wind_down_email.period_end_subject(), wind_down_email.build_period_end_email(
             plan=plan, access_until=access_until, message=note
@@ -2450,6 +2453,7 @@ def admin_wind_down_resume(request: AdminWindDownResumeRequest):
             dodo_id = sub.get("dodo_subscription_id")
             if dodo_id and not str(dodo_id).startswith("beta_dummy_"):
                 client.subscriptions.update(dodo_id, cancel_at_next_billing_date=False)
+            set_cancellation(item["email"], False)
             wind_down_store.update_item(item["email"], status="resumed", error=None)
             resumed += 1
             tier = get_tier(sub["tier_id"]) or {}
@@ -3080,6 +3084,8 @@ def get_profile(user_email: str = Depends(get_current_user_email)):
             "label": tier.get("label") if tier else None,
             "price_usd": tier.get("price_usd") if tier else None,
             "status": sub["status"] if sub else "none",
+            "cancel_scheduled": bool(sub and sub.get("cancel_scheduled") and sub["status"] == "active"),
+            "access_until": sub.get("access_until") if sub else None,
         },
         "quota": {
             "design_quota_per_month": quota,
@@ -3124,12 +3130,24 @@ def cancel_subscription(request: ProfileCancelSubscriptionRequest, user_email: s
     sub = get_subscription(user_email)
     if not sub or not sub.get("dodo_subscription_id"):
         raise HTTPException(status_code=400, detail="No active subscription to cancel.")
+    if sub.get("cancel_scheduled"):
+        # Already done: answer the same way instead of a second Dodo call and email.
+        return {"status": "cancellation_scheduled", "access_until": sub.get("access_until"), "already": True}
 
     if not DODO_API_KEY:
         raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
 
+    access_until = None
     try:
         client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        try:
+            nbd = getattr(client.subscriptions.retrieve(sub["dodo_subscription_id"]), "next_billing_date", None)
+            if isinstance(nbd, (datetime, date)):
+                access_until = nbd.strftime("%d %B %Y")
+            elif isinstance(nbd, str) and nbd.strip():
+                access_until = nbd.strip()
+        except Exception as exc:  # the date is a nicety; never block the cancellation on it
+            logger.warning(f"cancel_subscription: couldn't read next billing date for {user_email!r}: {exc}")
         client.subscriptions.update(
             sub["dodo_subscription_id"],
             cancel_at_next_billing_date=True,
@@ -3140,16 +3158,19 @@ def cancel_subscription(request: ProfileCancelSubscriptionRequest, user_email: s
         logger.error(f"cancel_subscription: Dodo API call failed for {user_email!r}: {exc}")
         raise HTTPException(status_code=502, detail=f"Dodo couldn't process the cancellation: {exc}")
 
+    set_cancellation(user_email, True, access_until)
+
     try:
+        tier = get_tier(sub["tier_id"]) or {}
         send_email(
             to_email=user_email,
-            subject="Your PropertyIQWeb subscription will not renew",
-            html="Your subscription is set to cancel at the end of your current billing period. You'll keep full access until then.",
+            subject=wind_down_email.self_cancel_subject(),
+            html=wind_down_email.build_self_cancel_email(plan=tier.get("label", sub["tier_id"]), access_until=access_until),
         )
     except Exception as exc:
         logger.error(f"cancel_subscription: confirmation email failed for {user_email!r}: {exc}")
 
-    return {"status": "cancellation_scheduled"}
+    return {"status": "cancellation_scheduled", "access_until": access_until}
 
 
 class ProfileDeleteAccountRequest(BaseModel):

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { studioApi } from "./studioApi";
 
 function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
@@ -11,6 +11,8 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const cardRef = useRef(null);
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   useEffect(() => {
@@ -24,15 +26,20 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
   }, []);
 
   const handleCancelSubscription = async () => {
-    if (!window.confirm("Cancel your subscription? You'll keep access until the end of your current billing period, then it won't renew.")) return;
     setBusy(true);
     setActionMessage("");
     setError("");
     try {
-      await studioApi.cancelSubscription(cancelReason.trim() || undefined);
-      setActionMessage("Your subscription is set to cancel at the end of this billing period.");
+      const result = await studioApi.cancelSubscription(cancelReason.trim() || undefined);
+      const until = result?.access_until;
+      setActionMessage(
+        `Done. Your subscription will not renew and you won't be charged again. You keep full access ${until ? `until ${until}` : "until the end of your current billing period"}. We've emailed you a confirmation.`
+      );
+      setConfirmingCancel(false);
       const refreshed = await studioApi.getProfile();
       setProfile(refreshed);
+      // The button is far down the card; bring the confirmation into view.
+      if (cardRef.current) cardRef.current.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err.message || "Couldn't cancel your subscription.");
     } finally {
@@ -59,7 +66,7 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
 
   return (
     <div className="refund-request-overlay" role="dialog" aria-modal="true" aria-label="Your profile">
-      <div className="refund-request-card" style={{ maxWidth: 560 }}>
+      <div className="refund-request-card" style={{ maxWidth: 560 }} ref={cardRef}>
         <h3>Your Account</h3>
 
         {loading && <p className="refund-request-intro">Loading...</p>}
@@ -104,6 +111,11 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
               {profile.tier.tier_id
                 ? `${profile.tier.label} — $${profile.tier.price_usd}/mo (${profile.tier.status})`
                 : "No active plan."}
+              {profile.tier.cancel_scheduled && (
+                <span className="profile-ending-badge">
+                  Not renewing{profile.tier.access_until ? ` · access until ${profile.tier.access_until}` : ""}
+                </span>
+              )}
             </p>
 
             {/* 2. Remaining designs */}
@@ -159,22 +171,45 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
             </div>
 
             {/* 6. Disable account / stop subscription */}
-            {profile.tier.tier_id && profile.tier.status === "active" && (
+            {profile.tier.tier_id && profile.tier.status === "active" && profile.tier.cancel_scheduled && (
+              <div className="profile-cancel-note">
+                <strong>Your subscription will not renew.</strong>{" "}
+                You keep full access{profile.tier.access_until ? ` until ${profile.tier.access_until}` : " until the end of your current billing period"}.
+                You won't be charged again. Your account and saved designs stay intact, and you can subscribe again from the plans page any time.
+              </div>
+            )}
+            {profile.tier.tier_id && profile.tier.status === "active" && !profile.tier.cancel_scheduled && (
               <>
                 <h4 style={{ marginBottom: 4 }}>Cancel Subscription</h4>
                 <p className="refund-request-intro">Stops future billing. You keep access until your current period ends. Your account and data stay intact.</p>
-                <input
-                  type="text"
-                  placeholder="Reason (optional)"
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  style={{ marginBottom: 8 }}
-                />
-                <div className="refund-request-actions" style={{ justifyContent: "flex-start", marginBottom: 20 }}>
-                  <button type="button" className="terms-gate-decline" onClick={handleCancelSubscription} disabled={busy}>
-                    Cancel Subscription
-                  </button>
-                </div>
+                {!confirmingCancel ? (
+                  <div className="refund-request-actions" style={{ justifyContent: "flex-start", marginBottom: 20 }}>
+                    <button type="button" className="terms-gate-decline" onClick={() => setConfirmingCancel(true)} disabled={busy}>
+                      Cancel Subscription
+                    </button>
+                  </div>
+                ) : (
+                  <div className="profile-cancel-confirm">
+                    <p className="refund-request-intro" style={{ marginTop: 0 }}>
+                      <strong>Cancel your subscription?</strong> It won't renew. The current period is not refunded, and you keep access until it ends.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Reason (optional)"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      style={{ marginBottom: 8 }}
+                    />
+                    <div className="refund-request-actions" style={{ justifyContent: "flex-start" }}>
+                      <button type="button" className="terms-gate-accept" onClick={() => setConfirmingCancel(false)} disabled={busy}>
+                        Keep my plan
+                      </button>
+                      <button type="button" className="terms-gate-decline" onClick={handleCancelSubscription} disabled={busy}>
+                        {busy ? "Cancelling..." : "Yes, cancel it"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
