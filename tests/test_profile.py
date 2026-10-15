@@ -273,3 +273,26 @@ def test_a_new_purchase_clears_the_not_renewing_flag():
     upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_new")
     s = get_subscription(email)
     assert s["cancel_scheduled"] is False and s["access_until"] is None
+
+
+def test_profile_picks_up_a_cancellation_made_before_we_stored_it():
+    import datetime
+    email = "oldcancel@example.com"
+    headers = _authed_headers(email)
+    upsert_subscription(email=email, tier_id="studio_pro", status="active", dodo_subscription_id="sub_old_cancel")
+    with patch("backend.api.DODO_API_KEY", "fake_key"), patch("backend.api.DodoPayments") as cls:
+        cls.return_value.subscriptions.retrieve.return_value = MagicMock(
+            cancel_at_next_billing_date=True, next_billing_date=datetime.datetime(2026, 11, 20)
+        )
+        cls.return_value.payments.list.return_value = MagicMock(items=[])
+        tier = client.get("/api/profile", headers=headers).json()["tier"]
+    assert tier["cancel_scheduled"] is True and tier["access_until"] == "20 November 2026"
+
+    # and if it is reversed on Dodo's side, the flag clears
+    with patch("backend.api.DODO_API_KEY", "fake_key"), patch("backend.api.DodoPayments") as cls:
+        cls.return_value.subscriptions.retrieve.return_value = MagicMock(
+            cancel_at_next_billing_date=False, next_billing_date=datetime.datetime(2026, 11, 20)
+        )
+        cls.return_value.payments.list.return_value = MagicMock(items=[])
+        tier = client.get("/api/profile", headers=headers).json()["tier"]
+    assert tier["cancel_scheduled"] is False

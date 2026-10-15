@@ -3036,6 +3036,27 @@ def get_profile(user_email: str = Depends(get_current_user_email)):
 
     payments = []
     payments_note = ""
+    if sub and sub.get("dodo_subscription_id") and DODO_API_KEY and sub.get("status") == "active" \
+            and not str(sub["dodo_subscription_id"]).startswith("beta_dummy_"):
+        # Dodo is the source of truth for "will not renew". Sync our copy so a
+        # cancellation made before we stored it, or in Dodo's own dashboard,
+        # still shows up here (and a reversed one disappears).
+        try:
+            live = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT).subscriptions.retrieve(
+                sub["dodo_subscription_id"]
+            )
+            cancelling = getattr(live, "cancel_at_next_billing_date", None)
+            if cancelling is True or cancelling is False:
+                nbd = getattr(live, "next_billing_date", None)
+                until = nbd.strftime("%d %B %Y") if isinstance(nbd, (datetime, date)) else (nbd.strip() if isinstance(nbd, str) and nbd.strip() else None)
+                if cancelling and (not sub.get("cancel_scheduled") or (until and until != sub.get("access_until"))):
+                    set_cancellation(user_email, True, until or sub.get("access_until"))
+                    sub = get_subscription(user_email)
+                elif not cancelling and sub.get("cancel_scheduled"):
+                    set_cancellation(user_email, False)
+                    sub = get_subscription(user_email)
+        except Exception as exc:
+            logger.warning(f"get_profile: couldn't sync cancellation state for {user_email!r}: {exc}")
     if sub and sub.get("dodo_subscription_id") and DODO_API_KEY:
         try:
             client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
