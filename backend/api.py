@@ -2514,6 +2514,59 @@ def _validate_checkout_currency(currency: Optional[str]) -> Optional[str]:
     return None
 
 
+def _format_dodo_date(value) -> Optional[str]:
+    if isinstance(value, (datetime, date)):
+        return value.strftime("%d %B %Y")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _is_real_dodo_id(value) -> bool:
+    return bool(value) and not str(value).startswith("beta_dummy_")
+
+
+def _cancel_replaced_subscription(old_dodo_id: str, email: str) -> None:
+    """A customer who completes a NEW checkout while an older Dodo subscription
+    is still running would otherwise be billed by both: our row (one per
+    email) points at the new one and nothing ever stops the old one. Stop the
+    old one at the end of the period it has already been paid for."""
+    if not DODO_API_KEY or not _is_real_dodo_id(old_dodo_id):
+        return
+    try:
+        DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT).subscriptions.update(
+            old_dodo_id,
+            cancel_at_next_billing_date=True,
+            cancel_reason="cancelled_by_customer",
+            cancellation_comment="Replaced by a new subscription",
+        )
+        logger.info(f"webhook: stopped replaced subscription {old_dodo_id} for {email!r}")
+    except Exception as exc:
+        logger.error(f"webhook: couldn't stop replaced subscription {old_dodo_id} for {email!r} (check Dodo): {exc}")
+        try:
+            _safety_log("alert", f"Could not stop an older Dodo subscription ({old_dodo_id}) after {email} subscribed again. Check it in Dodo to avoid double billing.")
+        except Exception:
+            pass
+
+
+def _event_conflicts_with_active_row(email: str, event_dodo_id, webhook_client) -> bool:
+    """True when this event belongs to a DIFFERENT Dodo subscription than the
+    one the customer's active row points at, and that other subscription is
+    just winding down. Such an event (e.g. the old plan's update after a plan
+    change) must not move the row back to the old subscription."""
+    existing = get_subscription(email)
+    if not existing or existing.get("status") != "active":
+        return False
+    current_id = existing.get("dodo_subscription_id")
+    if not _is_real_dodo_id(current_id) or not event_dodo_id or event_dodo_id == current_id:
+        return False
+    try:
+        live = webhook_client.subscriptions.retrieve(event_dodo_id)
+        return bool(getattr(live, "cancel_at_next_billing_date", False))
+    except Exception:
+        return True  # can't tell: keep the access the customer already has
+
+
 @app.post("/api/subscribe/checkout")
 def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depends(get_current_user_email)):
     """Creates a Dodo checkout session for a subscription tier. The Dodo
@@ -2528,6 +2581,20 @@ def subscribe_checkout(request: SubscribeCheckoutRequest, user_email: str = Depe
         raise HTTPException(status_code=404, detail=f"Unknown tier: {request.tier_id}")
     if tier.get("billing") != "subscription":
         raise HTTPException(status_code=400, detail=f"Tier '{request.tier_id}' is not a subscription tier")
+    existing = get_subscription(user_email)
+    if existing and existing.get("status") == "active" and existing.get("tier_id") == request.tier_id \
+            and _is_real_dodo_id(existing.get("dodo_subscription_id")):
+        # A second checkout for the plan they already hold would bill them twice.
+        if existing.get("cancel_scheduled"):
+            until = existing.get("access_until")
+            raise HTTPException(
+                status_code=409,
+                detail=f"You already have {tier.get('label', request.tier_id)}"
+                       f"{' until ' + until if until else ' until the end of this billing period'}. "
+                       "To continue it, use 'Keep my plan' in your account. "
+                       "To come back later, subscribe again after it ends.",
+            )
+        raise HTTPException(status_code=409, detail=f"You are already on {tier.get('label', request.tier_id)}.")
     if tier.get("coming_soon"):
         raise HTTPException(
             status_code=403,
@@ -2887,7 +2954,19 @@ async def dodo_webhook(request: Request):
     # treated as an automatic "activate" signal the way
     # subscription.active can; it must be interpreted using the
     # payload's own current status field instead.
-    if event_type in ("subscription.active", "subscription.renewed") and tier_id and user_email:
+    _stale_event = (
+        event_type in ("subscription.renewed", "subscription.updated")
+        and sub_status in (None, "active")
+        and bool(tier_id and user_email)
+        and _event_conflicts_with_active_row(user_email, dodo_subscription_id, webhook_client)
+    )
+    if _stale_event:
+        logger.info(f"webhook: ignored {event_type} for replaced subscription {dodo_subscription_id} ({user_email!r})")
+    elif event_type in ("subscription.active", "subscription.renewed") and tier_id and user_email:
+        _prior = get_subscription(user_email)
+        if _prior and _prior.get("status") == "active" and dodo_subscription_id \
+                and _prior.get("dodo_subscription_id") != dodo_subscription_id:
+            _cancel_replaced_subscription(_prior.get("dodo_subscription_id"), user_email)
         upsert_subscription(
             email=user_email,
             tier_id=tier_id,
@@ -3163,10 +3242,7 @@ def cancel_subscription(request: ProfileCancelSubscriptionRequest, user_email: s
         client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
         try:
             nbd = getattr(client.subscriptions.retrieve(sub["dodo_subscription_id"]), "next_billing_date", None)
-            if isinstance(nbd, (datetime, date)):
-                access_until = nbd.strftime("%d %B %Y")
-            elif isinstance(nbd, str) and nbd.strip():
-                access_until = nbd.strip()
+            access_until = _format_dodo_date(nbd)
         except Exception as exc:  # the date is a nicety; never block the cancellation on it
             logger.warning(f"cancel_subscription: couldn't read next billing date for {user_email!r}: {exc}")
         client.subscriptions.update(
@@ -3192,6 +3268,52 @@ def cancel_subscription(request: ProfileCancelSubscriptionRequest, user_email: s
         logger.error(f"cancel_subscription: confirmation email failed for {user_email!r}: {exc}")
 
     return {"status": "cancellation_scheduled", "access_until": access_until}
+
+
+@app.post("/api/profile/resume-subscription")
+def resume_subscription(user_email: str = Depends(get_current_user_email)):
+    """Undo the customer's own 'do not renew' before the period ends: the
+    plan simply carries on, with no new checkout and no second charge. This
+    is not a new subscription, so it is allowed even while launch mode keeps
+    new Studio subscriptions closed. It is refused during a service
+    wind-down, whose non-renewals are the admin's decision to undo."""
+    sub = get_subscription(user_email)
+    if not sub or sub.get("status") != "active" or not _is_real_dodo_id(sub.get("dodo_subscription_id")):
+        raise HTTPException(status_code=400, detail="There is no active subscription to keep.")
+    if not sub.get("cancel_scheduled"):
+        return {"status": "already_renewing"}
+    if get_wind_down_state():
+        raise HTTPException(
+            status_code=409,
+            detail="Subscriptions are paused at the moment, so this plan can't be continued. "
+                   "Your access stays until the end of the period you paid for.",
+        )
+    if not DODO_API_KEY:
+        raise HTTPException(status_code=503, detail="Dodo Payments is not configured. Set DODO_PAYMENTS_API_KEY.")
+
+    next_billing = None
+    try:
+        client = DodoPayments(bearer_token=DODO_API_KEY, environment=DODO_ENVIRONMENT)
+        try:
+            next_billing = _format_dodo_date(getattr(client.subscriptions.retrieve(sub["dodo_subscription_id"]), "next_billing_date", None))
+        except Exception as exc:
+            logger.warning(f"resume_subscription: couldn't read next billing date for {user_email!r}: {exc}")
+        client.subscriptions.update(sub["dodo_subscription_id"], cancel_at_next_billing_date=False)
+    except Exception as exc:
+        logger.error(f"resume_subscription: Dodo API call failed for {user_email!r}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Dodo couldn't process this: {exc}")
+
+    set_cancellation(user_email, False)
+    try:
+        tier = get_tier(sub["tier_id"]) or {}
+        send_email(
+            to_email=user_email,
+            subject=wind_down_email.self_resume_subject(),
+            html=wind_down_email.build_self_resume_email(plan=tier.get("label", sub["tier_id"]), next_billing=next_billing or sub.get("access_until")),
+        )
+    except Exception as exc:
+        logger.error(f"resume_subscription: confirmation email failed for {user_email!r}: {exc}")
+    return {"status": "resumed", "next_billing": next_billing}
 
 
 class ProfileDeleteAccountRequest(BaseModel):

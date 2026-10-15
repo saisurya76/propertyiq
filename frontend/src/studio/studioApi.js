@@ -389,6 +389,7 @@ export const studioApi = {
   updateDisplayName: (displayName) =>
     apiFetch("/api/profile/display-name", { method: "POST", body: JSON.stringify({ display_name: displayName }) }),
 
+  resumeSubscription: () => apiFetch("/api/profile/resume-subscription", { method: "POST" }),
   cancelSubscription: (reason) =>
     apiFetch("/api/profile/cancel-subscription", { method: "POST", body: JSON.stringify({ reason }) }),
 

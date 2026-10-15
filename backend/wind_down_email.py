@@ -108,9 +108,28 @@ def build_self_cancel_email(*, plan: str, access_until: Optional[str]) -> str:
         f"You will not be charged again.</p>"
         f"<p>You keep full access to your plan {until}. The current period is not refunded, as it is already "
         f"delivered.</p>"
-        f"<p>Your account and saved designs are <strong>not deleted</strong>. You can subscribe again from the "
-        f"pricing page whenever you like.</p>"
+        f"<p>Your account and saved designs are <strong>not deleted</strong>. Changed your mind? You can keep your "
+        f"plan from your profile before that date. After it ends, you can subscribe again whenever plans are "
+        f"available.</p>"
         f'<p style="font-size:13px;color:#5b6f7c;">This follows our '
+        f'<a href="{SITE}/refund-policy.html">Refund Policy</a> and '
+        f'<a href="{SITE}/terms-of-service.html">Terms of Service</a>. '
+        f'Questions: <a href="mailto:{SUPPORT}">{SUPPORT}</a>.</p>',
+    )
+
+
+def self_resume_subject() -> str:
+    return "Your PropertyIQWeb subscription will continue"
+
+
+def build_self_resume_email(*, plan: str, next_billing: Optional[str]) -> str:
+    """Sent when a customer undoes their own cancellation."""
+    when = f"on <strong>{next_billing}</strong>" if next_billing else "on your next billing date"
+    return _wrap(
+        "Your subscription will continue",
+        f"<p>As you asked, we have cancelled the non-renewal on your <strong>{plan}</strong> plan. "
+        f"It will renew as normal {when}. Nothing else changes, and you were not charged today.</p>"
+        f'<p style="font-size:13px;color:#5b6f7c;">You can cancel again any time from your profile. See our '
         f'<a href="{SITE}/refund-policy.html">Refund Policy</a> and '
         f'<a href="{SITE}/terms-of-service.html">Terms of Service</a>. '
         f'Questions: <a href="mailto:{SUPPORT}">{SUPPORT}</a>.</p>',

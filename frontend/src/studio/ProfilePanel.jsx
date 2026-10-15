@@ -47,6 +47,25 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
     }
   };
 
+  const handleResumeSubscription = async () => {
+    setBusy(true);
+    setActionMessage("");
+    setError("");
+    try {
+      const result = await studioApi.resumeSubscription();
+      setActionMessage(
+        `Done. Your plan will carry on and renew${result?.next_billing ? ` on ${result.next_billing}` : " on your next billing date"}. You were not charged today. We've emailed you a confirmation.`
+      );
+      const refreshed = await studioApi.getProfile();
+      setProfile(refreshed);
+      if (cardRef.current) cardRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      setError(err.message || "Couldn't keep your subscription.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     setError("");
     if (deleteConfirmEmail.trim().toLowerCase() !== profile.email.toLowerCase()) {
@@ -175,7 +194,13 @@ function ProfilePanel({ onClose, onUpgrade, onSignedOut }) {
               <div className="profile-cancel-note">
                 <strong>Your subscription will not renew.</strong>{" "}
                 You keep full access{profile.tier.access_until ? ` until ${profile.tier.access_until}` : " until the end of your current billing period"}.
-                You won't be charged again. Your account and saved designs stay intact, and you can subscribe again from the plans page any time.
+                You won't be charged again, and your account and saved designs stay intact.
+                Changed your mind? Keep your plan below. No new payment is needed. After it ends, you can subscribe again whenever plans are available.
+                <div className="refund-request-actions" style={{ justifyContent: "flex-start", marginTop: 10 }}>
+                  <button type="button" className="terms-gate-accept" onClick={handleResumeSubscription} disabled={busy}>
+                    {busy ? "Working..." : "Keep my plan"}
+                  </button>
+                </div>
               </div>
             )}
             {profile.tier.tier_id && profile.tier.status === "active" && !profile.tier.cancel_scheduled && (
