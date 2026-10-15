@@ -3210,3 +3210,16 @@
 }
 .admin-dashboard .cs-nav-primary:hover:not(:disabled), .admin-dashboard .admin-login-btn:hover:not(:disabled) { background: #174f8d; }
 .admin-dashboard .cs-nav-primary:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Signed-out "Sign in" entry point on the home page */
+.session-sign-in-btn {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid #6b4fa8;
+  background: #fff;
+  color: #6b4fa8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.session-sign-in-btn:hover { background: #f3ebff; }

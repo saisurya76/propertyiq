@@ -329,7 +329,7 @@ function App() {
   // landing on Pricing regardless of what triggered it — that generic
   // fallback is still correct for the "manage my plan" entry point,
   // just not for a paid action that got interrupted by a 401.
-  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent" | "ai_advisor"
+  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent" | "ai_advisor" | "signin"
   const [pendingAiAdvisorSummary, setPendingAiAdvisorSummary] = useState(null); // report summary text to copy, if the ai_advisor click came from a generated report rather than the homepage strip
   // Shown on the Pricing screen specifically when a paid action (not
   // the generic "manage my plan" entry point) is what actually sent
@@ -979,6 +979,12 @@ function App() {
   };
 
   const handleStudioAuthenticated = () => {
+    if (pendingAuthAction === "signin") {
+      // Plain sign-in from the home page: go back where they were.
+      setPendingAuthAction(null);
+      setStudioView("main");
+      return;
+    }
     if (pendingAuthAction === "assessment") {
       setPendingAuthAction(null);
       setStudioView("main");
@@ -1002,6 +1008,7 @@ function App() {
   };
 
   const backToReport = () => {
+    setPendingAuthAction(null);
     // Resets the "smart resume" state a saved-design open sets (see
     // launchStudio's own comment on why it exists) — a real, confirmed
     // bug this fixes: without this reset, explicitly leaving back to
@@ -1183,7 +1190,11 @@ function App() {
   return (
     <div className="app">
 
-      <SessionBar onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
+      <SessionBar
+        onSignOut={() => handleSignOut("main")}
+        onManagePlan={goToPricing}
+        onSignIn={() => requireTerms(() => { setPendingAuthAction("signin"); setStudioView("auth"); })}
+      />
 
       {siteNotice && (
         <div className="payment-return-banner payment-return-banner-neutral" role="status">

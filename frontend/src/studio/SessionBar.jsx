@@ -8,7 +8,7 @@ import ProfilePanel from "./ProfilePanel";
 // Clicking it navigates to the Studio pricing page (via onManagePlan)
 // so it doubles as a lightweight "manage my plan" entry point, without
 // needing a full separate profile/settings page for this alone.
-function SessionBar({ onSignOut, onManagePlan }) {
+function SessionBar({ onSignOut, onManagePlan, onSignIn }) {
   const [session, setSession] = useState(getSession());
   const [planLabel, setPlanLabel] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -27,7 +27,18 @@ function SessionBar({ onSignOut, onManagePlan }) {
     return () => { cancelled = true; };
   }, [session]);
 
-  if (!session) return null;
+  if (!session) {
+    // Signed-out visitors get a plain Sign in entry point, so signing in
+    // does not require running a report first.
+    if (!onSignIn) return null;
+    return (
+      <div className="session-bar session-bar-signed-out">
+        <button type="button" className="session-sign-in-btn" onClick={onSignIn}>
+          Sign in
+        </button>
+      </div>
+    );
+  }
 
   const handleClick = () => {
     clearSession();
