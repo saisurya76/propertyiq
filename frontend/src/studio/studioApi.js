@@ -235,6 +235,13 @@ export const studioApi = {
   adminLookupQuota: (password, userEmail) =>
     apiFetch("/api/admin/quota-lookup", { method: "POST", body: JSON.stringify({ password, user_email: userEmail }) }),
 
+  adminMarketingList: (password) =>
+    apiFetch("/api/admin/marketing/list", { method: "POST", body: JSON.stringify({ password }) }),
+  adminMarketingUpdate: (password, postId, status, scheduledAt) =>
+    apiFetch("/api/admin/marketing/update", { method: "POST", body: JSON.stringify({ password, post_id: postId, status, scheduled_at: scheduledAt }) }),
+  adminMarketingRun: (password, mode) =>
+    apiFetch("/api/admin/marketing/run", { method: "POST", body: JSON.stringify({ password, mode }) }),
+
   adminResetQuota: (password, userEmail, adminNote) =>
     apiFetch("/api/admin/reset-quota", { method: "POST", body: JSON.stringify({ password, user_email: userEmail, admin_note: adminNote }) }),
 

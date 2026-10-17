@@ -1315,6 +1315,49 @@ def fx_rates():
     return get_fx_rates()
 
 
+class AdminMarketingUpdateRequest(BaseModel):
+    password: str
+    post_id: str
+    status: str
+    scheduled_at: Optional[str] = None
+
+
+class AdminMarketingRunRequest(BaseModel):
+    password: str
+    mode: str = "send"
+
+
+def _marketing_call(fn, *args):
+    from backend import marketing_admin
+    try:
+        return fn(*args)
+    except marketing_admin.MarketingError as e:
+        raise HTTPException(status_code=e.status, detail=e.message)
+
+
+@app.post("/api/admin/marketing/list")
+def admin_marketing_list(request: AdminAuthRequest):
+    _require_admin_password(request.password)
+    from backend import marketing_admin
+    posts = _marketing_call(marketing_admin.list_posts)
+    return {"posts": posts, "repo": marketing_admin.REPO}
+
+
+@app.post("/api/admin/marketing/update")
+def admin_marketing_update(request: AdminMarketingUpdateRequest):
+    _require_admin_password(request.password)
+    from backend import marketing_admin
+    post = _marketing_call(marketing_admin.update_post, request.post_id, request.status, request.scheduled_at)
+    return {"post": post}
+
+
+@app.post("/api/admin/marketing/run")
+def admin_marketing_run(request: AdminMarketingRunRequest):
+    _require_admin_password(request.password)
+    from backend import marketing_admin
+    return _marketing_call(marketing_admin.run_job, request.mode)
+
+
 @app.post("/api/admin/manual")
 def admin_manual(request: AdminAuthRequest):
     """Admin-only user manual. Password-gated like every admin call, and

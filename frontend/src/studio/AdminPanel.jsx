@@ -27,6 +27,30 @@ const REFUND_REASON_LABELS = {
   other: "Other",
 };
 
+// Marketing send times are always entered and shown in India time (IST,
+// UTC+05:30), whatever the browser's own timezone, so what the admin
+// types is what gets scheduled.
+const IST_OFFSET_MIN = 330;
+function isoToIstInput(iso) {
+  if (!iso) return "";
+  const d = new Date(new Date(iso).getTime() + IST_OFFSET_MIN * 60000);
+  return d.toISOString().slice(0, 16);
+}
+function istInputToIso(value) {
+  if (!value) return null;
+  return new Date(`${value}:00+05:30`).toISOString();
+}
+function formatIst(iso) {
+  if (!iso) return "Not scheduled";
+  return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) + " IST";
+}
+const MARKETING_STATUS = {
+  draft: ["Draft", "#475569"],
+  approved: ["Approved — waiting to send", "#b45309"],
+  queued: ["With Buffer", "#047857"],
+  sent: ["Sent", "#1d4ed8"],
+};
+
 const MENU_ITEMS = [
   { screen: "overview", label: "Overview & Analytics", desc: "Subscription counts, insight purchases, and estimated revenue." },
   { screen: "tiers", label: "Tier Configuration", desc: "Prices, quotas, and which features each tier includes." },
@@ -39,6 +63,7 @@ const MENU_ITEMS = [
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
   { screen: "refund-requests", label: "Refund Requests", desc: "Review and act on refund requests customers have actually submitted." },
   { screen: "manual", label: "User Manual", desc: "How every admin screen works, step-by-step runbooks (refunds, launch mode, wind-down, Dodo) and what to do when something goes wrong." },
+  { screen: "marketing", label: "Instagram Marketing", desc: "Approve posts, set send times and run the posting job. Nothing goes out until you approve it." },
   { screen: "reset-quota", label: "Reset User Quota", desc: "Give a user a fresh monthly design quota without waiting for the month to roll over." },
 ];
 
@@ -92,6 +117,9 @@ function AdminPanel({ onBack }) {
   const [decisionForms, setDecisionForms] = useState({});
 
   // Reset User Quota screen state
+  const [marketingPosts, setMarketingPosts] = useState(null);
+  const [marketingTimes, setMarketingTimes] = useState({});
+  const [marketingMessage, setMarketingMessage] = useState("");
   const [quotaLookupEmail, setQuotaLookupEmail] = useState("");
   const [quotaInfo, setQuotaInfo] = useState(null);
   const [quotaResetNote, setQuotaResetNote] = useState("");
@@ -460,6 +488,51 @@ function AdminPanel({ onBack }) {
     }
   };
 
+  const loadMarketing = async () => {
+    setError("");
+    try {
+      const res = await studioApi.adminMarketingList(password);
+      setMarketingPosts(res.posts);
+      setMarketingTimes((prev) => {
+        const next = { ...prev };
+        res.posts.forEach((p) => { if (!(p.id in next)) next[p.id] = isoToIstInput(p.scheduled_at); });
+        return next;
+      });
+    } catch (err) {
+      setMarketingPosts([]);
+      setError(err.message || "Couldn't load the marketing queue.");
+    }
+  };
+
+  const setMarketingStatus = async (post, status) => {
+    setMarketingMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      await studioApi.adminMarketingUpdate(password, post.id, status, istInputToIso(marketingTimes[post.id]));
+      setMarketingMessage(status === "approved" ? `${post.id} approved. It goes to Buffer at the next job run.` : `${post.id} moved back to draft.`);
+      await loadMarketing();
+    } catch (err) {
+      setError(err.message || "Couldn't update this post.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runMarketingJob = async (mode) => {
+    setMarketingMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await studioApi.adminMarketingRun(password, mode);
+      setMarketingMessage(`Job started (${mode}). It takes about a minute. Results: ${res.url}`);
+    } catch (err) {
+      setError(err.message || "Couldn't start the job.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const lookupQuota = async () => {
     setQuotaMessage("");
     setError("");
@@ -658,7 +731,7 @@ function AdminPanel({ onBack }) {
           <p className="admin-menu-subtitle">Choose a section.</p>
           <div className="admin-menu-grid">
             {MENU_ITEMS.map((item) => (
-              <div key={item.screen} className="menu-tile" onClick={() => setScreen(item.screen)}>
+              <div key={item.screen} className="menu-tile" onClick={() => { setScreen(item.screen); if (item.screen === "marketing") loadMarketing(); }}>
                 <div className="menu-tile-label">{item.label}</div>
                 <div className="menu-tile-desc">{item.desc}</div>
               </div>
@@ -1606,6 +1679,70 @@ function AdminPanel({ onBack }) {
                 </div>
               </>
             )}
+          </div>
+        </>
+      )}
+
+      {screen === "marketing" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+          {marketingMessage && <div className="studio-status-banner">{marketingMessage}</div>}
+
+          <div className="admin-section admin-section-purple">
+            <h3>Instagram posts</h3>
+            <p className="admin-section-note">
+              Pick a send time (India time) and approve a post. Only approved posts are sent to Buffer, and
+              only when the job runs (daily at 9:00 AM IST, or press Run now). Posts already with Buffer
+              can't be changed here. Buffer's free plan holds 10 queued posts, so no more than 8 can be
+              approved or queued at once.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <button className="cs-nav-btn cs-nav-primary" onClick={() => runMarketingJob("send")} disabled={loading}>Run now — send approved</button>
+              <button className="cs-nav-btn" onClick={() => runMarketingJob("dry-run")} disabled={loading}>Test run (sends nothing)</button>
+              <button className="cs-nav-btn" onClick={() => runMarketingJob("channels")} disabled={loading}>Check Buffer connection</button>
+              <button className="cs-nav-btn" onClick={loadMarketing} disabled={loading}>Reload list</button>
+            </div>
+
+            {marketingPosts === null && <p>Loading…</p>}
+            {marketingPosts && marketingPosts.length === 0 && !error && <p>No posts in the queue.</p>}
+            {marketingPosts && marketingPosts.map((post) => {
+              const [label, color] = MARKETING_STATUS[post.status] || [post.status, "#475569"];
+              const editable = post.status === "draft" || post.status === "approved";
+              return (
+                <div key={post.id} style={{ display: "flex", gap: 14, padding: "14px 0", borderTop: "1px solid #e5e4e7", flexWrap: "wrap" }}>
+                  <img
+                    src={`https://raw.githubusercontent.com/saisurya76/propertyiq-marketing/main/posts/${post.id}.jpg`}
+                    alt={post.headline}
+                    style={{ width: 96, height: 120, objectFit: "cover", borderRadius: 8, background: "#eee" }}
+                  />
+                  <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{post.id} · {post.headline}</div>
+                    <div style={{ color, fontWeight: 600, fontSize: 13, margin: "2px 0 6px" }}>{label}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.4, whiteSpace: "pre-wrap", color: "#4a4160" }}>{post.caption}</div>
+                    {post.error && <div style={{ color: "#991b1b", fontSize: 13, marginTop: 6 }}>Last send failed: {post.error}</div>}
+                    {editable ? (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
+                        <input
+                          type="datetime-local"
+                          value={marketingTimes[post.id] || ""}
+                          onChange={(e) => setMarketingTimes((t) => ({ ...t, [post.id]: e.target.value }))}
+                          disabled={post.status === "approved"}
+                          style={{ width: "auto", flex: "0 0 auto", fontSize: 14, padding: "8px 10px" }}
+                        />
+                        <span style={{ fontSize: 12, marginLeft: -4 }}>IST</span>
+                        {post.status === "draft" ? (
+                          <button className="cs-nav-btn cs-nav-primary" onClick={() => setMarketingStatus(post, "approved")} disabled={loading || !marketingTimes[post.id]}>Approve</button>
+                        ) : (
+                          <button className="cs-nav-btn" onClick={() => setMarketingStatus(post, "draft")} disabled={loading}>Un-approve</button>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13, marginTop: 8 }}>Scheduled: {formatIst(post.scheduled_at)}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}

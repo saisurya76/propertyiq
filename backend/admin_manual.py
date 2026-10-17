@@ -50,6 +50,7 @@ MANUAL = [
                 "Quick Analysis Grants: every Quick Analysis purchase and who got it. Grants are permanent and tied to the email.",
                 "Refunds: look up a customer's payments by email and refund one through Dodo; record a manual refund that was handled outside Dodo; see refund history (section 7).",
                 "Refund Requests: requests customers submitted themselves. Approve through Dodo, approve manually, or deny; the customer is emailed each time.",
+                "Instagram Marketing: the free Instagram post queue. Pick a send time in India time and press Approve; only approved posts go to Buffer, and only when the job runs (daily 9:00 AM IST, or Run now). Test run sends nothing. Posts already with Buffer cannot be changed here. Needs the MARKETING_GITHUB_TOKEN setting on the server.",
                 "Reset User Quota: gives a user a fresh monthly design quota right now. Design history is never deleted. They get an email.",
             ]},
         ],
