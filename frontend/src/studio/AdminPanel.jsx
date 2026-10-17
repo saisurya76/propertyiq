@@ -1230,9 +1230,9 @@ function AdminPanel({ onBack }) {
             <p className="admin-section-note">
               Show or hide any of these homepage panels without a code change or redeploy — useful for
               temporarily hiding a panel while sorting out an issue with it, without taking the homepage down.
-              The first 5 are free quick-checks; Construction Studio, Agent Intelligence, and Property AI
-              Advisor are the 3 feature-strip entry points below them — Property AI Advisor is paid and
-              tier-gated. Hiding any of these here only controls whether its homepage entry point (and
+              The first 5 are free quick-checks; Construction Studio, Agent Intelligence, Property AI
+              Advisor and Neighborhood Insights are the 4 feature-strip entry points below them — Property AI
+              Advisor is paid and tier-gated, Neighborhood Insights is a free public page. Hiding any of these here only controls whether its homepage entry point (and
               sticker, for the feature strips) is shown, not who's actually entitled to use the feature.
             </p>
             {homepagePanelVisibility ? (
@@ -1247,6 +1247,7 @@ function AdminPanel({ onBack }) {
                   { key: "construction_studio", label: "Construction Studio (feature strip)" },
                   { key: "agent_intelligence", label: "Agent Intelligence (feature strip)" },
                   { key: "property_ai_advisor", label: "Property AI Advisor (feature strip — tier-gated, not free)" },
+                  { key: "neighborhood_insights", label: "Neighborhood Insights (feature strip — links to the free page)" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`homepage-toggle-${key}`}>{label}</label>
@@ -1284,6 +1285,7 @@ function AdminPanel({ onBack }) {
                   { key: "construction_studio", label: "Construction Studio" },
                   { key: "agent_intelligence", label: "Agent Intelligence" },
                   { key: "property_ai_advisor", label: "Property AI Advisor" },
+                  { key: "neighborhood_insights", label: "Neighborhood Insights" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`sticker-text-${key}`}>{label}</label>

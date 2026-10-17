@@ -34,6 +34,7 @@ const HOMEPAGE_PANELS_ALL_VISIBLE = {
   instant_property_score: true, hidden_deal: true, red_flag_hunt: true,
   challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
   construction_studio: true, agent_intelligence: true, property_ai_advisor: true,
+  neighborhood_insights: true,
 };
 const HOMEPAGE_PANELS_ALL_HIDDEN = Object.fromEntries(
   Object.keys(HOMEPAGE_PANELS_ALL_VISIBLE).map((k) => [k, false])
@@ -243,6 +244,7 @@ function App() {
     construction_studio: "🔥 Save Big",
     agent_intelligence: "💰 Earn More",
     property_ai_advisor: "✨ New",
+    neighborhood_insights: "🆓 Free Tool",
   });
   useEffect(() => {
     fetch(`${API_BASE}/api/homepage-panels/sticker-text`)
@@ -1370,6 +1372,25 @@ function App() {
           <span className="feature-strip-icon">🧭</span>
           <span className="feature-strip-text">
             <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQWeb's own methodology, before you decide.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
+
+      {homepagePanelVisibility.neighborhood_insights && (
+        <div
+          className="feature-strip"
+          onClick={() => window.location.assign(urlCountryContext ? `/${urlCountryContext.code}/neighborhood-insights` : "/neighborhood-insights")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
+        >
+          {featureStickerText.neighborhood_insights && (
+            <span className="feature-strip-sticker">{featureStickerText.neighborhood_insights}</span>
+          )}
+          <span className="feature-strip-icon">📍</span>
+          <span className="feature-strip-text">
+            <strong>Neighborhood Insights</strong> — see the hospitals, schools, markets, banks and transport near any property, plus a buyer's due-diligence checklist and resale demand signal. No signup needed.
           </span>
           <span className="feature-strip-arrow">→</span>
         </div>

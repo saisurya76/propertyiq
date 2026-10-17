@@ -4523,7 +4523,7 @@ def neighborhood_section_visibility():
     return get_ni_section_visibility()
 
 
-HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor", "construction_studio", "agent_intelligence"]
+HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor", "construction_studio", "agent_intelligence", "neighborhood_insights"]
 HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
 
 # The 3 feature-strip panels above get a small "excitement sticker" badge
@@ -4532,12 +4532,13 @@ HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
 # strip itself is shown (that's HOMEPAGE_PANELS/visibility, above).
 # Deliberately its own setting rather than baked into the sticker markup,
 # so wording can be tuned (or a badge retired) without a redeploy.
-FEATURE_STICKER_PANELS = ["construction_studio", "agent_intelligence", "property_ai_advisor"]
+FEATURE_STICKER_PANELS = ["construction_studio", "agent_intelligence", "property_ai_advisor", "neighborhood_insights"]
 FEATURE_STICKER_TEXT_SETTING_KEY = "feature_sticker_text"
 DEFAULT_FEATURE_STICKER_TEXT = {
     "construction_studio": "🔥 Save Big",
     "agent_intelligence": "💰 Earn More",
     "property_ai_advisor": "✨ New",
+    "neighborhood_insights": "🆓 Free Tool",
 }
 
 
