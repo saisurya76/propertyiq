@@ -211,7 +211,13 @@ function App() {
   // remembered value, fall back to all visible so a network blip can't
   // silently hide features nobody asked to hide.
   const [homepagePanelVisibility, setHomepagePanelVisibility] = useState(
-    () => loadCachedVisibility(HOMEPAGE_PANELS_CACHE_KEY) || HOMEPAGE_PANELS_ALL_HIDDEN
+    () => {
+      const cached = loadCachedVisibility(HOMEPAGE_PANELS_CACHE_KEY);
+      // A panel added after this browser last cached the map isn't in the
+      // cached object: treat it as visible instead of hiding it until the
+      // API answers (which is a long wait whenever the server is waking up).
+      return cached ? { ...HOMEPAGE_PANELS_ALL_VISIBLE, ...cached } : HOMEPAGE_PANELS_ALL_HIDDEN;
+    }
   );
   // Captured from the same real ipapi.co lookup the language-detection
   // effect below already makes (not a second, duplicate call) — the

@@ -4,6 +4,7 @@ import { getSession, studioApi } from "../studio/studioApi";
 import { loadCachedVisibility, saveCachedVisibility } from "../visibilityCache";
 
 const LAUNCH_MODE_CACHE_KEY = "piq_launch_mode_v1";
+const MY_ACCESS_CACHE_KEY = "piq_my_access_v1";
 
 // Quick Analysis-only launch mode, seen from the visitor's side.
 //
@@ -23,7 +24,15 @@ export default function useLaunchGate({ enabled = true, refreshKey = null } = {}
     return cached && typeof cached.active === "boolean" ? cached.active : null;
   });
   const [sessionTick, setSessionTick] = useState(0);
-  const [myAccess, setMyAccess] = useState(null);
+  // Remembered from this browser's last visit (same person only), so the
+  // strips they are entitled to show immediately instead of waiting for the
+  // server. It is replaced by the real answer as soon as that arrives, and it
+  // only ever decides whether a panel is shown, never what anyone can use.
+  const [myAccess, setMyAccess] = useState(() => {
+    const cached = loadCachedVisibility(MY_ACCESS_CACHE_KEY);
+    const email = getSession()?.email || null;
+    return cached && email && cached.email === email && Array.isArray(cached.features) ? cached : null;
+  });
 
   useEffect(() => {
     fetch(`${API_BASE}/api/launch-mode`)
@@ -46,9 +55,11 @@ export default function useLaunchGate({ enabled = true, refreshKey = null } = {}
     if (!enabled || !sessionEmail || launchMode === false) return;
     studioApi
       .getStatus()
-      .then((st) =>
-        setMyAccess({ email: sessionEmail, hasPlan: !!st.tier_id, features: st.features || [] })
-      )
+      .then((st) => {
+        const next = { email: sessionEmail, hasPlan: !!st.tier_id, features: st.features || [] };
+        setMyAccess(next);
+        saveCachedVisibility(MY_ACCESS_CACHE_KEY, next);
+      })
       .catch(() => setMyAccess({ email: sessionEmail, failedOpen: true, hasPlan: true, features: [] }));
   }, [enabled, sessionEmail, launchMode, refreshKey, sessionTick]);
 
