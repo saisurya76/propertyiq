@@ -1386,7 +1386,7 @@ function App() {
       {homepagePanelVisibility.neighborhood_insights && (
         <div
           className="feature-strip"
-          onClick={() => window.location.assign(urlCountryContext ? `/${urlCountryContext.code}/neighborhood-insights` : "/neighborhood-insights")}
+          onClick={() => window.location.assign(urlCountryContext ? `/${urlCountryContext.code}/neighborhood-insights?from=app` : "/neighborhood-insights?from=app")}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}

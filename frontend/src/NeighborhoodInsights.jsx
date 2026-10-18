@@ -249,6 +249,17 @@ function NeighborhoodInsights({ countryCode }) {
   // own name/label is never required to exist in any map database (a
   // brand-new, not-yet-built project genuinely won't), so it's plain
   // free text here — purely for display, never sent to LocationIQ.
+  // Visitors who arrive from inside PropertyIQWeb (the homepage strip, or any
+  // same-site page) don't need a "Back to LivingIQ" link that sends them to a
+  // different site. Direct visitors and those from elsewhere still see it.
+  const [cameFromApp] = useState(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("from") === "app") return true;
+      return !!document.referrer && new URL(document.referrer).origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  });
   const [propertyName, setPropertyName] = useState("");
   const [addressQuery, setAddressQuery] = useState(() => new URLSearchParams(window.location.search).get("place") || "");
   const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -697,7 +708,9 @@ function NeighborhoodInsights({ countryCode }) {
       <div className="ni-nav">
         <span className="ni-nav-brand">LivingIQ · Neighborhood Insights</span>
         <div className="ni-nav-links">
-          <a href="https://livingiqweb.com" target="_blank" rel="noopener noreferrer">← Back to LivingIQ</a>
+          {!cameFromApp && (
+            <a href="https://livingiqweb.com" target="_blank" rel="noopener noreferrer">← Back to LivingIQ</a>
+          )}
           <a href={country.homePath} target="_blank" rel="noopener noreferrer">PropertyIQWeb →</a>
         </div>
       </div>
