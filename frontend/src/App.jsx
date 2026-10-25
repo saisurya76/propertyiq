@@ -28,6 +28,7 @@ import useTermsGate from "./hooks/useTermsGate";
 import useLaunchGate from "./hooks/useLaunchGate";
 import { getSession, clearSession, studioApi, saveDetectedCountry } from "./studio/studioApi";
 import { API_BASE } from "./config";
+import { INDIA_CITY_STATE } from "./utils/citiesByCountry";
 import { loadCachedVisibility, saveCachedVisibility } from "./visibilityCache";
 
 const HOMEPAGE_PANELS_CACHE_KEY = "piq_homepage_panels_v1";
@@ -697,10 +698,13 @@ function App() {
 
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const next = { ...formData, [e.target.name]: e.target.value };
+    // The form has no state field, so keep the Indian state in step with the
+    // chosen city (a Goa city must not be sent as Telangana).
+    if (e.target.name === "city" && formData.country === "India" && INDIA_CITY_STATE[e.target.value]) {
+      next.stateProvince = INDIA_CITY_STATE[e.target.value];
+    }
+    setFormData(next);
   };
 
   // Backs the property_url_import tier feature: merges whichever
