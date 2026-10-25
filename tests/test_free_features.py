@@ -30,6 +30,9 @@ def teardown_function():
 
 
 def test_default_is_no_free_features():
+    # RERA is opened to signed-in users by a one-time startup migration (by
+    # design); everything else is closed until an admin opens it.
+    set_free_features([])
     assert get_free_features() == []
     assert user_has_feature("nobody-free@example.com", "property_assessment") is False
 

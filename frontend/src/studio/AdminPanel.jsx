@@ -58,6 +58,7 @@ const MENU_ITEMS = [
   { screen: "loan-eligibility", label: "Loan Eligibility — Thresholds", desc: "The real, configurable lending criteria (debt-to-income, loan-to-value, age cap, minimum credit rating) used for eligibility estimates." },
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
   { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any homepage panel or feature strip, and edit each feature strip's excitement-sticker wording." },
+  { screen: "rera", label: "RERA Verification — Portal Links", desc: "The official state RERA portal link shown to users. Fix a link here if a state moves its portal." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
   { screen: "grants", label: "Quick Analysis Grants", desc: "Every Quick Analysis purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
@@ -100,6 +101,8 @@ function AdminPanel({ onBack }) {
   const [homepageVisibilitySaveMessage, setHomepageVisibilitySaveMessage] = useState("");
   const [featureStickerText, setFeatureStickerText] = useState(null);
   const [stickerSaveMessage, setStickerSaveMessage] = useState("");
+  const [reraUrls, setReraUrls] = useState(null);
+  const [reraMessage, setReraMessage] = useState("");
 
   // Refunds screen state
   const [refundLookupEmail, setRefundLookupEmail] = useState("");
@@ -138,6 +141,7 @@ function AdminPanel({ onBack }) {
     setGeminiKeyConfigured(!!data.gemini_api_key_configured);
     setNiSectionVisibility(data.ni_section_visibility || null);
     setHomepagePanelVisibility(data.homepage_panel_visibility || null);
+    setReraUrls(data.rera_portal_urls || null);
     setFeatureStickerText(data.feature_sticker_text || null);
     setFeatureUsage(data.feature_usage || null);
     setTechStack(data.tech_stack || []);
@@ -379,6 +383,21 @@ function AdminPanel({ onBack }) {
       setStickerSaveMessage("Sticker text saved.");
     } catch (err) {
       setError(err.message || "Couldn't save sticker text.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveReraUrls = async () => {
+    setReraMessage("");
+    setError("");
+    setLoading(true);
+    try {
+      const res = await studioApi.adminSaveReraPortalUrls(password, reraUrls);
+      setReraUrls(res.rera_portal_urls || reraUrls);
+      setReraMessage("Portal links saved. A blank or invalid link is reset to the built-in default.");
+    } catch (err) {
+      setError(err.message || "Couldn't save portal links.");
     } finally {
       setLoading(false);
     }
@@ -1248,6 +1267,7 @@ function AdminPanel({ onBack }) {
                   { key: "agent_intelligence", label: "Agent Intelligence (feature strip)" },
                   { key: "property_ai_advisor", label: "Property AI Advisor (feature strip — tier-gated, not free)" },
                   { key: "neighborhood_insights", label: "Neighborhood Insights (feature strip — links to the free page)" },
+                  { key: "rera_verification", label: "RERA Verification (feature strip — free for signed-in users)" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`homepage-toggle-${key}`}>{label}</label>
@@ -1286,6 +1306,7 @@ function AdminPanel({ onBack }) {
                   { key: "agent_intelligence", label: "Agent Intelligence" },
                   { key: "property_ai_advisor", label: "Property AI Advisor" },
                   { key: "neighborhood_insights", label: "Neighborhood Insights" },
+                  { key: "rera_verification", label: "RERA Verification" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`sticker-text-${key}`}>{label}</label>
@@ -1680,6 +1701,42 @@ function AdminPanel({ onBack }) {
                   </button>
                 </div>
               </>
+            )}
+          </div>
+        </>
+      )}
+
+      {screen === "rera" && (
+        <>
+          <button type="button" className="admin-subscreen-back" onClick={() => setScreen("menu")}>← Back to menu</button>
+          <div className="admin-section">
+            <h3>RERA Verification — Official Portal Links</h3>
+            <p className="admin-section-note">
+              Who can use it: set under Tier Configuration → "Free for all signed-in users" (rera_verification), or tick it on a tier.
+              The homepage strip and its sticker are under Homepage. Here you control the official state portal link users are sent to.
+              Links must start with https://. Clear a box and save to go back to the built-in link.
+            </p>
+            {reraUrls ? (
+              <>
+                {Object.entries(reraUrls).map(([code, url]) => (
+                  <div key={code} className="admin-toggle-row">
+                    <label htmlFor={`rera-url-${code}`}>{code}</label>
+                    <input
+                      id={`rera-url-${code}`}
+                      type="text"
+                      value={url}
+                      onChange={(e) => setReraUrls({ ...reraUrls, [code]: e.target.value })}
+                      style={{ maxWidth: 360, width: "100%" }}
+                    />
+                  </div>
+                ))}
+                <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveReraUrls} disabled={loading}>
+                  {loading ? "Saving..." : "Save"}
+                </button>
+                {reraMessage && <div className="studio-status-banner">{reraMessage}</div>}
+              </>
+            ) : (
+              <p className="admin-empty-note">Loading...</p>
             )}
           </div>
         </>

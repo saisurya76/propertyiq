@@ -20,6 +20,7 @@ import ConstructionStudio from "./studio/ConstructionStudio";
 import StudioDesigns from "./studio/StudioDesigns";
 import ScrollToTopBottom from "./components/ScrollToTopBottom";
 import AdminPanel from "./studio/AdminPanel";
+import ReraVerification from "./ReraVerification";
 import SessionBar from "./studio/SessionBar";
 import StudioTopBar from "./studio/StudioTopBar";
 import LegalFooter from "./components/LegalFooter";
@@ -35,6 +36,7 @@ const HOMEPAGE_PANELS_ALL_VISIBLE = {
   challenge_a_friend: true, price_drop_alert: true, hottest_properties_ticker: true,
   construction_studio: true, agent_intelligence: true, property_ai_advisor: true,
   neighborhood_insights: true,
+  rera_verification: true,
 };
 const HOMEPAGE_PANELS_ALL_HIDDEN = Object.fromEntries(
   Object.keys(HOMEPAGE_PANELS_ALL_VISIBLE).map((k) => [k, false])
@@ -251,6 +253,7 @@ function App() {
     agent_intelligence: "💰 Earn More",
     property_ai_advisor: "✨ New",
     neighborhood_insights: "🆓 Free Tool",
+    rera_verification: "🆓 Free Tool",
   });
   useEffect(() => {
     fetch(`${API_BASE}/api/homepage-panels/sticker-text`)
@@ -337,7 +340,7 @@ function App() {
   // landing on Pricing regardless of what triggered it — that generic
   // fallback is still correct for the "manage my plan" entry point,
   // just not for a paid action that got interrupted by a 401.
-  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent" | "ai_advisor" | "signin"
+  const [pendingAuthAction, setPendingAuthAction] = useState(null); // null | "assessment" | "agent" | "ai_advisor" | "rera" | "signin"
   const [pendingAiAdvisorSummary, setPendingAiAdvisorSummary] = useState(null); // report summary text to copy, if the ai_advisor click came from a generated report rather than the homepage strip
   // Shown on the Pricing screen specifically when a paid action (not
   // the generic "manage my plan" entry point) is what actually sent
@@ -897,6 +900,15 @@ function App() {
   // AgentWorkspace's own first API call, the same inline-paywall
   // pattern NeighborhoodComparison.jsx already uses, rather than
   // duplicating that check here too.
+  const launchRera = () => {
+    if (!getSession()) {
+      setPendingAuthAction("rera");
+      setStudioView("auth");
+      return;
+    }
+    setStudioView("rera");
+  };
+
   const launchAgentWorkspace = () => {
     const session = getSession();
     if (!session) {
@@ -1002,6 +1014,11 @@ function App() {
     if (pendingAuthAction === "agent") {
       setPendingAuthAction(null);
       setStudioView("agent");
+      return;
+    }
+    if (pendingAuthAction === "rera") {
+      setPendingAuthAction(null);
+      setStudioView("rera");
       return;
     }
     if (pendingAuthAction === "ai_advisor") {
@@ -1135,6 +1152,17 @@ function App() {
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} />
         <AdminPanel onBack={backToReport} />
+        <LegalFooter />
+        <ScrollToTopBottom />
+      </div>
+    );
+  }
+
+  if (studioView === "rera") {
+    return (
+      <div className="app">
+        <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
+        <ReraVerification onBack={backToReport} onNeedPlan={goToPricing} />
         <LegalFooter />
         <ScrollToTopBottom />
       </div>
@@ -1378,6 +1406,25 @@ function App() {
           <span className="feature-strip-icon">🧭</span>
           <span className="feature-strip-text">
             <strong>Property AI Advisor</strong> — talk through your assessment report with an AI advisor that understands PropertyIQWeb's own methodology, before you decide.
+          </span>
+          <span className="feature-strip-arrow">→</span>
+        </div>
+      )}
+
+      {homepagePanelVisibility.rera_verification && (
+        <div
+          className="feature-strip"
+          onClick={launchRera}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
+        >
+          {featureStickerText.rera_verification && (
+            <span className="feature-strip-sticker">{featureStickerText.rera_verification}</span>
+          )}
+          <span className="feature-strip-icon">🛡️</span>
+          <span className="feature-strip-text">
+            <strong>RERA Verification</strong> — check a project's RERA number the right way: a guided checklist, a link to your state's official portal, and a quick sanity check of price, possession and advance.
           </span>
           <span className="feature-strip-arrow">→</span>
         </div>

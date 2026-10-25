@@ -152,6 +152,12 @@ export const studioApi = {
   adminUpdateSettings: (password, geminiApiKey, niSectionVisibility, homepagePanelVisibility, featureStickerText, freeFeatures) =>
     apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, gemini_api_key: geminiApiKey, ni_section_visibility: niSectionVisibility, homepage_panel_visibility: homepagePanelVisibility, feature_sticker_text: featureStickerText, free_features: freeFeatures }) }),
 
+  adminSaveReraPortalUrls: (password, reraPortalUrls) =>
+    apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, rera_portal_urls: reraPortalUrls }) }),
+
+  reraStates: () => apiFetch("/api/rera/states"),
+  reraCheck: (payload) => apiFetch("/api/rera/check", { method: "POST", body: JSON.stringify(payload) }),
+
   adminSetLaunchMode: (password, enabled) =>
     apiFetch("/api/admin/launch-mode", { method: "POST", body: JSON.stringify({ password, enabled }) }),
 

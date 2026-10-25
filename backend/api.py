@@ -179,6 +179,7 @@ from backend.config_store import (
     get_free_features,
     set_free_features,
     FREE_ELIGIBLE_FEATURES,
+    ensure_default_free_features,
     ALL_FEATURES,
     set_app_setting,
     get_app_setting,
@@ -306,11 +307,14 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(lifespan=_lifespan)
 
 
+from backend import rera as rera_module  # noqa: E402
+
 initialize_payment_store()
 initialize_construction_store()
 initialize_property_store()
 initialize_auth_store()
 initialize_config_store()
+ensure_default_free_features()
 initialize_subscription_store()
 initialize_refund_store()
 initialize_wind_down_store()
@@ -1417,6 +1421,7 @@ def admin_overview(request: AdminAuthRequest):
         # Current wording for each feature-strip's excitement sticker.
         "feature_sticker_text": get_feature_sticker_text(),
         "free_features": get_free_features(),
+        "rera_portal_urls": rera_module.get_portal_urls(),
         "free_eligible_features": FREE_ELIGIBLE_FEATURES,
         "launch_mode": get_launch_mode_status(),
         # Real usage counts per feature, real per-service configuration
@@ -1931,6 +1936,7 @@ class AdminSettingsRequest(BaseModel):
     homepage_panel_visibility: Optional[dict[str, bool]] = None
     feature_sticker_text: Optional[dict[str, str]] = None
     free_features: Optional[list[str]] = None
+    rera_portal_urls: Optional[dict[str, str]] = None
 
 
 @app.post("/api/admin/settings")
@@ -1975,6 +1981,9 @@ def admin_settings(request: AdminSettingsRequest):
         # set_free_features drops anything unknown or ineligible.
         set_free_features(request.free_features)
 
+    if request.rera_portal_urls is not None:
+        rera_module.set_portal_urls(request.rera_portal_urls)
+
     if request.feature_sticker_text is not None:
         # Same merge-not-overwrite reasoning — only accept known sticker
         # panels and never persist an empty/whitespace-only override,
@@ -1993,6 +2002,7 @@ def admin_settings(request: AdminSettingsRequest):
         "homepage_panel_visibility": get_homepage_panel_visibility(),
         "feature_sticker_text": get_feature_sticker_text(),
         "free_features": get_free_features(),
+        "rera_portal_urls": rera_module.get_portal_urls(),
     }
 
 
@@ -3110,6 +3120,50 @@ async def dodo_webhook(request: Request):
             )
 
     return {"received": True}
+
+
+class ReraCheckRequest(BaseModel):
+    state: str
+    registration_number: str
+    possession_date: Optional[str] = None
+    quoted_price_per_sqft: Optional[float] = None
+    market_price_per_sqft: Optional[float] = None
+    advance_percent: Optional[float] = None
+    is_under_construction: Optional[bool] = None
+    agent_registration_number: Optional[str] = None
+
+
+@app.get("/api/rera/states")
+def rera_states():
+    """Public: state list with official portal links (admin-overridable)."""
+    return {"states": rera_module.list_states(), "disclaimer": rera_module.DISCLAIMER}
+
+
+@app.post("/api/rera/check")
+def rera_check(request: ReraCheckRequest, user_email: str = Depends(get_current_user_email)):
+    if not user_has_feature(user_email, "rera_verification"):
+        raise HTTPException(status_code=403, detail="RERA check is not available on your plan.")
+    number = (request.registration_number or "").strip()
+    if not number:
+        raise HTTPException(status_code=400, detail="Enter the RERA registration number.")
+    if len(number) > 80:
+        raise HTTPException(status_code=400, detail="That registration number is too long.")
+    for name in ("quoted_price_per_sqft", "market_price_per_sqft", "advance_percent"):
+        v = getattr(request, name)
+        if v is not None and (v < 0 or v > 10_000_000):
+            raise HTTPException(status_code=400, detail="Please check the numbers you entered.")
+    try:
+        return rera_module.run_check(
+            request.state.strip().upper(), number,
+            possession_date=request.possession_date,
+            quoted_price_per_sqft=request.quoted_price_per_sqft,
+            market_price_per_sqft=request.market_price_per_sqft,
+            advance_percent=request.advance_percent,
+            is_under_construction=request.is_under_construction,
+            agent_number_provided=bool((request.agent_registration_number or "").strip()),
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Choose a state.")
 
 
 @app.get("/api/subscribe/status")
@@ -4523,7 +4577,7 @@ def neighborhood_section_visibility():
     return get_ni_section_visibility()
 
 
-HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor", "construction_studio", "agent_intelligence", "neighborhood_insights"]
+HOMEPAGE_PANELS = ["instant_property_score", "hidden_deal", "red_flag_hunt", "challenge_a_friend", "price_drop_alert", "hottest_properties_ticker", "property_ai_advisor", "construction_studio", "agent_intelligence", "neighborhood_insights", "rera_verification"]
 HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
 
 # The 3 feature-strip panels above get a small "excitement sticker" badge
@@ -4532,13 +4586,14 @@ HOMEPAGE_VISIBILITY_SETTING_KEY = "homepage_panel_visibility"
 # strip itself is shown (that's HOMEPAGE_PANELS/visibility, above).
 # Deliberately its own setting rather than baked into the sticker markup,
 # so wording can be tuned (or a badge retired) without a redeploy.
-FEATURE_STICKER_PANELS = ["construction_studio", "agent_intelligence", "property_ai_advisor", "neighborhood_insights"]
+FEATURE_STICKER_PANELS = ["construction_studio", "agent_intelligence", "property_ai_advisor", "neighborhood_insights", "rera_verification"]
 FEATURE_STICKER_TEXT_SETTING_KEY = "feature_sticker_text"
 DEFAULT_FEATURE_STICKER_TEXT = {
     "construction_studio": "🔥 Save Big",
     "agent_intelligence": "💰 Earn More",
     "property_ai_advisor": "✨ New",
     "neighborhood_insights": "🆓 Free Tool",
+    "rera_verification": "🆓 Free Tool",
 }
 
 

@@ -65,6 +65,7 @@ def test_every_remaining_feature_in_all_features_is_a_real_one_confirmed_by_hand
         "agent_intelligence",
         "loan_eligibility",
         "property_ai_advisor",
+        "rera_verification",  # api.py: POST /api/rera/check gates on user_has_feature
     }
 
 

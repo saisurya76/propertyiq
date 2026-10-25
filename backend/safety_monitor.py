@@ -35,6 +35,7 @@ PANEL_FEATURES = {
     "agent_intelligence": "agent_intelligence",
     "property_ai_advisor": "property_ai_advisor",
     "price_drop_alert": "price_drop_alert",
+    "rera_verification": "rera_verification",
 }
 NI_SECTION_FEATURES = {
     "comparison": "area_comparison",

@@ -1,0 +1,35 @@
+.rera-page { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; color: var(--text-body); }
+.rera-back { background: none; border: 0; color: var(--violet-700); cursor: pointer; font-size: 14px; padding: 0; margin-bottom: 12px; }
+.rera-page h1 { font-size: 26px; color: var(--text-strong); margin: 0 0 6px; }
+.rera-lead { margin: 0 0 18px; line-height: 1.5; }
+.rera-card { background: var(--surface-card); border: 1px solid var(--border-soft); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+.rera-card h2 { font-size: 17px; color: var(--text-strong); margin: 0 0 10px; }
+.rera-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rera-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted); }
+.rera-field.full { grid-column: 1 / -1; }
+.rera-field input, .rera-field select { font-size: 15px; padding: 10px 12px; border: 1px solid var(--violet-200); border-radius: 10px; background: #fff; color: var(--text-strong); min-width: 0; }
+.rera-actions { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.rera-btn { background: var(--violet-600); color: #fff; border: 0; border-radius: 10px; padding: 11px 18px; font-size: 15px; cursor: pointer; text-decoration: none; display: inline-block; }
+.rera-btn:disabled { opacity: 0.6; cursor: default; }
+.rera-btn.alt { background: var(--violet-100); color: var(--violet-800); }
+.rera-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
+.rera-note { background: var(--violet-50); border: 1px solid var(--violet-200); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; }
+.rera-point { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 14px; line-height: 1.45; }
+.rera-point:first-of-type { border-top: 0; }
+.rera-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; background: #94a3b8; }
+.rera-dot.ok { background: #16a34a; } .rera-dot.warn { background: #d97706; } .rera-dot.note { background: #94a3b8; }
+.rera-check { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.rera-check input { margin-top: 3px; flex: none; }
+.rera-check.done span { color: var(--text-muted); text-decoration: line-through; }
+.rera-step { font-size: 12px; color: var(--violet-700); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+@media (max-width: 560px) { .rera-grid { grid-template-columns: 1fr; } .rera-page h1 { font-size: 22px; } .rera-btn { width: 100%; text-align: center; box-sizing: border-box; } }
+.rera-page { text-align: left; }
+.rera-page .rera-field { text-align: left; align-items: stretch; }
+.rera-page .rera-check { display: flex !important; flex-direction: row !important; align-items: flex-start; text-align: left; width: 100%; }
+.rera-page .rera-check input { width: auto; flex: none; }
+.rera-page .rera-check span { flex: 1 1 auto; min-width: 0; width: auto; text-align: left; }
+.rera-page .rera-point span:last-child { flex: 1 1 auto; text-align: left; }
+.rera-page h1, .rera-page .rera-lead { text-align: left; }
+.rera-page .rera-step, .rera-page .rera-card h2 { text-align: left; }
+.rera-page .rera-back { display: block; }
+.rera-page .rera-note { text-align: left; }

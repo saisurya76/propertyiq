@@ -48,6 +48,7 @@ DEFAULT_TIER_CONFIG = {
             "property_ai_advisor",
             "amortization_projector",
             "agent_intelligence",
+            "rera_verification",
         ],
         "design_quota_per_month": 3,
         "saved_designs_limit": 2,
@@ -75,6 +76,7 @@ DEFAULT_TIER_CONFIG = {
             "property_ai_advisor",
             "amortization_projector",
             "agent_intelligence",
+            "rera_verification",
         ],
         "design_quota_per_month": 15,
         "saved_designs_limit": 10,
@@ -104,6 +106,7 @@ DEFAULT_TIER_CONFIG = {
             "property_ai_advisor",
             "amortization_projector",
             "agent_intelligence",
+            "rera_verification",
         ],
         "design_quota_per_month": None,  # None = unlimited
         "saved_designs_limit": None,  # None = unlimited
@@ -287,6 +290,7 @@ ALL_FEATURES = [
     "agent_intelligence",
     "loan_eligibility",
     "property_ai_advisor",
+    "rera_verification",
 ]
 
 
@@ -364,6 +368,22 @@ def set_free_features(features: list[str]) -> list[str]:
     cleaned = [f for f in FREE_ELIGIBLE_FEATURES if f in set(features)]
     set_app_setting(FREE_FEATURES_SETTING_KEY, json.dumps(cleaned))
     return cleaned
+
+
+RERA_FREE_MIGRATION_KEY = "migration_rera_free_v1"
+
+
+def ensure_default_free_features() -> None:
+    """One-time: opens rera_verification to every signed-in user, as decided.
+    Runs once (marker setting), so an admin who later switches it off is not
+    overridden on the next restart. Kept out of initialize_config_store so the
+    plain default of get_free_features() stays []."""
+    if get_app_setting(RERA_FREE_MIGRATION_KEY):
+        return
+    current = get_free_features()
+    if "rera_verification" not in current:
+        set_free_features(current + ["rera_verification"])
+    set_app_setting(RERA_FREE_MIGRATION_KEY, "done")
 
 
 def user_has_feature(user_email: str, feature: str) -> bool:
