@@ -3,7 +3,7 @@ import "./ReraVerification.css";
 import { studioApi } from "./studio/studioApi";
 
 const EMPTY = {
-  state: "", number: "", agent: "", possession: "", underConstruction: "",
+  state: "", number: "", project: "", builder: "", agent: "", possession: "", underConstruction: "",
   quoted: "", market: "", advance: "",
 };
 
@@ -46,6 +46,8 @@ export default function ReraVerification({ onBack, onNeedPlan }) {
         advance_percent: num(form.advance),
         is_under_construction: form.underConstruction === "" ? null : form.underConstruction === "yes",
         agent_registration_number: form.agent || null,
+        project_name: form.project || null,
+        builder_name: form.builder || null,
       });
       setResult(res);
       setTicked({});
@@ -92,6 +94,12 @@ export default function ReraVerification({ onBack, onNeedPlan }) {
           </label>
           <label className="rera-field">RERA registration number
             <input value={form.number} onChange={set("number")} maxLength={80} placeholder="As printed on the brochure" autoComplete="off" />
+          </label>
+          <label className="rera-field">Project name (as advertised)
+            <input value={form.project} onChange={set("project")} maxLength={120} autoComplete="off" />
+          </label>
+          <label className="rera-field">Builder / promoter name
+            <input value={form.builder} onChange={set("builder")} maxLength={120} autoComplete="off" />
           </label>
           <label className="rera-field full">Agent's RERA number (optional)
             <input value={form.agent} onChange={set("agent")} maxLength={80} autoComplete="off" />
@@ -140,6 +148,18 @@ export default function ReraVerification({ onBack, onNeedPlan }) {
             <div className="rera-point">
               <span className={`rera-dot ${result.format_check.level}`} />
               <span>{result.format_check.notes.join(" ")}</span>
+            </div>
+            <div className="rera-compare">
+              <div className="rera-step">Must match what the portal shows</div>
+              {[["RERA number", result.number], ["Project name", result.provided.project_name], ["Builder / promoter", result.provided.builder_name]].map(([k, v]) => (
+                <div key={k} className="rera-compare-row">
+                  <span>{k}</span>
+                  <strong>{v || "Not entered"}</strong>
+                </div>
+              ))}
+              <p className="rera-lead" style={{ fontSize: 13, margin: "6px 0 0" }}>
+                Look up the number on the portal. If the project name or builder differs, or the number is not found, do not pay anything yet.
+              </p>
             </div>
             <div className="rera-actions">
               <a className="rera-btn" href={result.state.portal_url} target="_blank" rel="noopener noreferrer">

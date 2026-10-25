@@ -1435,7 +1435,7 @@ function App() {
         </div>
       )}
 
-      {homepagePanelVisibility.rera_verification && (
+      {homepagePanelVisibility.rera_verification && !urlCountryContext && (
         <div
           className="feature-strip"
           onClick={launchRera}

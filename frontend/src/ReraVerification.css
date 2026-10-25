@@ -33,3 +33,7 @@
 .rera-page .rera-step, .rera-page .rera-card h2 { text-align: left; }
 .rera-page .rera-back { display: block; }
 .rera-page .rera-note { text-align: left; }
+.rera-compare { margin-top: 12px; padding: 12px; background: var(--violet-50); border: 1px solid var(--violet-200); border-radius: 10px; }
+.rera-compare-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; border-top: 1px solid var(--border-soft); }
+.rera-compare-row:first-of-type { border-top: 0; }
+.rera-compare-row strong { text-align: right; word-break: break-word; color: var(--text-strong); }

@@ -193,13 +193,17 @@ def basic_analysis(
     return out
 
 
-def run_check(state: str, number: str, **details: Any) -> dict[str, Any]:
+def run_check(state: str, number: str, project_name: Optional[str] = None, builder_name: Optional[str] = None, **details: Any) -> dict[str, Any]:
     if state not in RERA_STATES:
         raise ValueError("Unknown state")
     urls = get_portal_urls()
     return {
         "state": {"code": state, "name": RERA_STATES[state][0], "portal_url": urls[state]},
         "number": number.strip(),
+        "provided": {
+            "project_name": (project_name or "").strip(),
+            "builder_name": (builder_name or "").strip(),
+        },
         "format_check": check_format(state, number),
         "analysis": basic_analysis(**details),
         "checklist": CHECKLIST,

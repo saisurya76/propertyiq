@@ -107,3 +107,17 @@ def test_free_migration_runs_once_and_respects_admin_off():
 def test_homepage_strip_defaults():
     assert client.get("/api/homepage-panels/visibility").json()["rera_verification"] is True
     assert client.get("/api/homepage-panels/sticker-text").json()["rera_verification"]
+
+
+def test_names_are_echoed_back_and_length_limited():
+    set_free_features(["rera_verification"])
+    h = _headers("reranames@example.com")
+    r = client.post("/api/rera/check", headers=h, json={"state": "MH", "registration_number": "P51700012345", "project_name": " Sky Towers ", "builder_name": "ABC Builders"})
+    assert r.json()["provided"] == {"project_name": "Sky Towers", "builder_name": "ABC Builders"}
+    assert client.post("/api/rera/check", headers=h, json={"state": "MH", "registration_number": "P51700012345", "project_name": "x" * 200}).status_code == 400
+
+
+def test_strip_is_india_only():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "frontend/src/App.jsx").read_text()
+    assert "homepagePanelVisibility.rera_verification && !urlCountryContext" in src

@@ -3131,6 +3131,8 @@ class ReraCheckRequest(BaseModel):
     advance_percent: Optional[float] = None
     is_under_construction: Optional[bool] = None
     agent_registration_number: Optional[str] = None
+    project_name: Optional[str] = None
+    builder_name: Optional[str] = None
 
 
 @app.get("/api/rera/states")
@@ -3148,6 +3150,9 @@ def rera_check(request: ReraCheckRequest, user_email: str = Depends(get_current_
         raise HTTPException(status_code=400, detail="Enter the RERA registration number.")
     if len(number) > 80:
         raise HTTPException(status_code=400, detail="That registration number is too long.")
+    for label in (request.project_name, request.builder_name, request.agent_registration_number):
+        if label and len(label) > 120:
+            raise HTTPException(status_code=400, detail="A name you entered is too long.")
     for name in ("quoted_price_per_sqft", "market_price_per_sqft", "advance_percent"):
         v = getattr(request, name)
         if v is not None and (v < 0 or v > 10_000_000):
@@ -3161,6 +3166,8 @@ def rera_check(request: ReraCheckRequest, user_email: str = Depends(get_current_
             advance_percent=request.advance_percent,
             is_under_construction=request.is_under_construction,
             agent_number_provided=bool((request.agent_registration_number or "").strip()),
+            project_name=request.project_name,
+            builder_name=request.builder_name,
         )
     except ValueError:
         raise HTTPException(status_code=400, detail="Choose a state.")
