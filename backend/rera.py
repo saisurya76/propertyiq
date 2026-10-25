@@ -198,7 +198,10 @@ def run_check(state: str, number: str, project_name: Optional[str] = None, build
         raise ValueError("Unknown state")
     urls = get_portal_urls()
     return {
+        "country": "IN",
         "state": {"code": state, "name": RERA_STATES[state][0], "portal_url": urls[state]},
+        "links": [{"label": "Official state RERA portal", "url": urls[state]}],
+        "number_label": "RERA registration number",
         "number": number.strip(),
         "provided": {
             "project_name": (project_name or "").strip(),

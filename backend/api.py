@@ -308,6 +308,7 @@ app = FastAPI(lifespan=_lifespan)
 
 
 from backend import rera as rera_module  # noqa: E402
+from backend import country_checks  # noqa: E402
 
 initialize_payment_store()
 initialize_construction_store()
@@ -1422,6 +1423,7 @@ def admin_overview(request: AdminAuthRequest):
         "feature_sticker_text": get_feature_sticker_text(),
         "free_features": get_free_features(),
         "rera_portal_urls": rera_module.get_portal_urls(),
+        "country_link_urls": country_checks.get_link_urls(),
         "free_eligible_features": FREE_ELIGIBLE_FEATURES,
         "launch_mode": get_launch_mode_status(),
         # Real usage counts per feature, real per-service configuration
@@ -1937,6 +1939,7 @@ class AdminSettingsRequest(BaseModel):
     feature_sticker_text: Optional[dict[str, str]] = None
     free_features: Optional[list[str]] = None
     rera_portal_urls: Optional[dict[str, str]] = None
+    country_link_urls: Optional[dict[str, str]] = None
 
 
 @app.post("/api/admin/settings")
@@ -1984,6 +1987,9 @@ def admin_settings(request: AdminSettingsRequest):
     if request.rera_portal_urls is not None:
         rera_module.set_portal_urls(request.rera_portal_urls)
 
+    if request.country_link_urls is not None:
+        country_checks.set_link_urls(request.country_link_urls)
+
     if request.feature_sticker_text is not None:
         # Same merge-not-overwrite reasoning — only accept known sticker
         # panels and never persist an empty/whitespace-only override,
@@ -2003,6 +2009,7 @@ def admin_settings(request: AdminSettingsRequest):
         "feature_sticker_text": get_feature_sticker_text(),
         "free_features": get_free_features(),
         "rera_portal_urls": rera_module.get_portal_urls(),
+        "country_link_urls": country_checks.get_link_urls(),
     }
 
 
@@ -3123,8 +3130,12 @@ async def dodo_webhook(request: Request):
 
 
 class ReraCheckRequest(BaseModel):
-    state: str
-    registration_number: str
+    country: str = "IN"
+    state: Optional[str] = None
+    registration_number: Optional[str] = None
+    first_payment_percent: Optional[float] = None
+    buyer_is_foreign: Optional[bool] = None
+    certificate_type: Optional[str] = None
     possession_date: Optional[str] = None
     quoted_price_per_sqft: Optional[float] = None
     market_price_per_sqft: Optional[float] = None
@@ -3138,39 +3149,52 @@ class ReraCheckRequest(BaseModel):
 @app.get("/api/rera/states")
 def rera_states():
     """Public: state list with official portal links (admin-overridable)."""
-    return {"states": rera_module.list_states(), "disclaimer": rera_module.DISCLAIMER}
+    return {"states": rera_module.list_states(), "disclaimer": rera_module.DISCLAIMER, "countries": country_checks.list_countries()}
 
 
 @app.post("/api/rera/check")
 def rera_check(request: ReraCheckRequest, user_email: str = Depends(get_current_user_email)):
     if not user_has_feature(user_email, "rera_verification"):
         raise HTTPException(status_code=403, detail="RERA check is not available on your plan.")
+    country = (request.country or "IN").strip().upper()
     number = (request.registration_number or "").strip()
-    if not number:
+    if country == "IN" and not number:
         raise HTTPException(status_code=400, detail="Enter the RERA registration number.")
     if len(number) > 80:
         raise HTTPException(status_code=400, detail="That registration number is too long.")
-    for label in (request.project_name, request.builder_name, request.agent_registration_number):
+    for label in (request.project_name, request.builder_name, request.agent_registration_number, request.certificate_type):
         if label and len(label) > 120:
             raise HTTPException(status_code=400, detail="A name you entered is too long.")
-    for name in ("quoted_price_per_sqft", "market_price_per_sqft", "advance_percent"):
+    for name in ("quoted_price_per_sqft", "market_price_per_sqft", "advance_percent", "first_payment_percent"):
         v = getattr(request, name)
         if v is not None and (v < 0 or v > 10_000_000):
             raise HTTPException(status_code=400, detail="Please check the numbers you entered.")
     try:
-        return rera_module.run_check(
-            request.state.strip().upper(), number,
-            possession_date=request.possession_date,
-            quoted_price_per_sqft=request.quoted_price_per_sqft,
-            market_price_per_sqft=request.market_price_per_sqft,
-            advance_percent=request.advance_percent,
-            is_under_construction=request.is_under_construction,
-            agent_number_provided=bool((request.agent_registration_number or "").strip()),
+        if country == "IN":
+            return rera_module.run_check(
+                (request.state or "").strip().upper(), number,
+                possession_date=request.possession_date,
+                quoted_price_per_sqft=request.quoted_price_per_sqft,
+                market_price_per_sqft=request.market_price_per_sqft,
+                advance_percent=request.advance_percent,
+                is_under_construction=request.is_under_construction,
+                agent_number_provided=bool((request.agent_registration_number or "").strip()),
+                project_name=request.project_name,
+                builder_name=request.builder_name,
+            )
+        return country_checks.run_check(
+            country, number,
             project_name=request.project_name,
             builder_name=request.builder_name,
+            deposit_percent=request.advance_percent,
+            first_payment_percent=request.first_payment_percent,
+            buyer_is_foreign=request.buyer_is_foreign,
+            certificate_type=request.certificate_type,
+            quoted_price_per_sqft=request.quoted_price_per_sqft,
+            market_price_per_sqft=request.market_price_per_sqft,
         )
     except ValueError:
-        raise HTTPException(status_code=400, detail="Choose a state.")
+        raise HTTPException(status_code=400, detail="Choose a state." if country == "IN" else "That country isn't supported.")
 
 
 @app.get("/api/subscribe/status")

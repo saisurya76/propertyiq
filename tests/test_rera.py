@@ -117,7 +117,62 @@ def test_names_are_echoed_back_and_length_limited():
     assert client.post("/api/rera/check", headers=h, json={"state": "MH", "registration_number": "P51700012345", "project_name": "x" * 200}).status_code == 400
 
 
-def test_strip_is_india_only():
+def test_strip_shows_on_every_country_site():
     from pathlib import Path
     src = (Path(__file__).resolve().parent.parent / "frontend/src/App.jsx").read_text()
-    assert "homepagePanelVisibility.rera_verification && !urlCountryContext" in src
+    assert "homepagePanelVisibility.rera_verification && (" in src
+
+
+def _post(h, **body):
+    return client.post("/api/rera/check", headers=h, json=body)
+
+
+def test_countries_listed_publicly_with_official_links():
+    c = {x["code"]: x for x in client.get("/api/rera/states").json()["countries"]}
+    assert set(c) == {"TH", "PH", "VN", "ID"}
+    assert all(l["url"].startswith("https://") for x in c.values() for l in x["links"])
+    assert c["ID"]["certificate_types"]
+
+
+def test_philippines_without_lts_number_is_warned():
+    set_free_features(["rera_verification"])
+    h = _headers("rera-ph@example.com")
+    body = _post(h, country="PH").json()
+    assert body["verified"] is False and body["country"] == "PH"
+    assert any(a["level"] == "warn" and "License to Sell" in a["text"] for a in body["analysis"])
+    ok = _post(h, country="PH", registration_number="LTS-123").json()
+    assert not any(a["level"] == "warn" for a in ok["analysis"])
+
+
+def test_vietnam_deposit_and_first_payment_caps():
+    set_free_features(["rera_verification"])
+    h = _headers("rera-vn@example.com")
+    a = _post(h, country="VN", advance_percent=10, first_payment_percent=40).json()["analysis"]
+    assert sum(1 for x in a if x["level"] == "warn") == 2
+    a = _post(h, country="VN", advance_percent=5, first_payment_percent=30).json()["analysis"]
+    assert not any(x["level"] == "warn" for x in a)
+
+
+def test_thailand_and_indonesia_rules():
+    set_free_features(["rera_verification"])
+    h = _headers("rera-thid@example.com")
+    a = _post(h, country="TH", advance_percent=50, buyer_is_foreign=True).json()["analysis"]
+    assert any(x["level"] == "warn" for x in a) and any("49%" in x["text"] for x in a)
+    a = _post(h, country="ID", buyer_is_foreign=True, certificate_type="hak_milik").json()["analysis"]
+    assert any(x["level"] == "warn" and "citizens" in x["text"] for x in a)
+
+
+def test_unknown_country_and_india_still_needs_number():
+    set_free_features(["rera_verification"])
+    h = _headers("rera-xx@example.com")
+    assert _post(h, country="ZZ").status_code == 400
+    assert _post(h, country="IN", state="MH").status_code == 400
+
+
+def test_admin_can_fix_a_country_link():
+    client.post("/api/admin/settings", json={"password": PW, "country_link_urls": {"TH.dbd": "https://example.org/dbd", "XX.y": "https://x.org"}})
+    from backend import country_checks
+    assert country_checks.get_link_urls()["TH.dbd"] == "https://example.org/dbd"
+    assert "XX.y" not in country_checks.get_link_urls()
+    client.post("/api/admin/settings", json={"password": PW, "country_link_urls": {"TH.dbd": ""}})
+    assert country_checks.get_link_urls()["TH.dbd"].startswith("https://ebiz.dbd")

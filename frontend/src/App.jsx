@@ -1182,7 +1182,7 @@ function App() {
     return (
       <div className="app">
         <StudioTopBar onBackToReport={backToReport} onSignOut={() => handleSignOut("main")} onManagePlan={goToPricing} />
-        <ReraVerification onBack={backToReport} onNeedPlan={goToPricing} />
+        <ReraVerification onBack={backToReport} onNeedPlan={goToPricing} countryCode={urlCountryContext?.code} />
         <LegalFooter />
         <ScrollToTopBottom />
       </div>
@@ -1435,7 +1435,7 @@ function App() {
         </div>
       )}
 
-      {homepagePanelVisibility.rera_verification && !urlCountryContext && (
+      {homepagePanelVisibility.rera_verification && (
         <div
           className="feature-strip"
           onClick={launchRera}
@@ -1448,7 +1448,7 @@ function App() {
           )}
           <span className="feature-strip-icon">🛡️</span>
           <span className="feature-strip-text">
-            <strong>RERA Verification</strong> — check a project's RERA number the right way: a guided checklist, a link to your state's official portal, and a quick sanity check of price, possession and advance.
+            {urlCountryContext ? (<><strong>Developer &amp; Title Check</strong> — check the developer, the title and the contract the right way: a guided checklist for {urlCountryContext.name}, links to the official registries, and quick sanity checks on deposits and payments.</>) : (<><strong>RERA Verification</strong> — check a project's RERA number the right way: a guided checklist, a link to your state's official portal, and a quick sanity check of price, possession and advance.</>)}
           </span>
           <span className="feature-strip-arrow">→</span>
         </div>

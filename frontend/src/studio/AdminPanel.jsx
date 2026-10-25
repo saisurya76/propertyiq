@@ -58,7 +58,7 @@ const MENU_ITEMS = [
   { screen: "loan-eligibility", label: "Loan Eligibility — Thresholds", desc: "The real, configurable lending criteria (debt-to-income, loan-to-value, age cap, minimum credit rating) used for eligibility estimates." },
   { screen: "neighborhood", label: "Neighborhood Insights — Page Sections", desc: "Show or hide any section of the public Neighborhood Insights page." },
   { screen: "homepage", label: "Homepage — Free Quick-Check Panels", desc: "Show or hide any homepage panel or feature strip, and edit each feature strip's excitement-sticker wording." },
-  { screen: "rera", label: "RERA Verification — Portal Links", desc: "The official state RERA portal link shown to users. Fix a link here if a state moves its portal." },
+  { screen: "rera", label: "RERA Verification — Portal Links", desc: "The official registry links shown to users (India state RERA portals and the other countries). Fix a link here if one moves." },
   { screen: "subscriptions", label: "Active Subscriptions", desc: "Browse current subscription records and their status." },
   { screen: "grants", label: "Quick Analysis Grants", desc: "Every Quick Analysis purchase and who it was granted to." },
   { screen: "refunds", label: "Refunds", desc: "Issue a real refund via Dodo, record one Dodo missed, and see refund history." },
@@ -102,6 +102,7 @@ function AdminPanel({ onBack }) {
   const [featureStickerText, setFeatureStickerText] = useState(null);
   const [stickerSaveMessage, setStickerSaveMessage] = useState("");
   const [reraUrls, setReraUrls] = useState(null);
+  const [countryLinks, setCountryLinks] = useState(null);
   const [reraMessage, setReraMessage] = useState("");
 
   // Refunds screen state
@@ -142,6 +143,7 @@ function AdminPanel({ onBack }) {
     setNiSectionVisibility(data.ni_section_visibility || null);
     setHomepagePanelVisibility(data.homepage_panel_visibility || null);
     setReraUrls(data.rera_portal_urls || null);
+    setCountryLinks(data.country_link_urls || null);
     setFeatureStickerText(data.feature_sticker_text || null);
     setFeatureUsage(data.feature_usage || null);
     setTechStack(data.tech_stack || []);
@@ -393,8 +395,9 @@ function AdminPanel({ onBack }) {
     setError("");
     setLoading(true);
     try {
-      const res = await studioApi.adminSaveReraPortalUrls(password, reraUrls);
+      const res = await studioApi.adminSaveReraPortalUrls(password, reraUrls, countryLinks);
       setReraUrls(res.rera_portal_urls || reraUrls);
+      setCountryLinks(res.country_link_urls || countryLinks);
       setReraMessage("Portal links saved. A blank or invalid link is reset to the built-in default.");
     } catch (err) {
       setError(err.message || "Couldn't save portal links.");
@@ -1267,7 +1270,7 @@ function AdminPanel({ onBack }) {
                   { key: "agent_intelligence", label: "Agent Intelligence (feature strip)" },
                   { key: "property_ai_advisor", label: "Property AI Advisor (feature strip — tier-gated, not free)" },
                   { key: "neighborhood_insights", label: "Neighborhood Insights (feature strip — links to the free page)" },
-                  { key: "rera_verification", label: "RERA Verification (feature strip — free for signed-in users)" },
+                  { key: "rera_verification", label: "RERA Verification / Developer & Title Check (feature strip — free for signed-in users)" },
                 ].map(({ key, label }) => (
                   <div key={key} className="admin-toggle-row">
                     <label htmlFor={`homepage-toggle-${key}`}>{label}</label>
@@ -1730,6 +1733,24 @@ function AdminPanel({ onBack }) {
                     />
                   </div>
                 ))}
+                {countryLinks && (
+                  <>
+                    <h3 style={{ marginTop: 24 }}>Other countries — official registry links</h3>
+                    <p className="admin-section-note">TH = Thailand, PH = Philippines, VN = Vietnam, ID = Indonesia.</p>
+                    {Object.entries(countryLinks).map(([key, url]) => (
+                      <div key={key} className="admin-toggle-row">
+                        <label htmlFor={`country-url-${key}`}>{key}</label>
+                        <input
+                          id={`country-url-${key}`}
+                          type="text"
+                          value={url}
+                          onChange={(e) => setCountryLinks({ ...countryLinks, [key]: e.target.value })}
+                          style={{ maxWidth: 360, width: "100%" }}
+                        />
+                      </div>
+                    ))}
+                  </>
+                )}
                 <button className="cs-nav-btn cs-nav-primary" style={{ marginTop: 16 }} onClick={saveReraUrls} disabled={loading}>
                   {loading ? "Saving..." : "Save"}
                 </button>
