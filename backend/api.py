@@ -309,6 +309,7 @@ app = FastAPI(lifespan=_lifespan)
 
 from backend import rera as rera_module  # noqa: E402
 from backend import country_checks  # noqa: E402
+from backend import price_hints as price_hints_module  # noqa: E402
 
 initialize_payment_store()
 initialize_construction_store()
@@ -3127,6 +3128,19 @@ async def dodo_webhook(request: Request):
             )
 
     return {"received": True}
+
+
+@app.get("/api/price-hints")
+def price_hints(request: Request, country: str = "", state_province: str = "", city: str = "", property_type: str = "Apartment", area_unit: str = "sqft", locality: str = ""):
+    """Public: suggested guidance value and market average for the report
+    form. City-level only; says so when there is no data."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = (forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown"))
+    if not check_rate_limit(f"price_hints:{ip}", max_attempts=60, window_seconds=60):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
+    if not country.strip() or not city.strip():
+        return price_hints_module.get_hints(country, state_province, city, property_type, area_unit, locality)
+    return price_hints_module.get_hints(country[:60], state_province[:60], city[:60], property_type[:40], area_unit[:20], locality[:80])
 
 
 class ReraCheckRequest(BaseModel):

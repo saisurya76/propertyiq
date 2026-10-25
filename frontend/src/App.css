@@ -3386,3 +3386,8 @@ body {
   font-weight: 600;
   color: #047857;
 }
+
+.price-hint { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; padding: 8px 10px; background: var(--surface-pastel); border: 1px solid var(--violet-200); border-radius: 10px; font-size: 12.5px; line-height: 1.4; color: var(--text-body); text-align: left; }
+.price-hint em { display: block; font-style: normal; color: var(--text-muted); margin-top: 2px; }
+.price-hint button, .price-hint a { flex: none; background: var(--violet-600); color: #fff; border: 0; border-radius: 8px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; text-decoration: none; }
+@media (max-width: 560px) { .price-hint { flex-direction: column; align-items: stretch; } .price-hint button, .price-hint a { text-align: center; } }

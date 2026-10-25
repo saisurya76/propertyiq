@@ -155,6 +155,8 @@ export const studioApi = {
   adminSaveReraPortalUrls: (password, reraPortalUrls, countryLinkUrls) =>
     apiFetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ password, rera_portal_urls: reraPortalUrls, country_link_urls: countryLinkUrls }) }),
 
+  priceHints: (params) => apiFetch(`/api/price-hints?${new URLSearchParams(params).toString()}`),
+
   reraStates: () => apiFetch("/api/rera/states"),
   reraCheck: (payload) => apiFetch("/api/rera/check", { method: "POST", body: JSON.stringify(payload) }),
 

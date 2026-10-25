@@ -3,6 +3,8 @@ import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
 import { getCitiesForCountry } from "../utils/citiesByCountry";
 import { studioApi, getSession } from "../studio/studioApi";
 
+const property_label = (t) => (t ? t.toLowerCase() : "this property type");
+
 function PropertyForm({
   formData,
   handleChange,
@@ -13,6 +15,27 @@ function PropertyForm({
 }) {
   const availableCities = getCitiesForCountry(formData.country, formData.city);
   const governmentValueLabel = getGovernmentValueLabel(formData.country);
+
+  // Suggestions for the Government Guidance Value and Market Average boxes,
+  // looked up from the chosen country, state, city, property type, area unit
+  // and (when typed) locality. City-level data only: the server says so, and
+  // never invents a number where it has none.
+  const [hints, setHints] = useState(null);
+  const { country, stateProvince, city, propertyType, areaUnit, location } = formData;
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      if (!country || !city) { setHints(null); return; }
+      studioApi
+        .priceHints({ country, state_province: stateProvince || "", city, property_type: propertyType || "Apartment", area_unit: areaUnit || "sqft", locality: location || "" })
+        .then((h) => { if (alive) setHints(h); })
+        .catch(() => { if (alive) setHints(null); });
+    }, 500);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [country, stateProvince, city, propertyType, areaUnit, location]);
+
+  const fmt = (n) => Number(n).toLocaleString(hints?.currency === "INR" ? "en-IN" : "en-US", { maximumFractionDigits: 0 });
+  const applyHint = (name, value) => handleChange({ target: { name, value: String(value) } });
 
   // Backs the property_url_import tier feature — paste a listing URL
   // from any real-estate site, and whichever fields the extraction
@@ -230,6 +253,24 @@ function PropertyForm({
               onChange={handleChange}
             />
 
+            {hints?.government?.available && (
+              <div className="price-hint">
+                <span>
+                  Suggested: <strong>{hints.currency} {fmt(hints.government.value)}</strong> per {hints.area_unit}
+                  <em>{hints.government.source}. City-level: your locality can differ.</em>
+                </span>
+                <button type="button" onClick={() => applyHint("governmentGuidance", hints.government.value)}>Use this</button>
+              </div>
+            )}
+            {hints && !hints.government?.available && hints.government?.how_to && (
+              <div className="price-hint">
+                <span>
+                  No built-in figure for {city}. Official source: <strong>{hints.government.how_to.name}</strong>, from {hints.government.how_to.publisher}.
+                </span>
+                <a href={hints.government.how_to.search_url} target="_blank" rel="noopener noreferrer">Find it ↗</a>
+              </div>
+            )}
+
           </div>
 
           <div className="form-field">
@@ -242,6 +283,22 @@ function PropertyForm({
               onChange={handleChange}
               placeholder="Current market rate per selected area unit"
             />
+
+            {hints?.market?.available && (
+              <div className="price-hint">
+                <span>
+                  Suggested: <strong>{hints.currency} {fmt(hints.market.value)}</strong> per {hints.area_unit}
+                  {hints.market.count > 1 && <> (range {fmt(hints.market.low)} to {fmt(hints.market.high)})</>}
+                  <em>{hints.market.source}. City-level: your locality can differ.</em>
+                </span>
+                <button type="button" onClick={() => applyHint("marketAverage", hints.market.value)}>Use this</button>
+              </div>
+            )}
+            {hints && !hints.market?.available && (
+              <div className="price-hint">
+                <span>No market data for {property_label(propertyType)} in {city || "this city"} yet. Check recent listings and sold prices near the property and enter the average.</span>
+              </div>
+            )}
 
             <small className="field-help">
               Current market rate for similar properties in this location.
