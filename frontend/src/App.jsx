@@ -148,6 +148,20 @@ function detectCountryCodeFromUrl() {
 // the manual language-selector handler). Retries after a short delay
 // since the widget's <select> isn't guaranteed to exist in the DOM yet
 // the moment this runs (it's injected asynchronously by Google's script).
+// The language the visitor picked in the dropdown. Kept so it survives the
+// full page reload a site switch does; without it every reload re-guessed the
+// language from the visitor's IP/browser and could land on an unrelated one.
+const LANG_CHOICE_KEY = "piq_language_choice";
+function readLanguageChoice() {
+  try { return window.localStorage.getItem(LANG_CHOICE_KEY) || ""; } catch { return ""; }
+}
+function writeLanguageChoice(code) {
+  try {
+    if (code) window.localStorage.setItem(LANG_CHOICE_KEY, code);
+    else window.localStorage.removeItem(LANG_CHOICE_KEY);
+  } catch { /* storage unavailable */ }
+}
+
 function triggerGoogleTranslation(languageCode) {
   // No early-return for "en" here — that was the actual bug: switching
   // BACK to English after the page had already been translated needs
@@ -444,6 +458,11 @@ function App() {
       // English page around them. This should win outright, skipping
       // IP-geolocation entirely, rather than just being one more input
       // that geo-detection could still override.
+      const chosen = readLanguageChoice();
+      if (chosen) {
+        applyLanguage(chosen);
+        return;
+      }
       if (urlCountryContext?.language) {
         applyLanguage(urlCountryContext.language);
         return;
@@ -671,6 +690,7 @@ function App() {
   const changeLanguage = (event) => {
     const selected = event.target.value;
     setLanguage(selected);
+    writeLanguageChoice(selected);
     document.documentElement.lang = selected;
     triggerGoogleTranslation(selected);
   };
@@ -1219,6 +1239,10 @@ function App() {
       `This starts a fresh session for ${newInfo.name} — it will NOT affect any of your existing saved designs from other countries, which keep their own saved settings regardless of what site you're on. Continue?`;
 
     if (window.confirm(message)) {
+      // Moving to a country site that has its own language: let that win.
+      // Otherwise (e.g. Global) keep the language the visitor already picked.
+      if (newInfo.language) writeLanguageChoice("");
+      else if (!readLanguageChoice()) writeLanguageChoice(language);
       window.location.href = newCode ? `/${newCode}` : "/";
     }
   };
