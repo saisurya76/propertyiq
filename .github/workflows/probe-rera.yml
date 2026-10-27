@@ -1,0 +1,24 @@
+name: probe-rera
+on:
+  push:
+    branches: [probe-rera]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe portals
+        run: |
+          for u in \
+            "https://maharera.maharashtra.gov.in" \
+            "https://maharerait.maharashtra.gov.in/public/project/view" \
+            "https://rera.karnataka.gov.in/viewAllProjects" \
+            "https://rera.goa.gov.in" \
+            "https://rera.telangana.gov.in" \
+            "https://haryanarera.gov.in" \
+            "https://up-rera.in" ; do
+            echo "=== $u"
+            curl -sS -L -m 25 -A "Mozilla/5.0" -o /tmp/out.html -w "status=%{http_code} size=%{size_download} type=%{content_type} final=%{url_effective}\n" "$u" || echo "FAILED"
+            head -c 1500 /tmp/out.html | tr -s '\n ' ' ' | head -c 1200; echo
+            grep -o -i 'captcha[^"<]\{0,40\}' /tmp/out.html | head -3
+            grep -o -E '(api|ajax|rest)[A-Za-z0-9_/.-]{0,60}' /tmp/out.html | sort -u | head -8
+          done
