@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getGovernmentValueLabel } from "../utils/governmentValueLabels";
 import { getCitiesForCountry } from "../utils/citiesByCountry";
 import { studioApi, getSession } from "../studio/studioApi";
@@ -34,8 +34,29 @@ function PropertyForm({
     return () => { alive = false; clearTimeout(timer); };
   }, [country, stateProvince, city, propertyType, areaUnit, location]);
 
+  // Fill the two boxes with the real figures we hold, instead of making the
+  // visitor click. A box is only overwritten while it is empty or still holds
+  // the value we filled in ourselves, so anything the visitor typed is kept.
+  const autoFilled = useRef({ governmentGuidance: "", marketAverage: "" });
+  useEffect(() => {
+    if (!hints) return;
+    const fill = (name, avail, value) => {
+      const current = String(formData[name] ?? "");
+      const mine = autoFilled.current[name];
+      if (avail && (current === "" || current === mine)) {
+        autoFilled.current[name] = String(value);
+        if (current !== String(value)) handleChange({ target: { name, value: String(value) } });
+      } else if (!avail && mine && current === mine) {
+        autoFilled.current[name] = "";
+        handleChange({ target: { name, value: "" } });
+      }
+    };
+    fill("governmentGuidance", hints.government?.available, hints.government?.value);
+    fill("marketAverage", hints.market?.available, hints.market?.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hints]);
+
   const fmt = (n) => Number(n).toLocaleString(hints?.currency === "INR" ? "en-IN" : "en-US", { maximumFractionDigits: 0 });
-  const applyHint = (name, value) => handleChange({ target: { name, value: String(value) } });
 
   // Backs the property_url_import tier feature — paste a listing URL
   // from any real-estate site, and whichever fields the extraction
@@ -256,10 +277,9 @@ function PropertyForm({
             {hints?.government?.available && (
               <div className="price-hint">
                 <span>
-                  Suggested: <strong>{hints.currency} {fmt(hints.government.value)}</strong> per {hints.area_unit}
+                  Filled in: <strong>{hints.currency} {fmt(hints.government.value)}</strong> per {hints.area_unit}. You can change it.
                   <em>{hints.government.source}. City-level: your locality can differ.</em>
                 </span>
-                <button type="button" onClick={() => applyHint("governmentGuidance", hints.government.value)}>Use this</button>
               </div>
             )}
             {hints && !hints.government?.available && hints.government?.how_to && (
@@ -287,11 +307,10 @@ function PropertyForm({
             {hints?.market?.available && (
               <div className="price-hint">
                 <span>
-                  Suggested: <strong>{hints.currency} {fmt(hints.market.value)}</strong> per {hints.area_unit}
-                  {hints.market.count > 1 && <> (range {fmt(hints.market.low)} to {fmt(hints.market.high)})</>}
+                  Filled in: <strong>{hints.currency} {fmt(hints.market.value)}</strong> per {hints.area_unit}
+                  {hints.market.count > 1 && <> (range {fmt(hints.market.low)} to {fmt(hints.market.high)})</>}. You can change it.
                   <em>{hints.market.source}. City-level: your locality can differ.</em>
                 </span>
-                <button type="button" onClick={() => applyHint("marketAverage", hints.market.value)}>Use this</button>
               </div>
             )}
             {hints && !hints.market?.available && (

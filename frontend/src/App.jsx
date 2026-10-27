@@ -698,13 +698,18 @@ function App() {
 
 
   const handleChange = (e) => {
-    const next = { ...formData, [e.target.name]: e.target.value };
-    // The form has no state field, so keep the Indian state in step with the
-    // chosen city (a Goa city must not be sent as Telangana).
-    if (e.target.name === "city" && formData.country === "India" && INDIA_CITY_STATE[e.target.value]) {
-      next.stateProvince = INDIA_CITY_STATE[e.target.value];
-    }
-    setFormData(next);
+    const { name, value } = e.target;
+    // Functional update: two quick changes in a row (the auto-filled price
+    // boxes) must not overwrite each other.
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      // The form has no state field, so keep the Indian state in step with the
+      // chosen city (a Goa city must not be sent as Telangana).
+      if (name === "city" && prev.country === "India" && INDIA_CITY_STATE[value]) {
+        next.stateProvince = INDIA_CITY_STATE[value];
+      }
+      return next;
+    });
   };
 
   // Backs the property_url_import tier feature: merges whichever
