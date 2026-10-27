@@ -1,0 +1,48 @@
+=== https://maharera.maharashtra.gov.in
+curl: (28) Connection timed out after 25001 milliseconds
+status=000 size=0 type= final=https://maharera.maharashtra.gov.in/
+FAILED
+head: cannot open '/tmp/out.html' for reading: No such file or directory
+
+grep: /tmp/out.html: No such file or directory
+grep: /tmp/out.html: No such file or directory
+=== https://maharerait.maharashtra.gov.in/public/project/view
+curl: (60) SSL certificate problem: unable to get local issuer certificate
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+status=000 size=0 type= final=https://maharerait.maharashtra.gov.in/public/project/view
+FAILED
+head: cannot open '/tmp/out.html' for reading: No such file or directory
+
+grep: /tmp/out.html: No such file or directory
+grep: /tmp/out.html: No such file or directory
+=== https://rera.karnataka.gov.in/viewAllProjects
+curl: (28) Connection timed out after 25001 milliseconds
+status=000 size=0 type= final=https://rera.karnataka.gov.in/viewAllProjects
+FAILED
+head: cannot open '/tmp/out.html' for reading: No such file or directory
+
+grep: /tmp/out.html: No such file or directory
+grep: /tmp/out.html: No such file or directory
+=== https://rera.goa.gov.in
+status=200 size=12084 type=text/html;charset=ISO-8859-1 final=https://rera.goa.gov.in/
+    <!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 2.1//EN" "http://tiles.apache.org/dtds/tiles-config_2_1.dtd"> <html> <head> <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"> <title>Welcome To RERA</title> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1"> <link 	href="/resources/css/bootstrap.min.css" 	rel="stylesheet" /> <link href="/resources/css/style.css" 	rel="stylesheet" /> <link href="/resources/images/favicon.ico" 	rel="shortcut icon" type="image/x-icon" /> <script src="/resources/js/jquery.min.js"></script> <script 	src="/resources/js/DatePicker/jquery.datepick.js"></script> <link 	href="/resources/css/font-awesome.min.css" 	rel="stylesheet" /> <script src="/resources/js/jquery.min.js"></script> <script 	src="/resources/js/bootstrap.min.js" defer></script> <script 	src="/resources/js/jquery.ticker.js" defer></script> <script src="/resources/js/site.js"></script> <script src="/resources/js/common.js"></script> <script src="/resources/js/commdropdown.js"></script> <script src="/resources/js/validation.js" defer></script>  <script> 
+=== https://rera.telangana.gov.in
+status=200 size=44108 type=text/html; charset=utf-8 final=https://rera.telangana.gov.in/
+<html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="description" content="Welcome to TG-RERA"> <meta name="keywords" content="TG-RERA">   <link href="/desing/css/bootstrap.min.css" rel="stylesheet" /> <link rel="stylesheet" href="/desing/css/font-awesome.min.css"> <link rel="stylesheet" type="text/css" href="/desing/breakingnews/breaking-news-ticker.css"> <link href="/desing/menu/sm-core-css.css" rel="stylesheet"> <link href="/desing/menu/sm-blue.css" rel="stylesheet"> <link rel="shortcut icon" href="/jydmmpef/wrlwer8nsfg?adsjfasd=tg_logo.png" type="image/x-icon">  <link href="/desing/css/flexslider.css" rel="stylesheet" id="theme-stylesheet"> <link href="/desing/custom.css" rel="stylesheet" id="theme-stylesheet">   <link rel="stylesheet" href="/designcss/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css"> <link rel="stylesheet" href="/designcss/plugins/datatables-responsive/css/responsive.bootstrap4.min.css"> <link rel="stylesheet" href="/designcss/plugins/datatables-buttons/css/buttons.bootstrap4.min.css">  <title> Welcome to TGRERA </title>  <script type="text/javascri
+=== https://haryanarera.gov.in
+curl: (28) Connection timed out after 25002 milliseconds
+status=000 size=0 type= final=https://haryanarera.gov.in/
+FAILED
+<html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="description" content="Welcome to TG-RERA"> <meta name="keywords" content="TG-RERA">   <link href="/desing/css/bootstrap.min.css" rel="stylesheet" /> <link rel="stylesheet" href="/desing/css/font-awesome.min.css"> <link rel="stylesheet" type="text/css" href="/desing/breakingnews/breaking-news-ticker.css"> <link href="/desing/menu/sm-core-css.css" rel="stylesheet"> <link href="/desing/menu/sm-blue.css" rel="stylesheet"> <link rel="shortcut icon" href="/jydmmpef/wrlwer8nsfg?adsjfasd=tg_logo.png" type="image/x-icon">  <link href="/desing/css/flexslider.css" rel="stylesheet" id="theme-stylesheet"> <link href="/desing/custom.css" rel="stylesheet" id="theme-stylesheet">   <link rel="stylesheet" href="/designcss/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css"> <link rel="stylesheet" href="/designcss/plugins/datatables-responsive/css/responsive.bootstrap4.min.css"> <link rel="stylesheet" href="/designcss/plugins/datatables-buttons/css/buttons.bootstrap4.min.css">  <title> Welcome to TGRERA </title>  <script type="text/javascri
+=== https://up-rera.in
+status=200 size=173021 type=text/html; charset=utf-8 final=https://up-rera.in/
+  <!DOCTYPE html> <html> <head id="ctl00_Head1"><link rel="shortcut icon" href="img/rera_logo.png" type="image/x-icon" /> <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&subset=latin,cyrillic-ext" rel="stylesheet" type="text/css" /> <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" type="text/css" /> <script src="js/jquery.min.js"></script>  <style> /* Container holding both icon and text */ .container1 { display: flex; /* Align icon and text horizontally */ align-items: center; /* Vertically align items in the center */ justify-content: flex-start;/* Align items to the left */ }  /* Icon styling */ .small-icon { font-size: 15px; /* Set the size of the icon */ color: #fff; /* Set the color of the icon */ margin-right: 10px; /* Space between the icon and the text */ }  /* Text styling */ .text { color: #7a7575; /* Text color */ font-size: 16px; /* Font size for text */ } </style> <style> .heading-with-icon { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; font-size: 14px; color: #7a7575; margin: 0; width: 100%; }  .small-icon2 { font-
+ajax
+ajaxchimp.min.js
+apis.com/css
+apis.com/icon
+rest
