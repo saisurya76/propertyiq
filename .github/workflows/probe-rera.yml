@@ -2,12 +2,17 @@ name: probe-rera
 on:
   push:
     branches: [probe-rera]
+permissions:
+  contents: write
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Probe portals
         run: |
+          mkdir -p probe-out
+          {
           for u in \
             "https://maharera.maharashtra.gov.in" \
             "https://maharerait.maharashtra.gov.in/public/project/view" \
@@ -22,3 +27,10 @@ jobs:
             grep -o -i 'captcha[^"<]\{0,40\}' /tmp/out.html | head -3
             grep -o -E '(api|ajax|rest)[A-Za-z0-9_/.-]{0,60}' /tmp/out.html | sort -u | head -8
           done
+          } > probe-out/result.txt 2>&1 || true
+      - name: Save result
+        run: |
+          git config user.name probe && git config user.email probe@example.com
+          git add -f probe-out/result.txt
+          git commit -m "probe result" || true
+          git push origin HEAD:probe-rera
